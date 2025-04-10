@@ -129,6 +129,9 @@ menuitemsaves (1) := "New"
 menuitemsaves (0) := "---"
 menuitemdelete (99) := ""
 
+%New range: x: -19999 to 20000, y: -4999 to 5000
+
+
 %Turn the integer value of a colour into a string
 procedure colourstringify (clr : int)
     if clr = 0 then
@@ -676,7 +679,7 @@ if loaded then %Load world
 	loop
 	    get : loadedsave, textfound
 	    block (strint (textfound)) := true
-	    x := floor (strint (textfound) / 10000) - 24999 - 10000
+	    x := floor (strint (textfound) / 10000) - 19999 - 10000
 	    y := strint (textfound) - (floor (strint (textfound) / 10000)) * 10000 - 4999
 	    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
 	    put : autosave, textfound
@@ -692,7 +695,7 @@ else %Generate ground
     loop
 	blkount += 1
 	Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
-	tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
 	block (tempcoords (1)) := true
 	put : autosave, tempcoords (1)
 	x += blocksize
@@ -712,7 +715,7 @@ if mstScrnHsGnUp = groundlevel then
     x := -blocksize + offsetx
     y := -blocksize + offsety
     loop
-	tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
 	if #block (tempcoords (1)) = boolUnInit then
 	    block (tempcoords (1)) := false
 	end if
@@ -734,7 +737,7 @@ if mstScrnHsGnLft = offsetleftright then
     x := ((floor ((maxx - offsetx) / blocksize)) * blocksize + offsetx)
     y := -blocksize + offsety
     loop
-	tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
 	if #block (tempcoords (1)) = boolUnInit then
 	    block (tempcoords (1)) := false
 	end if
@@ -756,7 +759,7 @@ if mstScrnHsGnRght = offsetleftright then
     x := -blocksize + offsetx
     y := -blocksize + offsety
     loop
-	tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
 	if #block (tempcoords (1)) = boolUnInit then
 	    block (tempcoords (1)) := false
 	end if
@@ -781,9 +784,9 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
     loop
 	get : autosave, autocoords
 	if block (strint (autocoords)) then
-	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
+	    srx := floor (strint (autocoords) / 10000) - 19999 - 10000
 	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
-	    tempcoords (1) := 100000000 + (srx + scrdirx + 24999) * 10000 + (sry + scrdiry + 4999)
+	    tempcoords (1) := 100000000 + (srx + scrdirx + 19999) * 10000 + (sry + scrdiry + 4999)
 	    block (strint (autocoords)) := false
 	    block (tempcoords (1)) := true
 	    put : autosave2, tempcoords (1)
@@ -812,7 +815,7 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 	x := -blocksize - blocksize + offsetx
 	y := -blocksize - blocksize + offsety
 	loop
-	    tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	    tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
 	    if #block (tempcoords (1)) = boolUnInit then
 		block (tempcoords (1)) := false
 	    end if
@@ -831,7 +834,7 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 	x := ((floor ((maxx - offsetx) / blocksize)) * blocksize + offsetx) + blocksize
 	y := -blocksize + offsety
 	loop
-	    tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	    tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
 	    if #block (tempcoords (1)) = boolUnInit then
 		block (tempcoords (1)) := false
 	    end if
@@ -850,7 +853,7 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 	x := -blocksize - blocksize + offsetx
 	y := -blocksize + offsety
 	loop
-	    tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	    tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
 	    if #block (tempcoords (1)) = boolUnInit then
 		block (tempcoords (1)) := false
 	    end if
@@ -884,6 +887,7 @@ end updateAutosave
 %Show world
 View.Update
 
+%Main program
 loop
     handheight := chary + charheight div 3 * 2
 
@@ -901,17 +905,17 @@ loop
 
     %If character must crawl
     if charheight <= blocksize then
-	tempcoords (1) := 100000000 + (rcharxl + 24999) * 10000 + (rcharyuceil + 4999)
+	tempcoords (1) := 100000000 + (rcharxl + 19999) * 10000 + (rcharyuceil + 4999)
     else
-	tempcoords (1) := 100000000 + (rcharxl + 24999) * 10000 + (rcharyu + 4999)
+	tempcoords (1) := 100000000 + (rcharxl + 19999) * 10000 + (rcharyu + 4999)
     end if
     if #block (tempcoords (1)) = boolUnInit then
 	block (tempcoords (1)) := false
     end if
     if charheight <= blocksize then
-	tempcoords (2) := 100000000 + (rcharxr + 24999) * 10000 + (rcharyuceil + 4999)
+	tempcoords (2) := 100000000 + (rcharxr + 19999) * 10000 + (rcharyuceil + 4999)
     else
-	tempcoords (2) := 100000000 + (rcharxr + 24999) * 10000 + (rcharyu + 4999)
+	tempcoords (2) := 100000000 + (rcharxr + 19999) * 10000 + (rcharyu + 4999)
     end if
     if #block (tempcoords (2)) = boolUnInit then
 	block (tempcoords (2)) := false
@@ -929,11 +933,11 @@ loop
     end if
 
     %If character is on the ground
-    tempcoords (1) := 100000000 + (rcharxl + 24999) * 10000 + (rcharyd - blocksize + 4999)
+    tempcoords (1) := 100000000 + (rcharxl + 19999) * 10000 + (rcharyd - blocksize + 4999)
     if #block (tempcoords (1)) = boolUnInit then
 	block (tempcoords (1)) := false
     end if
-    tempcoords (2) := 100000000 + (rcharxr + 24999) * 10000 + (rcharyd - blocksize + 4999)
+    tempcoords (2) := 100000000 + (rcharxr + 19999) * 10000 + (rcharyd - blocksize + 4999)
     if #block (tempcoords (2)) = boolUnInit then
 	block (tempcoords (2)) := false
     end if
@@ -950,8 +954,8 @@ loop
     end if
 
     %If character is against a wall to the left
-    tempcoords (1) := 100000000 + (rcharxl + 24999) * 10000 + (rcharydfloor + 4999)
-    tempcoords (2) := 100000000 + (rcharxl + 24999) * 10000 + (rcharydfloor + blocksize + 4999)
+    tempcoords (1) := 100000000 + (rcharxl + 19999) * 10000 + (rcharydfloor + 4999)
+    tempcoords (2) := 100000000 + (rcharxl + 19999) * 10000 + (rcharydfloor + blocksize + 4999)
     if #block (tempcoords (1)) = boolUnInit then
 	block (tempcoords (1)) := false
     end if
@@ -967,8 +971,8 @@ loop
     end if
 
     %If character is against a wall to the right
-    tempcoords (1) := 100000000 + (rcharxr + 24999) * 10000 + (rcharydfloor + 4999)
-    tempcoords (2) := 100000000 + (rcharxr + 24999) * 10000 + (rcharydfloor + blocksize + 4999)
+    tempcoords (1) := 100000000 + (rcharxr + 19999) * 10000 + (rcharydfloor + 4999)
+    tempcoords (2) := 100000000 + (rcharxr + 19999) * 10000 + (rcharydfloor + blocksize + 4999)
     if #block (tempcoords (1)) = boolUnInit then
 	block (tempcoords (1)) := false
     end if
@@ -984,11 +988,11 @@ loop
     end if
 
     %If character is against the ceiling
-    tempcoords (1) := 100000000 + (rcharxl + 24999) * 10000 + (rcharyu + 4999)
+    tempcoords (1) := 100000000 + (rcharxl + 19999) * 10000 + (rcharyu + 4999)
     if #block (tempcoords (1)) = boolUnInit then
 	block (tempcoords (1)) := false
     end if
-    tempcoords (2) := 100000000 + (rcharxr + 24999) * 10000 + (rcharyu + 4999)
+    tempcoords (2) := 100000000 + (rcharxr + 19999) * 10000 + (rcharyu + 4999)
     if #block (tempcoords (2)) = boolUnInit then
 	block (tempcoords (2)) := false
     end if
@@ -1115,7 +1119,7 @@ loop
 	    rcursorybb := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
 	    rcursorxpb := rcursorxbb
 	    rcursorypb := rcursorybb
-	    tempcoords (1) := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
+	    tempcoords (1) := 100000000 + (rcursorxbb + 19999) * 10000 + (rcursorybb + 4999)
 	    if #block (tempcoords (1)) = boolUnInit then
 		block (tempcoords (1)) := false
 	    end if
@@ -1132,7 +1136,7 @@ loop
 	    null := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
 	    null := rcursorxbb
 	    null := rcursorybb
-	    null := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
+	    null := 100000000 + (rcursorxbb + 19999) * 10000 + (rcursorybb + 4999)
 	    if #block (null) = boolUnInit then
 		null := 0
 	    end if
@@ -1161,16 +1165,16 @@ loop
 	end if
 	if mclickr = blockplacespeed then
 	    if (rcursorxpb not= rcharxl and rcursorxpb not= rcharxr) or rcursorypb not= rcharydfloor then
-		tempcoords (1) := 100000000 + (rcursorxpb + 24999) * 10000 + (rcursorypb + 4999)
+		tempcoords (1) := 100000000 + (rcursorxpb + 19999) * 10000 + (rcursorypb + 4999)
 		if #block (tempcoords (1)) = boolUnInit then
 		    block (tempcoords (1)) := false
 		end if
-		x := floor (tempcoords (1) / 10000) - 24999 - 10000
+		x := floor (tempcoords (1) / 10000) - 19999 - 10000
 		y := tempcoords (1) - (floor (tempcoords (1) / 10000)) * 10000 - 4999
-		tempcoords (2) := 100000000 + ((x + blocksize) + 24999) * 10000 + ((y) + 4999)
-		tempcoords (3) := 100000000 + ((x - blocksize) + 24999) * 10000 + ((y) + 4999)
-		tempcoords (4) := 100000000 + ((x) + 24999) * 10000 + ((y + blocksize) + 4999)
-		tempcoords (5) := 100000000 + ((x) + 24999) * 10000 + ((y - blocksize) + 4999)
+		tempcoords (2) := 100000000 + ((x + blocksize) + 19999) * 10000 + ((y) + 4999)
+		tempcoords (3) := 100000000 + ((x - blocksize) + 19999) * 10000 + ((y) + 4999)
+		tempcoords (4) := 100000000 + ((x) + 19999) * 10000 + ((y + blocksize) + 4999)
+		tempcoords (5) := 100000000 + ((x) + 19999) * 10000 + ((y - blocksize) + 4999)
 		if #block (tempcoords (2)) = boolUnInit then
 		    block (tempcoords (2)) := false
 		end if
@@ -1209,7 +1213,7 @@ loop
 	    mclickl := blockbreakspeed
 	end if
 	if mclickl = blockbreakspeed then
-	    tempcoords (1) := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
+	    tempcoords (1) := 100000000 + (rcursorxbb + 19999) * 10000 + (rcursorybb + 4999)
 	    if #block (tempcoords (1)) = boolUnInit then
 		block (tempcoords (1)) := false
 	    end if
@@ -1284,7 +1288,7 @@ loop
 		loop
 		    get : autosave, autocoords
 		    if block (strint (autocoords)) then
-			x := floor (strint (autocoords) / 10000) - 24999 - 10000
+			x := floor (strint (autocoords) / 10000) - 19999 - 10000
 			y := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
 			Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
 		    end if
@@ -1643,11 +1647,11 @@ loop
     Pic.Draw (character, charx - charwidth div 2, chary, picMerge)
 
     %Get blocks at block placing box and block breaking crosshairs
-    tempcoords (1) := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
+    tempcoords (1) := 100000000 + (rcursorxbb + 19999) * 10000 + (rcursorybb + 4999)
     if #block (tempcoords (1)) = boolUnInit then
 	block (tempcoords (1)) := false
     end if
-    tempcoords (2) := 100000000 + (rcursorxpb + 24999) * 10000 + (rcursorypb + 4999)
+    tempcoords (2) := 100000000 + (rcursorxpb + 19999) * 10000 + (rcursorypb + 4999)
     if #block (tempcoords (2)) = boolUnInit then
 	block (tempcoords (2)) := false
     end if
