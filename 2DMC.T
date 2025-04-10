@@ -11,13 +11,17 @@ import GUI
 View.Set ("position:top;right,graphics:640;400") %Smallest advisable:450,330
 buttonchoose ("multibutton")
 setscreen ("noecho")
-
-%Fixed for alt but NOWHERE ELSE: if you want to get the block type at a certain location (not just check if it equals something), it DOESN'T CONSIDER TERRAIN! Aka "if [thisblock x,y] = [thistype] then" WON'T WORK
-
-%Fix clicking and then pausing sometimes clicks the button where your mouse was??
-%Fix gui loops not exiting properly (when quit button is pressed?) (start->pause->returntomenu->quit)
-%Make gui pause create buttons only happen once(?) but it happens multiple times, yet no duplicates are created, which means... we succesfully deleted the old ones?!? Look into this!
-
+/*
+ -Background makes block not infinite
+ -No background blocks underground
+ -Only naturally occuring terrain blocks can be infinite (dirt, stone, sand, water (not ores))
+ -Trees on whole regular blocks, no "nat wood" - this way, can climb them and jump from treetop to treetop
+ -Wood: Can be climbed like a ladder if just a pole
+ -Hotbar 1,2,3 are three tools: foreground, background, and terrain(terrain tool is just foreground tool, but removes any background blocks behind it)
+ -Tools other than foreground have to be unlocked/acquired/crafted
+ -Rest of hotbar is blocks
+ -First try struct of two int1s - bg and block
+ */
 %Add physics to sand and water!
 %Add fire switching to different shades of red, orange, and yellow randomly
 %Make time affect sky color (rgb.addcolor 256, set to whatever)
@@ -51,7 +55,7 @@ var blockbreakspeed : int := 130
 const playerSpeed : real := 5 / 1000
 const charudpxrange := 30
 var infinatePlacing : boolean := false
-var bareBonesPreview : boolean := true
+var bareBonesPreview : boolean := false
 const parallelinput : boolean := false
 const keepmapblocksize : boolean := true
 const pxscrollclearance : int := 70
@@ -74,14 +78,22 @@ type blockStruct :
     end record
 var blockType : array 0 .. numBlockTypes - 1 of blockStruct
 
-procedure setBlockInfo (var blockIn : int, nameIn : string, solidIn : boolean, physicsIn : boolean, clrIn : int)
+type blockVec :
+    record
+	block : int1
+	bg : int1
+    end record
+
+procedure setBlockInfo (var blockIn : int, nameIn : string, solidIn : boolean, physicsIn : boolean, clrIn /*r,g,b*/ : int)
     blockType (blockIn).id := blockIn
     blockType (blockIn).name := nameIn
     blockType (blockIn).solid := solidIn
     blockType (blockIn).physics := physicsIn
-    blockType (blockIn).clr := clrIn
+    %rgb.setcolor(20+iter, r, g, b)
+    blockType (blockIn).clr := clrIn % 20 + iter
     blockIn += 1
 end setBlockInfo
+
 var iter : int := 0
 %Legend: name, isSolid, color
 setBlockInfo (iter, "void", false, false, white)
@@ -210,9 +222,9 @@ var gametimeold, sprintpossibled, sprintpossiblea, flypossible, mclickr, mclickl
     healthold, crosshairsbb2, crosshairsbb, crosshairspb2, crosshairspb, mstScrnHsGnLft, mstScrnHsGnRght, mstScrnHsGnUp,
     mstScrnHsGnDwn : int := 0
 var onground, inground, onleftwall, onrightwall, hitceiling, sprintd, sprinta, recentstartd, recentstarta, recentstartspace,
-    mustcrawl, startgame, recentclick, loaded, quitthegame, keyspc, keya, keys, keyd, keyp, keyalt, preview, resetdefaulthead, flying,
+    mustcrawl, recentclick, loaded, quitthegame, keyspc, keya, keys, keyd, keyp, keyalt, preview, resetdefaulthead, flying,
     menuReturn, returningFromPreview, inPauseMenu, scrollSlow, yesDelete : boolean := false
-var frstmthrgh, gmfrstmthrgh, survival : boolean := true
+var gmfrstmthrgh, survival : boolean := true
 var jumpcount, gravcount, frametimer, offsetleftright, offsetupdown, slowScrollSpeed, timeOfDay : real := 0
 var ponwlk, poncrl, isaves, wlk, crl : int := 1
 var headcolour : int := 983
@@ -483,7 +495,7 @@ end PicDrawTranslucentBox
 
 %If the game is to continue and menus are to close
 procedure start
-    startgame := true
+    GUI.Quit
     delay (10)
 end start
 
@@ -491,12 +503,12 @@ end start
 procedure endgame
     quitthegame := true
     GUI.Quit
-    delay (10)
+    delay (5)
 end endgame
 
 %If user clicks "Return to Main Menu" button
 procedure returnMain
-    startgame := true
+    GUI.Quit
     menuReturn := true
     delay (10)
 end returnMain
@@ -621,6 +633,8 @@ procedure DeleteSelected
 	Draw.Text ("to delete world", 10, maxy - 35, font, black)
 	Draw.Text (message, 10, maxy - 55, font, black)
     end if
+    %Font.Free(font)
+    GUI.SetDisplayWhenCreated (true)
     var deleteBtn : int := GUI.CreateButton (20, 10, 0, "Delete", setDeleteFlag)
     var quitBtn : int := GUI.CreateButton (110, 10, 0, "Cancel", GUI.Quit)
 
@@ -654,7 +668,7 @@ procedure DeleteSelected
     end if
 end DeleteSelected
 
-%If the user selects an opting in the "Load" menu
+%If the user selects an option in the "Load" menu
 procedure LoadSelected
     for i : 1 .. isaves
 	if item4 (i) = GUI.GetEventWidgetID then
@@ -666,7 +680,7 @@ procedure LoadSelected
 		put "World: New                       "
 	    else
 		loaded := true
-		put "World: ", menuitemsaves (i) + "                      "
+		put "World: ", loadfile + "                      "
 	    end if
 	end if
     end for
@@ -722,7 +736,7 @@ function terrainQuery (x, y : real) : int
 end terrainQuery
 
 %Check block function
-function isBlock (xin : real, yin : real, blockIn : string, useTerrain : boolean) : boolean
+function isBlock (xin, yin : real, blockIn : string, useTerrain : boolean) : boolean
     var cdx : int := toBlock (xin)
     var cdy : int := toBlock (yin)
 
@@ -748,6 +762,20 @@ function isBlock (xin : real, yin : real, blockIn : string, useTerrain : boolean
 	result blockType (foundType).name = blockIn
     end if
 end isBlock
+
+function getBlock (x, y : real, useTerrain : boolean) : blockStruct
+    var cdx : int := toBlock (x)
+    var cdy : int := toBlock (y)
+
+    if cdx < -XLIMIT or cdx > XLIMIT or cdy < -YLIMIT or cdy > YLIMIT then
+	result blockType (blockID ("boarder"))
+    end if
+    var returnBlock : blockStruct := blockType (block (cdx) (cdy))
+    if useTerrain and returnBlock.name = "void" then
+	returnBlock := blockType (terrainQuery (cdx, cdy))
+    end if
+    result returnBlock
+end getBlock
 
 function raycastLine (x1, y1, x2, y2, rangeIn : real, var rayHit, rayBefore : vec2, onlyThisSegment : boolean) : boolean
     var xinc, yinc : real := 0
@@ -802,11 +830,8 @@ procedure DrawBlockScrn (x, y, clr : int)
 end DrawBlockScrn
 
 procedure DrawBlock (x, y : real, useTerrain : boolean)
-    var foundType : int := block (toBlock (x)) (toBlock (y))
-    if useTerrain and blockType (foundType).name = "void" then
-	foundType := terrainQuery (x, y)
-    end if
-    DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), blockType (foundType).clr)
+    var foundType : blockStruct := getBlock (x, y, useTerrain)
+    DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), foundType.clr)
 end DrawBlock
 
 procedure DrawBlockClr (x, y : real, clr : int)
@@ -819,6 +844,9 @@ end DrawBlockR
 
 %Save feature
 procedure saveWorld
+    %Save menu screen
+    Pic.Free (backpic)
+    backpic := Pic.New (0, 0, maxx, maxy) %Pic.New (0, maxy - 210, 340, maxy - 35)
     loading (bgcolour)
     textfound := GUI.GetText (nameTextField)
     if textfound not= "" then
@@ -846,12 +874,16 @@ procedure saveWorld
 	    end for
 	end for
 	close : saveFile
-	GUI.Quit
+	Pic.Draw (backpic, 0, 0, picCopy)
+	locate (10, 1)
+	put textfound, " saved!                "
+	GUI.Refresh
     end if
-    startgame := true
 end saveWorld
 
 procedure createguis
+    GUI.SetDisplayWhenCreated (false)
+
     btnstrt := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Start Game", start, 30, chr (13), false)
     btnend := GUI.CreateButtonFull (midx - 150, maxy div 9 - 20, 300, "Quit", endgame, 30, chr (13), false)
 
@@ -886,38 +918,55 @@ procedure createguis
     nameLabel := GUI.CreateLabelFull (midx - 105, saveasguiheight, "Save as:", 0, 0, GUI.RIGHT, 0)
     btncont := GUI.CreateButtonFull (midx - 150, maxy div 3, 300, "Continue", start, 30, chr (13), false)
     mainMenuButton := GUI.CreateButtonFull (midx - 150, maxy div 4.4 - 10, 300, "Return to Main Menu", returnMain, 30, chr (13), false)
+    GUI.Hide (nameTextField)
+end createguis
+
+%The GUIs that are used for main menu
+procedure showMainMenuGUIs
+    GUI.Show (btnstrt)
+    GUI.Show (btnend)
+    GUI.Show (cbprev)
+    GUI.Show (cbcreative)
+    GUI.ShowMenuBar
+    GUI.Enable (menuload)
+    GUI.Enable (menudelete)
+    GUI.ResetQuit
+    GUI.Refresh
+end showMainMenuGUIs
+
+procedure hideMainMenuGUIs
+    GUI.Disable (menuload)
+    GUI.Disable (menudelete)
+    GUI.Hide (btnstrt)
+    GUI.Hide (btnend)
+    GUI.Hide (cbprev)
+    GUI.Hide (cbcreative)
+    GUI.HideMenuBar
+end hideMainMenuGUIs
+
+%The GUIs that are only used on pause screen
+procedure showPauseGUIs
+    GUI.Show (saveButton)
+    GUI.Show (nameTextField)
+    GUI.SetText (nameTextField, textfound)
+    GUI.Show (nameLabel)
+    GUI.Show (btncont)
+    GUI.Show (btnend)
+    GUI.Show (mainMenuButton)
+    GUI.ShowMenuBar
+    GUI.ResetQuit
+    GUI.Refresh
+end showPauseGUIs
+
+procedure hidePauseGUIs
     GUI.Hide (saveButton)
     GUI.Hide (nameTextField)
     GUI.Hide (nameLabel)
     GUI.Hide (btncont)
     GUI.Hide (btnend)
     GUI.Hide (mainMenuButton)
-end createguis
-
-%The GUIs that are used for main and pause menus
-process guis
-    loop
-	if startgame then
-	    exit
-	end if
-	exit when GUI.ProcessEvent
-    end loop
-end guis
-
-%The GUIs that are only used on pause screen
-process pauseguis
-    if gmfrstmthrgh then
-
-    end if
-    GUI.Show (btncont)
-    GUI.SetText (nameTextField, textfound)
-    loop
-	if startgame then
-	    exit
-	end if
-	exit when GUI.ProcessEvent
-    end loop
-end pauseguis
+    GUI.HideMenuBar
+end hidePauseGUIs
 
 %Draw blocks on screen
 procedure showWorld ()
@@ -1010,49 +1059,22 @@ procedure screenscroll (Scrdirx : real, Scrdiry : real)
     showWorld ()
 end screenscroll
 
-%Re-enables start GUIs
-procedure ReEnableStartGUIs
-    if not gmfrstmthrgh then
-	if returningFromPreview then
-	    Pic.Draw (backpic, 0, maxy - 210, picCopy)
-	    returningFromPreview := false
-	end if
-	GUI.Enable (menuload)
-	GUI.Enable (menudelete)
-	GUI.Enable (cbprev)
-	GUI.Enable (cbcreative)
-	GUI.Show (btnstrt)
-	GUI.ShowMenuBar
-	GUI.ResetQuit
-	GUI.Refresh
-    end if
-end ReEnableStartGUIs
 
 %Show colour preview as default
 procedure ShowColourPreveiwDefault
-    if frstmthrgh then
-	Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
-	Draw.Text ("Default head", 1, maxy - 90, font2, black)
-	Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
-	Draw.Text ("Default background", 100, maxy - 90, font2, black)
-	Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
-	Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
-	locate (12, 1)
+    Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
+    Draw.Text ("Default head", 1, maxy - 90, font2, black)
+    Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
+    Draw.Text ("Default background", 100, maxy - 90, font2, black)
+    Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
+    Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
+    locate (12, 1)
+    if loadfile not= "" then
+	put "World: ", loadfile
+    else
 	put "World: New"
     end if
 end ShowColourPreveiwDefault
-
-%Disable and hide all GUIs
-procedure DisableAndHideGUIs
-    GUI.Disable (menuload)
-    GUI.Disable (menudelete)
-    GUI.Disable (cbprev)
-    GUI.Disable (cbcreative)
-    GUI.Hide (btnstrt)
-    GUI.Hide (btnend)
-    GUI.HideMenuBar
-    GUI.Quit
-end DisableAndHideGUIs
 
 procedure CenterCamera
     offsetleftright := pos.x - toGameCdMeasure (maxx div 2)
@@ -1345,9 +1367,6 @@ procedure WorldPreview
 		    if not bareBonesPreview and blockType (foundType).name = "void" then
 			foundType := terrainQuery (cdx, cdy)
 		    end if
-		    if not bareBonesPreview and blockType (block (cdx) (cdy)).name not= "void" then
-			Draw.Dot (x, y, blockType (terrainQuery (cdx, cdy)).clr)
-		    end if
 		    Draw.Dot (x, y, blockType (foundType).clr)
 		end if
 	    end for
@@ -1616,9 +1635,14 @@ procedure PlayerRightClick
 		mouseOnPlayer := toBlock (mouseGX + 1) > leftSide () and toBlock (mouseGX) <= rightSide ()
 		    and toBlock (mouseGY + 1) > pos.y and toBlock (mouseGY) <= topSideCrouch ()
 	    end if
-	    if not mouseOnPlayer and not isBlock (mouseGX, mouseGY, "solid", true) then
-		if infinatePlacing or placingBlock.physics or isBlock (mouseGX + 1, mouseGY, "solid", true) or isBlock (mouseGX - 1, mouseGY, "solid", true)
-			or isBlock (mouseGX, mouseGY + 1, "solid", true) or isBlock (mouseGX, mouseGY - 1, "solid", true) then
+
+	    if not mouseOnPlayer or not isBlock (mouseGX, mouseGY, "solid", true) then
+		var againstValidBlock : boolean :=
+		    isBlock (mouseGX + 1, mouseGY, "any", true) or
+		    isBlock (mouseGX - 1, mouseGY, "any", true) or
+		    isBlock (mouseGX, mouseGY + 1, "any", true) or
+		    isBlock (mouseGX, mouseGY - 1, "any", true)
+		if infinatePlacing or placingBlock.physics or againstValidBlock then
 		    setBlock (mouseGX, mouseGY, placingBlock.name)
 		    DrawBlock (mouseGX, mouseGY, true)     %draws block you clicked, until a screen scroll/update
 		end if
@@ -1637,10 +1661,11 @@ end PlayerRightClick
 procedure PlayerLeftClick
     if cm = 1 and health > 0 and xm >= 0 and xm <= maxx and ym >= 0 and ym <= maxy then
 	if keyalt then
-	    placingBlock := blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y)))
-	    if placingBlock.name = "void" then
-		placingBlock := blockType (terrainQuery (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y)))
-	    end if
+	    placingBlock := getBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), true)
+	    /*placingBlock := blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y)))
+	     if placingBlock.name = "void" then
+	     placingBlock := blockType (terrainQuery (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y)))
+	     end if*/
 	else
 	    if mclickl = 0 then
 		mclickl := blockbreakspeed
@@ -1664,16 +1689,17 @@ end PlayerLeftClick
 %If 'p' key is pressed
 procedure PressPKey
     if keyp then
+	for i : 0 .. 9 % I hate this, but otherwise, when you click where the "return to menu"
+	    %or any other button will be, then pause, it will act as if you clicked the button.
+	    var t : boolean := GUI.ProcessEvent %Gobbles up 10 last events to prevent processing
+	end for
 	inPauseMenu := true
 	View.Set ("nooffscreenonly")
 	oldbackcolour := bgcolour
-	fork pauseguis
 	Pic.Free (screenpic)
 	screenpic := Pic.New (0, 0, maxx, maxy)
 	Draw.FillBox (0, 0, maxx, maxy, bgcolour)     %a cls
-	GUI.ResetQuit
-	GUI.Show (btnend)
-	GUI.ShowMenuBar
+	showPauseGUIs
 	Draw.FillBox (32, maxy - 67, 62, maxy - 37, headcolour)
 	Draw.Box (32, maxy - 67, 62, maxy - 37, black)
 	Draw.Text (colourstringify (headcolour) + " head", 1, maxy - 90, font2, black)
@@ -1684,24 +1710,15 @@ procedure PressPKey
 	Draw.Box (265, maxy - 67, 295, maxy - 37, black)
 	Draw.Text (placingBlock.name + " blocks", 238, maxy - 90, font2, black)
 	loop
-	    exit when GUI.ProcessEvent %startgame
+	    exit when GUI.ProcessEvent
 	end loop
 
 	%If the quit button has not been clicked
 	if not quitthegame then
-
-	    %Temporarily disable and hide all GUIs
-	    GUI.Quit
-	    GUI.Hide (saveButton)
-	    GUI.Hide (nameTextField)
-	    GUI.Hide (nameLabel)
-	    GUI.Hide (btncont)
-	    GUI.Hide (btnend)
-	    GUI.Hide (mainMenuButton)
-	    GUI.HideMenuBar
+	    %Temporarily hide pause GUIs
+	    hidePauseGUIs
 
 	    %Reset game-continuing variable
-	    startgame := false
 	    View.Set ("offscreenonly")
 
 	    %Loading screen
@@ -2092,7 +2109,6 @@ procedure CharSnapDownFall
     %Function prototype:
     %if there is enough room below you to stand, then
     %   pos.y := highest possible that will allow a full standing pose
-    %end if
     if not onground and mustcrawl and not inground then     %Falling, but block above (on) head (crawling)
 	var offendingY : int
 	var canStand : boolean := true
@@ -2171,8 +2187,6 @@ procedure Gravity
 	if survival then
 	    if staticfalldamage then
 		if gravcount >= lethalFallHeight then
-		    locate (1, 1)
-		    %put round (((gravcount - blocksize * 4) / (blocksize * 15)) * 1000)
 		    health -= round (((gravcount - (lethalFallHeight - 1)) / 15) * 1000)
 		end if
 	    else
@@ -2582,7 +2596,6 @@ procedure resetVariables
     recentstartd := false
     recentstarta := false
     mustcrawl := false
-    startgame := false
     recentclick := false
     loaded := false
     quitthegame := false
@@ -2608,8 +2621,6 @@ procedure resetVariables
     headcolour := 983
     ponwlk := 1
     poncrl := 1
-    isaves := 1
-    frstmthrgh := true
     loading (white)
     View.Update
     for i : mstScrnHsGnLft .. mstScrnHsGnRght
@@ -2623,12 +2634,32 @@ procedure resetVariables
     mstScrnHsGnDwn := 0
 end resetVariables
 
+procedure DebugDraw
+    locate (1, 1)
+    put pos.x, " ", pos.y
+
+    %Drawing debug character inhabited boxes and misc
+    Draw.FillOval (toScrnCdX (toBlock (leftSide ())), toScrnCdY (toBlock (pos.y)), 4, 4, yellow)
+    Draw.FillOval (toScrnCdX (toBlock (rightSide ())), toScrnCdY (toBlock (pos.y)), 4, 4, brightgreen)
+    Draw.FillOval (toScrnCdX (toBlock (leftSide ())), toScrnCdY (toBlock (topSide ())), 4, 4, brightblue)
+    Draw.FillOval (toScrnCdX (toBlock (rightSide ())), toScrnCdY (toBlock (topSide ())), 4, 4, brightred)
+    Draw.Box (toScrnCdX (toBlock (leftSide ())), toScrnCdY (toBlock (pos.y)),
+	toScrnCdX (toBlock (leftSide ()) + 1), toScrnCdY (toBlock (pos.y) + 1), yellow)
+    Draw.Box (toScrnCdX (toBlock (rightSide ())), toScrnCdY (toBlock (pos.y)),
+	toScrnCdX (toBlock (rightSide ()) + 1), toScrnCdY (toBlock (pos.y) + 1), brightgreen)
+    Draw.Box (toScrnCdX (toBlock (leftSide ())), toScrnCdY (toBlock (topSide ())),
+	toScrnCdX (toBlock (leftSide ()) + 1), toScrnCdY (toBlock (topSide ()) + 1), brightblue)
+    Draw.Box (toScrnCdX (toBlock (rightSide ())), toScrnCdY (toBlock (topSide ())),
+	toScrnCdX (toBlock (rightSide ()) + 1), toScrnCdY (toBlock (topSide ()) + 1), brightred)
+end DebugDraw
+
+
 %Entire program loop
 loop
     %Main menu loop
     loop
 	colorback (white)
-	if not returningFromPreview then
+	if gmfrstmthrgh then
 	    %Find all saved files' names
 	    var savenames : int
 	    var fileName : string
@@ -2658,31 +2689,21 @@ loop
 	%Disables buffer drawing
 	View.Set ("nooffscreenonly")
 
-	ReEnableStartGUIs
-
 	%Run the GUIs to be used in main and pause menus
 	if gmfrstmthrgh then
 	    createguis
 	end if
-	fork guis
-	if #btnend not= 16#80000000 then
-	    GUI.Show (btnend)
-	end if
+	showMainMenuGUIs
 
 	ShowColourPreveiwDefault
 
 	%Wait until user clicks "start" or "quit" button
 	loop
-	    exit when startgame or quitthegame
+	    exit when GUI.ProcessEvent
 	end loop
-
 	if quitthegame then
 	    exit
 	end if
-
-	%Save main menu screen
-	Pic.Free (backpic)
-	backpic := Pic.New (0, maxy - 210, 340, maxy - 35)
 
 	%Get preview checkbox state
 	if GUI.GetCheckBox (cbprev) then
@@ -2704,10 +2725,7 @@ loop
 	    resetdefaulthead := true
 	end if
 
-	%Set program variables
-	startgame := false
-
-	DisableAndHideGUIs
+	hideMainMenuGUIs
 
 	cls
 
@@ -2728,7 +2746,6 @@ loop
 
 	WorldPreview
 
-	frstmthrgh := false
 	if not preview then
 	    exit
 	end if
@@ -2771,7 +2788,6 @@ loop
 
 	PressPKey
 	if quitthegame then
-	    GUI.Quit
 	    exit
 	elsif menuReturn then
 	    menuReturn := false
@@ -2840,25 +2856,7 @@ loop
 
 	IfDeadGameOver
 
-	locate (1, 1)
-	%put pos.x, " ", pos.y
-
-	%Drawing debug character inhabited boxes and misc
-
-	%Draw.Dot (toScrnCdX (pos.x), toScrnCdY (topSide () + 5), brightred)
-	/*Draw.FillOval (toScrnCdX (toBlock (leftSide ())), toScrnCdY (toBlock (pos.y)), 4, 4, yellow)
-	 Draw.FillOval (toScrnCdX (toBlock (rightSide ())), toScrnCdY (toBlock (pos.y)), 4, 4, brightgreen)
-	 Draw.FillOval (toScrnCdX (toBlock (leftSide ())), toScrnCdY (toBlock (topSide ())), 4, 4, brightblue)
-	 Draw.FillOval (toScrnCdX (toBlock (rightSide ())), toScrnCdY (toBlock (topSide ())), 4, 4, brightred)
-	 Draw.Box (toScrnCdX (toBlock (leftSide ())), toScrnCdY (toBlock (pos.y)),
-	 toScrnCdX (toBlock (leftSide ()) + 1), toScrnCdY (toBlock (pos.y) + 1), yellow)
-	 Draw.Box (toScrnCdX (toBlock (rightSide ())), toScrnCdY (toBlock (pos.y)),
-	 toScrnCdX (toBlock (rightSide ()) + 1), toScrnCdY (toBlock (pos.y) + 1), brightgreen)
-	 Draw.Box (toScrnCdX (toBlock (leftSide ())), toScrnCdY (toBlock (topSide ())),
-	 toScrnCdX (toBlock (leftSide ()) + 1), toScrnCdY (toBlock (topSide ()) + 1), brightblue)
-	 Draw.Box (toScrnCdX (toBlock (rightSide ())), toScrnCdY (toBlock (topSide ())),
-	 toScrnCdX (toBlock (rightSide ()) + 1), toScrnCdY (toBlock (topSide ()) + 1), brightred)
-	 */
+	%DebugDraw
 
 	%Show new screen
 	View.Update
@@ -2903,8 +2901,6 @@ if #mainMenuButton not= 16#80000000 then
 end if
 GUI.Hide (btnend)
 GUI.HideMenuBar
-startgame := true     %to escape from remaining gui loops (why needed now, I do not know, but after saving or deleting a level inside a level, we seem to need this.)
-%^Should already be done by the endgame function, too...
 cls
 
 put "Thanks For Playing!"
