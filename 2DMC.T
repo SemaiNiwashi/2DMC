@@ -12,6 +12,7 @@ buttonchoose ("multibutton")
 setscreen ("noecho")
 %Framerate goal: deltatime of 6-7 on still, 17-20 on screen scrolling
 
+%constrain p2's virtual cursor to within the screen, and add an arrow that points to p2 when they are off-screen
 %Colors for the preview are all wrong.
 %Dropdowns go off-screen. See "CreateTextBoxChoiceCustom.t"
 %Text for "_________ saved" and other "put"s move based on user's set font size. Only use Draw.Text.
@@ -40,8 +41,6 @@ setscreen ("noecho")
 %Make time affect sky color (rgb.addcolor 256, set to whatever)
 %Add swimming
 %Add alter jump height by amount space pressed
-%Make character an instance of a class
-%Add second player
 %Add seed in preferences(?) file?
 %Add different block types (solid, platform, decoration)
 %Add background blocks?
@@ -72,10 +71,6 @@ const pxscrollclearance : int := 70
 const savDir : string := "ByanSaves\\"
 const imgDir : string := "Images\\"
 const imgType : string := ".bmp"
-var trainx : real := 10
-var trainy : real := 3
-var trainLeft : boolean := true
-var trainbackpic : int := Pic.New (0, 0, 2, 2)
 
 %Type declarations for blocks
 %Block class
@@ -189,14 +184,15 @@ var arrow : array char of boolean
 var backpic : int := Pic.New (0, 0, 2, 2)
 var screenpic : int := Pic.New (0, 0, 2, 2)
 var deltaTime, xm, ym, cm, btnstrt, btncont, btnend, mainMenuButton, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload,
-    saveButton, saveasguiheight, nameTextField, nameLabel, saveFile, menudelete, cbprev, cbcreative, genVersion, seed, popupWinID : int
-var gametimeold, mstScrnHsGnLft, mstScrnHsGnRght, mstScrnHsGnUp, mstScrnHsGnDwn : int := 0
+    saveButton, saveasguiheight, nameTextField, nameLabel, saveFile, menudelete, cbprev, cbcreative, cbmultiplayer, genVersion, seed,
+    popupWinID : int
+var gametimeold, mstScrnHsGnLft, mstScrnHsGnRght, mstScrnHsGnUp, mstScrnHsGnDwn, numEntities : int := 0
 var loaded, quitthegame, preview, resetdefaulthead, resetdefaulttime, resetdefaultblock, menuReturn,
     inPauseMenu, scrollSlow, yesConfirm, recentclick, keyp : boolean := false
 var gmfrstmthrgh : boolean := true
 var offsetleftright, offsetupdown, slowScrollSpeed : real := 0
 var timeOfDay, oldTimeColorVal, oldTime : real := -1
-var isaves : int := 1
+var isaves, numPlayers : int := 1
 var bgcolour : int := white
 var textfound : string
 var loadfile, importedBlockList : string := ""
@@ -316,7 +312,7 @@ end PicDrawTranslucentBox
 
 
 %Declaration statement for the array of blocks: used to be way down there because
-%it took a really long time But now, it's snappy fast as an int1 (-128 to 127)!
+%it took a really long time. But now, it's snappy fast as an int1 (-128 to 127)!
 const XLIMIT : int := 5000 % = total of 5000 + 5000 + 1 = 10001 blocks
 const YLIMIT : int := 2500 % = total of 2500 + 2500 + 1 = 5001 blocks
 var block : array - XLIMIT .. XLIMIT of array - YLIMIT .. YLIMIT of blockVec
@@ -505,11 +501,11 @@ end entity
 
 class player
     inherit entity
-    import xm, ym, cm, scrollSlow
+    import scrollSlow
     export headcolour, placingBlock, SetHeadColour, SetPlacingBlock, pos, health, survival,
 	leftSide, rightSide, topSide, SetPosX, SetPosY, SetHealth, FinalVariableAssingment,
 	KeyboardInput, HandleMouse, SetSurvival, HandleKeyboard, ResetVariables, DebugDraw,
-	UpdateOldPos
+	SetPlayerNumber, CopyProperties
 
 
     %Enums for readability
@@ -523,12 +519,14 @@ class player
     const staticfalldamage : boolean := true
     const lethalFallHeight : int := 5
     const gravAmount : real := 0.025
+    const virtualMouseSpeed : real := 0.2
 
     var blockplacespeed : int := 130
     var blockbreakspeed : int := 130
     var reach : real := 5
     var playerSpeed : real := 5 / 1000
 
+    var playerNum : int := 1
     var charbackpic : int := Pic.New (0, 0, 2, 2)
     var healthbarback : int := Pic.New (0, 0, 2, 2)
     var sprite : array 0 .. 7 of array 0 .. 3 of array 0 .. 2 of array 0 .. 1 of int
@@ -538,26 +536,27 @@ class player
     var crosshairsbbpre2 : int % (action)(frame)(isbb=0)(colorwhite=1)
     var crosshairspbpre : int % (action)(frame)(ispb=1)(colorblack=0)
     var crosshairspbpre2 : int % (action)(frame)(ispb=1)(colorwhite=1)
-    var charwidth : real
-    var charheight : real
+    var charwidth, charheight, crouchheight, standheight : real
     var pos, oldPos : vec2
     var rcursorbb, rcursorpb : vec2i
-    var character, backpiccross, backpicbox : int
+    var character, backpiccross, backpicbox, backpicvirtmouse, virtualCursor, cursorWidth, cursorHeight : int
     var sprintpossibled, sprintpossiblea, flypossible, mclickr, mclickl, healthold, crosshairsbb2, crosshairsbb, crosshairspb2,
-	crosshairspb, action, actionCurrent, frame, isClick, facing : int := 0
+	crosshairspb, action, actionCurrent, frame, isClick, facing, xm, ym, cm : int := 0
     var onground, inground, onleftwall, onrightwall, hitceiling, sprintd, sprinta, recentstartd, recentstarta, recentstartspace,
-	mustcrawl, flying, moving, keyspc, keya, keys, keyd, keyalt : boolean := false
+	mustcrawl, flying, moving, keyspc, keya, keys, keyd, keyalt, keyi, keyj, keyk, keyl, keyr, keyy, keyb, keyq, keye : boolean := false
     var survival : boolean := true
     var jumpcount, gravcount, frametimer : real := 0
+    var virtualXm, virtualYm : real := -100000
     var headcolour : int := -1
     var health : int := 1000
     var placingBlock : blockStruct := blockType (ord (blk.error))
     var oldfacing : string := ""
 
-    var crouchheight : real % := toGameCdMeasure (Pic.Height (crawlr))
-    var standheight : real % := toGameCdMeasure (Pic.Height (stand))
-
     forward procedure LoadSprites
+
+    procedure SetPlayerNumber (player : int)
+	playerNum := player
+    end SetPlayerNumber
 
     body procedure Initialize
 	pos.x := 0
@@ -578,6 +577,10 @@ class player
 	charheight := Pic.Height (stand) / blocksize
 	crouchheight := toGameCdMeasure (Pic.Height (crawlr))
 	standheight := toGameCdMeasure (Pic.Height (stand))
+	if playerNum = 2 then
+	    cursorWidth := Pic.Width (virtualCursor)
+	    cursorHeight := Pic.Height (virtualCursor)
+	end if
     end Initialize
 
     %Assign values to variables that are calculated using "blocksize"
@@ -666,6 +669,10 @@ class player
 		end for
 	    end for
 	end for
+	if playerNum = 2 then
+	    virtualCursor := Pic.FileNew (imgDir + "cursor" + imgType)
+	    Pic.SetTransparentColor (virtualCursor, brightred)
+	end if
     end LoadSprites
 
     procedure SetHeadColour (clr : int)
@@ -709,10 +716,12 @@ class player
 
     procedure SetPosX (posXin : real)
 	pos.x := posXin
+	oldPos.x := posXin
     end SetPosX
 
     procedure SetPosY (posYin : real)
-	pos.x := posYin
+	pos.y := posYin
+	oldPos.y := posYin
     end SetPosY
 
     procedure SetHealth (newHealth : int)
@@ -727,30 +736,75 @@ class player
 	end if
     end SetSurvival
 
+    procedure CopyProperties (other : pointer to player)
+	pos := other -> pos
+	headcolour := other -> headcolour
+	survival := other -> survival
+    end CopyProperties
 
     %Get input for keyboard and parallelport
     procedure KeyboardInput (arrow : array char of boolean)
 	%Reset input variables
-	keyspc := false
-	keya := false
-	keys := false
-	keyd := false
 	keyalt := false
+	keyspc := false %/t
+	keya := false   %/f
+	keys := false   %/g
+	keyd := false   %/h
+	%2P only to replace mouse:
+	keyi := false
+	keyj := false
+	keyk := false
+	keyl := false
+	keyr := false
+	keyy := false
+	keyb := false
+	keyq := false
+	keye := false
 
 	%Assign input variables for keyboard
-	if arrow (' ') then
+	if playerNum = 1 and (arrow (' ') or arrow ('w')) or playerNum = 2 and (arrow ('t') or arrow ('b')) then
 	    keyspc := true
 	end if
-	if arrow ('a') or arrow (KEY_LEFT_ARROW) then
+	if playerNum = 1 and (arrow ('a') or arrow (KEY_LEFT_ARROW)) or playerNum = 2 and arrow ('f') then
 	    keya := true
 	end if
-	if arrow ('s') or arrow (KEY_DOWN_ARROW) then
+	if playerNum = 1 and (arrow ('s') or arrow (KEY_DOWN_ARROW)) or playerNum = 2 and arrow ('g') then
 	    keys := true
 	end if
-	if arrow ('d') or arrow (KEY_RIGHT_ARROW) then
+	if playerNum = 1 and (arrow ('d') or arrow (KEY_RIGHT_ARROW)) or playerNum = 2 and arrow ('h') then
 	    keyd := true
 	end if
-
+	if playerNum = 1 then
+	    if arrow ('q') then
+		keyq := true
+	    end if
+	    if arrow ('e') then
+		keye := true
+	    end if
+	end if
+	if playerNum = 2 then
+	    if arrow ('i') then
+		keyi := true
+	    end if
+	    if arrow ('j') then
+		keyj := true
+	    end if
+	    if arrow ('k') then
+		keyk := true
+	    end if
+	    if arrow ('l') then
+		keyl := true
+	    end if
+	    if arrow ('r') then
+		keyr := true
+	    end if
+	    if arrow ('y') then
+		keyy := true
+	    end if
+	    if arrow ('b') then
+		keyb := true
+	    end if
+	end if
 	if arrow (KEY_ALT) then
 	    keyalt := true
 	end if
@@ -924,8 +978,60 @@ class player
 	end if
     end PlayerLeftClick
 
+    procedure HandleMouse (xmIn, ymIn, cmIn, deltaTime : int)
+	if playerNum = 1 then
+	    xm := xmIn
+	    ym := ymIn
+	    cm := cmIn
+	    if cm = 0 then
+		if keyq then
+		    cm := 1
+		elsif keye then
+		    cm := 100
+		end if
+	    end if
+	elsif playerNum = 2 then
+	    if virtualXm = -100000 and virtualYm = -100000 then
+		virtualXm := toScrnCdX (pos.x)
+		virtualYm := toScrnCdY (pos.y) + 10
+	    end if
 
-    procedure HandleMouse
+	    if keyr then
+		cm := 1
+	    elsif keyy then
+		cm := 100
+	    else
+		cm := 0
+	    end if
+	    /*cm := 0
+	     if keyb and recentstartb then
+	     recentstartb := false
+	     cm := 1
+	     else
+	     recentstartb := true
+	     end if
+	     if keym and recentstartm then
+	     recentstartm := false
+	     cm := 100
+	     else
+	     recentstartm := true
+	     end if*/
+	    if keyi then
+		virtualYm += virtualMouseSpeed * deltaTime
+	    end if
+	    if keyj then
+		virtualXm -= virtualMouseSpeed * deltaTime
+	    end if
+	    if keyk then
+		virtualYm -= virtualMouseSpeed * deltaTime
+	    end if
+	    if keyl then
+		virtualXm += virtualMouseSpeed * deltaTime
+	    end if
+	    xm := round (virtualXm)
+	    ym := round (virtualYm)
+	end if
+
 	isClick := 0
 	if cm not= 0 then
 	    isClick := 1
@@ -1118,7 +1224,6 @@ class player
 	PressSKey (deltaTime)
 
     end HandleKeyboard
-
 
     %Gravity
     procedure Gravity (deltaTime : int)
@@ -1518,12 +1623,9 @@ class player
 	character := sprite (finalAction) (finalFrame) (finalLeftRight) (finalIsClick)
     end CharImage
 
-    procedure UpdateOldPos
-	oldPos.x := pos.x
-	oldPos.y := pos.y
-    end UpdateOldPos
-
     body procedure Update (deltaTime : int)
+	HandleKeyboard (deltaTime)
+
 	Gravity (deltaTime)
 
 	CharJump (deltaTime)
@@ -1549,7 +1651,8 @@ class player
 	end if
 
 	%Setting oldPos
-	UpdateOldPos
+	oldPos.x := pos.x
+	oldPos.y := pos.y
 
 	if health < 0 then
 	    health := 0
@@ -1572,6 +1675,10 @@ class player
 	    else
 		%Save background behind crosshairs and box
 		backpiccross := Pic.New (rcursorbb.x, rcursorbb.y, rcursorbb.x + blocksize - 1, rcursorbb.y + blocksize - 1)
+	    end if
+	    if playerNum = 2 then
+		%Save background behind crosshairs
+		backpicvirtmouse := Pic.New (xm, ym - cursorHeight + 1, xm + cursorWidth - 1, ym)
 	    end if
 	end if
     end AimGuideBacksave
@@ -1714,6 +1821,11 @@ class player
     body procedure DrawGUI
 	DrawAimGuide
 	DrawHealthBar
+
+	if playerNum = 2 and health > 0 then
+	    Pic.Draw (virtualCursor, xm, ym - cursorHeight + 1, picMerge)
+	end if
+
 	%DebugDraw
     end DrawGUI
 
@@ -1732,6 +1844,11 @@ class player
 		%Draw old unaltered block over crosshairs for breaking blocks and box for placing blocks
 		Pic.Draw (backpiccross, rcursorbb.x, rcursorbb.y, picCopy)
 		Pic.Free (backpiccross)
+	    end if
+	    if playerNum = 2 then
+		%Draw old unaltered area over virtual cursor
+		Pic.Draw (backpicvirtmouse, xm, ym - cursorHeight + 1, picCopy)
+		Pic.Free (backpicvirtmouse)
 	    end if
 	end if
     end EraseAimGuide
@@ -1779,6 +1896,8 @@ class player
 	mustcrawl := false
 	charwidth := toGameCdMeasure (Pic.Width (character) - Pic.Width (character) mod 2)
 	charheight := toGameCdMeasure (Pic.Height (character))
+	oldPos.x := 0
+	oldPos.y := 0
 	pos.x := 0
 	pos.y := 0
 	health := 1000
@@ -1801,14 +1920,8 @@ class player
     end ResetVariables
 end player
 
-
-var numEntities : int := 0
 var entities : array 0 .. MAX_ENTITIES of pointer to entity
-
-new player, entities (numEntities)
-var player1 : pointer to player := entities (0)
-player1 -> Initialize ()
-numEntities += 1
+var player1, player2 : pointer to player
 
 
 %Turn the integer value of a colour into a string
@@ -2341,6 +2454,7 @@ procedure createguis
 
     cbprev := GUI.CreateCheckBox (maxx - 80, maxy - 70, "Preview", DoNothing)
     cbcreative := GUI.CreateCheckBox (maxx - 80, maxy - 100, "Creative", DoNothing)
+    cbmultiplayer := GUI.CreateCheckBox (maxx - 80, maxy - 130, "Multiplayer", DoNothing)
 
     menuhead := GUI.CreateMenu ("Head Colour")
     for i : 1 .. 16
@@ -2379,6 +2493,7 @@ procedure showMainMenuGUIs
     GUI.Show (btnend)
     GUI.Show (cbprev)
     GUI.Show (cbcreative)
+    GUI.Show (cbmultiplayer)
     GUI.ShowMenuBar
     GUI.Enable (menuload)
     GUI.Enable (menudelete)
@@ -2399,6 +2514,7 @@ procedure hideMainMenuGUIs
     GUI.Hide (btnend)
     GUI.Hide (cbprev)
     GUI.Hide (cbcreative)
+    GUI.Hide (cbmultiplayer)
     GUI.HideMenuBar
 end hideMainMenuGUIs
 
@@ -3054,6 +3170,8 @@ end WorldPreview
 
 %Get input for keyboard and parallelport
 procedure KeyboardInput
+    Input.KeyDown (arrow)
+
     %Reset input variables
     keyp := false
 
@@ -3061,22 +3179,12 @@ procedure KeyboardInput
     if arrow ('p') then
 	keyp := true
     end if
-    if arrow ('l') then
-	for i : 0 .. 5
-	    for i2 : 0 .. 5
-		setBlock (player1 -> pos.x - 3 + i, player1 -> pos.y - 3 + i2, ord (blk.dirt), false)
-	    end for
-	end for
-	showWorld ()
-    end if
-    if arrow ('k') then
-	setBlock (player1 -> pos.x, player1 -> pos.y, ord (blk.air), false)
-    end if
-    if arrow ('o') then
-	trainx := player1 -> pos.x
-	trainy := player1 -> pos.y
-    end if
 
+    %Give input to players
+    player1 -> KeyboardInput (arrow)
+    if numPlayers > 1 then
+	player2 -> KeyboardInput (arrow)
+    end if
 end KeyboardInput
 
 %Screen sliding
@@ -3153,29 +3261,25 @@ procedure PressPKey
     end if
 end PressPKey
 
-
-procedure TrainCompute
-    if not isBlockR (trainx, trainy - 0.01, blkGroup.solid, 1, true) then
-	trainy -= 0.01
-    end if
-    if not isBlockR (trainx - 0.01, trainy, blkGroup.solid, 1, true) and trainLeft then
-	trainx -= 0.01
-    end if
-    if not isBlockR (trainx + 1.01, trainy, blkGroup.solid, 1, true) and not trainLeft then
-	trainx += 0.01
-    end if
-    if isBlockR (trainx - 0.01, trainy, blkGroup.solid, 1, true) or isBlockR (trainx + 1.01, trainy, blkGroup.solid, 1, true) then
-	trainy += 0.08
-    end if
-    if trainx <= -208 then
-	trainLeft := false
-    elsif trainx >= 21 then
-	trainLeft := true
-    end if
-end TrainCompute
-
-
-
+/*procedure TrainCompute
+ if not isBlockR (trainx, trainy - 0.01, blkGroup.solid, 1, true) then
+ trainy -= 0.01
+ end if
+ if not isBlockR (trainx - 0.01, trainy, blkGroup.solid, 1, true) and trainLeft then
+ trainx -= 0.01
+ end if
+ if not isBlockR (trainx + 1.01, trainy, blkGroup.solid, 1, true) and not trainLeft then
+ trainx += 0.01
+ end if
+ if isBlockR (trainx - 0.01, trainy, blkGroup.solid, 1, true) or isBlockR (trainx + 1.01, trainy, blkGroup.solid, 1, true) then
+ trainy += 0.08
+ end if
+ if trainx <= -208 then
+ trainLeft := false
+ elsif trainx >= 21 then
+ trainLeft := true
+ end if
+ end TrainCompute*/
 
 procedure IfDeadGameOver
     if player1 -> health = 0 then
@@ -3184,11 +3288,13 @@ procedure IfDeadGameOver
 end IfDeadGameOver
 
 
-
 %End of main loop procedures
 
 procedure resetVariables
     player1 -> ResetVariables
+    if numPlayers > 1 then
+	player2 -> ResetVariables
+    end if
 
     /*%loadfile := ""
      if loaded then
@@ -3221,6 +3327,7 @@ procedure resetVariables
     mstScrnHsGnRght := 0
     mstScrnHsGnUp := 0
     mstScrnHsGnDwn := 0
+    numEntities := 0
 end resetVariables
 
 
@@ -3250,6 +3357,13 @@ cls
 
 %Beginning loading screen
 loading (white)
+
+new player, player1
+player1 -> SetPlayerNumber (1)
+player1 -> Initialize ()
+new player, player2
+player2 -> SetPlayerNumber (2)
+player2 -> Initialize ()
 
 %Entire program loop
 loop
@@ -3329,6 +3443,17 @@ loop
 	%Get iscreative checkbox state
 	player1 -> SetSurvival (not GUI.GetCheckBox (cbcreative))
 
+	if GUI.GetCheckBox (cbmultiplayer) then
+	    numPlayers := 2
+	    entities (numEntities) := player1
+	    numEntities += 1
+	    entities (numEntities) := player2
+	    numEntities += 1
+	else
+	    numPlayers := 1
+	    entities (numEntities) := player1
+	    numEntities += 1
+	end if
 
 	%Set menu option default indicator
 	if player1 -> headcolour = -1 then
@@ -3355,6 +3480,12 @@ loop
 
 	%Assign values to variables that are calculated using "blocksize"
 	player1 -> FinalVariableAssingment
+	if numPlayers > 1 then
+	    player2 -> SetPlacingBlock (blockType (ord (blk.dirt)))
+	    player2 -> FinalVariableAssingment
+	    player2 -> CopyProperties (player1)
+	    player2 -> SetHeadColour (brightblue)
+	end if
 
 	%Update background colour
 	Draw.FillBox (0, 0, maxx, maxy, blockType (ord (blk.air)).clr)    %a cls
@@ -3377,9 +3508,6 @@ loop
     %Show world
     View.Update
 
-    %Setting oldPos
-    player1 -> UpdateOldPos
-
     %Game program loop
     loop
 	deltaTime := Time.Elapsed - gametimeold
@@ -3392,11 +3520,12 @@ loop
 	Mouse.Where (xm, ym, cm)
 
 	%Get keyboard input
-	Input.KeyDown (arrow)
+	KeyboardInput
 
-	player1 -> KeyboardInput (arrow)
-
-	player1 -> HandleMouse
+	player1 -> HandleMouse (xm, ym, cm, deltaTime)
+	if numPlayers > 1 then
+	    player2 -> HandleMouse (-1, -1, -1, deltaTime)
+	end if
 
 	PressPKey
 	if quitthegame then
@@ -3419,24 +3548,25 @@ loop
 	    timeOfDay := 0
 	end if
 
-	KeyboardInput
-
-	player1 -> HandleKeyboard (deltaTime)
+	%player1 -> Update (deltaTime)
+	%player1 -> PreDraw
+	%player1 -> DrawEntity
+	%player1 -> DrawGUI
 
 	for i : 0 .. numEntities - 1
 	    entities (i) -> Update (deltaTime) %Separate because this must happen first for all entities
 	end for
 
 	for i : 0 .. numEntities - 1
-	    player1 -> PreDraw %Separate because this must happen second for all entities
+	    entities (i) -> PreDraw %Separate because this must happen second for all entities
 	end for
 
 	for i : 0 .. numEntities - 1
-	    player1 -> DrawEntity %Separate because this must happen next for all entities with UI elements
+	    entities (i) -> DrawEntity %Separate because this must happen next for all entities with UI elements
 	end for
 
 	for i : 0 .. numEntities - 1
-	    player1 -> DrawGUI %Separate because this must happen last for all entities with UI elements
+	    entities (i) -> DrawGUI %Separate because this must happen last for all entities with UI elements
 	end for
 
 	%locate (1, 1)
@@ -3445,17 +3575,18 @@ loop
 	%Show new screen
 	View.Update
 
+
+	%player1 -> UnDraw
 	for i : 0 .. numEntities - 1
-	    player1 -> UnDraw
+	    entities (i) -> UnDraw
 	end for
 
 	IfDeadGameOver
 
 	%Make physics blocks fall (temp until entities added(?))
-	for xb : toGameCdXR (0) .. toGameCdXR (maxx)
-	    for yb : toGameCdYR (0) .. toGameCdYR (maxy)
+	for xb : toGameCdXR (0 - midx) .. toGameCdXR (maxx + midx)
+	    for yb : toGameCdYR (0 - midy) .. toGameCdYR (maxy + midy)
 		if blockType (block (xb) (yb).block).physics then
-		    %if block (xb) (yb).block = ord (blk.water) then
 		    if isBlock (xb, yb - 1, ord (blk.air), ord (layerId.foreground), true) then
 			block (xb) (yb - 1).block := block (xb) (yb).block
 			block (xb) (yb).block := ord (blk.air)
