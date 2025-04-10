@@ -3,19 +3,17 @@
 %File Name: 2DMC.t
 %Date: Feb. 11, 2013
 
-%The reason that there is no "Return to main menu" feature is that when you try to put 1600+ lines of code in a loop, turing gives you an error.
-
 %Make using GUI features possible
 import GUI
 
 %Program settings
-View.Set ("graphics:640;400") %Smallest advisable:450,310
+var MainWinID : int := Window.Open ("position:top;right,graphics:640;400") %Smallest advisable:450,330
 buttonchoose ("multibutton")
 setscreen ("noecho")
 
 %Declaration Statements
 %Constant declarations
-const midx : int := maxx div 2
+const midx : int := maxx div 2 
 const midy : int := maxy div 2
 const boolUnInit := 16#FF
 const numblockscanjump : real := 2.3
@@ -23,79 +21,88 @@ const numblockscanreach : real := 5
 const doubletapspeed : int := 100
 const blockplacespeed : int := 130
 const blockbreakspeed : int := 130
+const infinatePlacing : boolean := false
 const charudpxrange := 0
 const parallelinput : boolean := false
-const keepmapblocksize : boolean := false
-const pxscrollclearance : int := 100
+const keepmapblocksize : boolean := true
+const pxscrollclearance : int := 70
+const mainmaxx : int := maxx
+const staticfalldamage : boolean := true
 %Variable declarations
 var blocksize : int := 16 %Must be > 15
 var font1 := Font.New ("sans serif:40:bold")
 var font2 := Font.New ("sans serif:8:bold")
 var walkr : array 1 .. 4 of int
-walkr (1) := Pic.FileNew ("walk1r.bmp")
-walkr (2) := Pic.FileNew ("walk2r.bmp")
-walkr (3) := Pic.FileNew ("walk3r.bmp")
-walkr (4) := Pic.FileNew ("walk4r.bmp")
+walkr (1) := Pic.FileNew ("Images\\walk1r.bmp")
+walkr (2) := Pic.FileNew ("Images\\walk2r.bmp")
+walkr (3) := Pic.FileNew ("Images\\walk3r.bmp")
+walkr (4) := Pic.FileNew ("Images\\walk4r.bmp")
 var walkl : array 1 .. 4 of int
-walkl (1) := Pic.FileNew ("walk1l.bmp")
-walkl (2) := Pic.FileNew ("walk2l.bmp")
-walkl (3) := Pic.FileNew ("walk3l.bmp")
-walkl (4) := Pic.FileNew ("walk4l.bmp")
+walkl (1) := Pic.FileNew ("Images\\walk1l.bmp")
+walkl (2) := Pic.FileNew ("Images\\walk2l.bmp")
+walkl (3) := Pic.FileNew ("Images\\walk3l.bmp")
+walkl (4) := Pic.FileNew ("Images\\walk4l.bmp")
 var crawlr : array 1 .. 4 of int
-crawlr (1) := Pic.FileNew ("crawl1r.bmp")
-crawlr (2) := Pic.FileNew ("crawl2r.bmp")
-crawlr (3) := Pic.FileNew ("crawl3r.bmp")
-crawlr (4) := Pic.FileNew ("crawl4r.bmp")
+crawlr (1) := Pic.FileNew ("Images\\crawl1r.bmp")
+crawlr (2) := Pic.FileNew ("Images\\crawl2r.bmp")
+crawlr (3) := Pic.FileNew ("Images\\crawl3r.bmp")
+crawlr (4) := Pic.FileNew ("Images\\crawl4r.bmp")
 var crawll : array 1 .. 4 of int
-crawll (1) := Pic.FileNew ("crawl1l.bmp")
-crawll (2) := Pic.FileNew ("crawl2l.bmp")
-crawll (3) := Pic.FileNew ("crawl3l.bmp")
-crawll (4) := Pic.FileNew ("crawl4l.bmp")
+crawll (1) := Pic.FileNew ("Images\\crawl1l.bmp")
+crawll (2) := Pic.FileNew ("Images\\crawl2l.bmp")
+crawll (3) := Pic.FileNew ("Images\\crawl3l.bmp")
+crawll (4) := Pic.FileNew ("Images\\crawl4l.bmp")
 var walkrc : array 1 .. 4 of int
-walkrc (1) := Pic.FileNew ("walk1rc.bmp") %click
-walkrc (2) := Pic.FileNew ("walk2rc.bmp") %click
-walkrc (3) := Pic.FileNew ("walk3rc.bmp") %click
-walkrc (4) := Pic.FileNew ("walk4rc.bmp") %click
+walkrc (1) := Pic.FileNew ("Images\\walk1rc.bmp") %click
+walkrc (2) := Pic.FileNew ("Images\\walk2rc.bmp") %click
+walkrc (3) := Pic.FileNew ("Images\\walk3rc.bmp") %click
+walkrc (4) := Pic.FileNew ("Images\\walk4rc.bmp") %click
 var walklc : array 1 .. 4 of int
-walklc (1) := Pic.FileNew ("walk1lc.bmp") %click
-walklc (2) := Pic.FileNew ("walk2lc.bmp") %click
-walklc (3) := Pic.FileNew ("walk3lc.bmp") %click
-walklc (4) := Pic.FileNew ("walk4lc.bmp") %click
+walklc (1) := Pic.FileNew ("Images\\walk1lc.bmp") %click
+walklc (2) := Pic.FileNew ("Images\\walk2lc.bmp") %click
+walklc (3) := Pic.FileNew ("Images\\walk3lc.bmp") %click
+walklc (4) := Pic.FileNew ("Images\\walk4lc.bmp") %click
 var crawlrc : array 1 .. 4 of int
-crawlrc (1) := Pic.FileNew ("crawl1rc.bmp") %click
-crawlrc (2) := Pic.FileNew ("crawl2rc.bmp") %click
-crawlrc (3) := Pic.FileNew ("crawl3rc.bmp") %click
-crawlrc (4) := Pic.FileNew ("crawl4rc.bmp") %click
+crawlrc (1) := Pic.FileNew ("Images\\crawl1rc.bmp") %click
+crawlrc (2) := Pic.FileNew ("Images\\crawl2rc.bmp") %click
+crawlrc (3) := Pic.FileNew ("Images\\crawl3rc.bmp") %click
+crawlrc (4) := Pic.FileNew ("Images\\crawl4rc.bmp") %click
 var crawllc : array 1 .. 4 of int
-crawllc (1) := Pic.FileNew ("crawl1lc.bmp") %click
-crawllc (2) := Pic.FileNew ("crawl2lc.bmp") %click
-crawllc (3) := Pic.FileNew ("crawl3lc.bmp") %click
-crawllc (4) := Pic.FileNew ("crawl4lc.bmp") %click
-var jump : int := Pic.FileNew ("falljump.bmp")
-var jumpcr : int := Pic.FileNew ("falljumpcr.bmp") %click
-var jumpcl : int := Pic.FileNew ("falljumpcl.bmp") %click
-var jumpr : int := Pic.FileNew ("jumpr.bmp")
-var jumpl : int := Pic.FileNew ("jumpl.bmp")
-var jumprc : int := Pic.FileNew ("jumprc.bmp") %click
-var jumplc : int := Pic.FileNew ("jumplc.bmp") %click
-var jumprl : int := Pic.FileNew ("jumprl.bmp") %click
-var jumplr : int := Pic.FileNew ("jumplr.bmp") %click
-var fallr : int := Pic.FileNew ("fallr.bmp")
-var falll : int := Pic.FileNew ("falll.bmp")
-var fallrc : int := Pic.FileNew ("fallrc.bmp") %click
-var falllc : int := Pic.FileNew ("falllc.bmp") %click
-var fallrl : int := Pic.FileNew ("fallrl.bmp") %click
-var falllr : int := Pic.FileNew ("falllr.bmp") %click
-var fall : int := Pic.FileNew ("falljump.bmp")
-var fallcr : int := Pic.FileNew ("falljumpcr.bmp") %click
-var fallcl : int := Pic.FileNew ("falljumpcl.bmp") %click
-var stand : int := Pic.FileNew ("stand.bmp")
-var standcr : int := Pic.FileNew ("standcr.bmp") %click
-var standcl : int := Pic.FileNew ("standcl.bmp") %click
-var crosshairsbbpre : int := Pic.FileNew ("crosshairsbb.bmp")
-var crosshairsbbpre2 : int := Pic.FileNew ("crosshairsbb2.bmp")
-var crosshairspbpre : int := Pic.FileNew ("crosshairspb.bmp")
-var crosshairspbpre2 : int := Pic.FileNew ("crosshairspb2.bmp")
+crawllc (1) := Pic.FileNew ("Images\\crawl1lc.bmp") %click
+crawllc (2) := Pic.FileNew ("Images\\crawl2lc.bmp") %click
+crawllc (3) := Pic.FileNew ("Images\\crawl3lc.bmp") %click
+crawllc (4) := Pic.FileNew ("Images\\crawl4lc.bmp") %click
+var jump : int := Pic.FileNew ("Images\\falljump.bmp")
+var jumpcr : int := Pic.FileNew ("Images\\falljumpcr.bmp") %click
+var jumpcl : int := Pic.FileNew ("Images\\falljumpcl.bmp") %click
+var jumpr : int := Pic.FileNew ("Images\\jumpr.bmp")
+var jumpl : int := Pic.FileNew ("Images\\jumpl.bmp")
+var jumprc : int := Pic.FileNew ("Images\\jumprc.bmp") %click
+var jumplc : int := Pic.FileNew ("Images\\jumplc.bmp") %click
+var jumprl : int := Pic.FileNew ("Images\\jumprl.bmp") %click
+var jumplr : int := Pic.FileNew ("Images\\jumplr.bmp") %click
+var fallr : int := Pic.FileNew ("Images\\fallr.bmp")
+var falll : int := Pic.FileNew ("Images\\falll.bmp")
+var fallrc : int := Pic.FileNew ("Images\\fallrc.bmp") %click
+var falllc : int := Pic.FileNew ("Images\\falllc.bmp") %click
+var fallrl : int := Pic.FileNew ("Images\\fallrl.bmp") %click
+var falllr : int := Pic.FileNew ("Images\\falllr.bmp") %click
+var fall : int := Pic.FileNew ("Images\\falljump.bmp")
+var fallcr : int := Pic.FileNew ("Images\\falljumpcr.bmp") %click
+var fallcl : int := Pic.FileNew ("Images\\falljumpcl.bmp") %click
+var stand : int := Pic.FileNew ("Images\\stand.bmp")
+var standcr : int := Pic.FileNew ("Images\\standcr.bmp") %click
+var standcl : int := Pic.FileNew ("Images\\standcl.bmp") %click
+var dead : int := Pic.FileNew ("Images\\dead.bmp")
+var deadl : int := Pic.FileNew ("Images\\deadl.bmp")
+var deadr : int := Pic.FileNew ("Images\\deadr.bmp")
+var crosshairsbbpre : int := Pic.FileNew ("Images\\crosshairsbb.bmp")
+var crosshairsbbpre2 : int := Pic.FileNew ("Images\\crosshairsbb2.bmp")
+var crosshairspbpre : int := Pic.FileNew ("Images\\crosshairspb.bmp")
+var crosshairspbpre2 : int := Pic.FileNew ("Images\\crosshairspb2.bmp")
+var loadingScreen1 : int := Pic.FileNew ("Images\\loadingScreen.bmp")
+var healthbarfrst : int := Pic.FileNew ("Images\\healthbar.bmp")
+var loadingScreen : int := Pic.Scale (loadingScreen1, maxx - 20, maxy - 20)
 var charwidth : int := Pic.Width (stand)
 var charheight : int := Pic.Height (stand)
 var arrow : array char of boolean
@@ -103,18 +110,19 @@ var charx : int := midx + 2
 var chary : int := 200
 var backpic : int := Pic.New (0, 0, 2, 2)
 var screenpic : int := Pic.New (0, 0, 2, 2)
+var healthbar : int := Pic.New (0, 0, 2, 2)
+var healthbarback : int := Pic.New (0, 0, 2, 2)
 var tempcoords : array 1 .. 5 of int
 var xm, ym, cm, s, character, rcharxl, rcharyd, rcharxr, rcharyu, rcursorxbb, rcursorybb, rcursorxpb, rcursorypb, rcharydfloor, rcharyuceil,
     btnstrt, btncont, btnend, mainMenuButton, savenames, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload, saveButton, nameTextField, nameLabel,
     oldbackcolour, saveFile, autosave, menudelete, oldblockcolour, handheight, tempi, linegx, linegy, idelete, null, backpiccross, backpicbox,
-    srx, sry, slx, sly, sux, suy, sdx, sdy, shiftspot, endspot, mstScrnHsGnUp, mstScrnHsGnDwn, val, autocoords, cbprev, cbfly, bigx, bigy : int
+    srx, sry, slx, sly, sux, suy, sdx, sdy, shiftspot, endspot, mstScrnHsGnUp, mstScrnHsGnDwn, val, autocoords, cbprev, cbfly, bigx, bigy, saveasguiheight : int
 var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y,
-    iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2,
-    crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety, offsetleftright, mstScrnHsGnLft, mstScrnHsGnRght, offsetupdown, offsetprevlr,
-    offsetprevud : int := 0
+    iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2, crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety,
+    offsetleftright, mstScrnHsGnLft, mstScrnHsGnRght, offsetupdown, offsetprevlr, offsetprevud, healthold : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
     mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput, keyspc, keya, keys, keyd, keyp, preview, inmainmenu, resetdefaultbg,
-    resetdefaulthead, resetdefaultblk, canfly, flying, menuReturn, forcedelete : boolean := false
+    resetdefaulthead, resetdefaultblk, canfly, flying, menuReturn, forcedelete, returningFromPreview : boolean := false
 var action : string := "standing"
 var textfound, deletesaveread, headcolourstr, bgcolourstr, blockcolourstr, tempcolourstr : string
 var facing, oldfacing, loadfile : string := ""
@@ -123,17 +131,29 @@ var ponwlk, poncrl, movegaptens, isaves : int := 1
 var item1, item2, item3 : array 1 .. 16 of int
 var item4 : array 0 .. 99 of int
 var item5 : array 1 .. 99 of int
-var oktosavenew, frstmthrgh, gmfrstmthrgh : boolean := true
+var oktosavenew, frstmthrgh, gmfrstmthrgh, survival : boolean := true
 var previoussaves : array 1 .. 99 of string (30)
 var xinc, yinc, reach, nullreal : real
 var groundlevel : int := 50
-var menuitemcolours : array 1 .. 16 of string (20) :=
-    init ("Default", "White", "Light Grey", "Dark Grey", "Black", "Brown", "Red", "Orange", "Yellow", "Green", "Dark Green", "Turquoise", "Blue", "Dark Blue", "Purple", "Pink")
+var health : int := 1000
+var menuitemcolours : array 1 .. 16 of string (20) := init ("Default", "White", "Light Grey", "Dark Grey", "Black", "Brown", "Red", "Orange", "Yellow",
+    "Green", "Dark Green", "Turquoise", "Blue", "Dark Blue", "Purple", "Pink")
 var menuitemsaves : array 0 .. 99 of string (50)
 var menuitemdelete : array 1 .. 99 of string (50)
 menuitemsaves (1) := "New"
 menuitemsaves (0) := "---"
 menuitemdelete (99) := ""
+if maxy >= 350 then
+    saveasguiheight := maxy - 150
+else
+    saveasguiheight := maxy - 120
+end if
+
+var winID : int := Window.Open ("position:center;center,graphics:836;73")
+Window.Hide (winID)
+Window.SetActive (winID)
+Pic.Draw (healthbarfrst, 0, 0, picCopy)
+Window.SetActive (MainWinID)
 
 %Range: x: -4999 to 5000, y: -2499 to 2500
 
@@ -196,10 +216,14 @@ end returnMain
 %Loading screen
 procedure loading (loadscreencolour : int)
     Draw.FillBox (0, 0, maxx, maxy, loadscreencolour)
-    colourback (loadscreencolour)
-    locate (1, 1)
-    put "LOADING..."
-    colourback (white)
+    Pic.Draw (loadingScreen, 10, 10, picCopy)
+    %Draw.FillOval (midx, midy, maxx div 2 - 10, maxy div 2 - 10, red)
+    Draw.Oval (midx, midy, maxx div 2 - 10, maxy div 2 - 10, black)
+    Draw.Text ("LOADING...", midx - Font.Width ("LOADING...", font1) div 2 - 1, midy - 21, font1, black)
+    Draw.Text ("LOADING...", midx - Font.Width ("LOADING...", font1) div 2 - 1, midy - 19, font1, black)
+    Draw.Text ("LOADING...", midx - Font.Width ("LOADING...", font1) div 2 + 1, midy - 21, font1, black)
+    Draw.Text ("LOADING...", midx - Font.Width ("LOADING...", font1) div 2 + 1, midy - 19, font1, black)
+    Draw.Text ("LOADING...", midx - Font.Width ("LOADING...", font1) div 2, midy - 20, font1, loadscreencolour)
     View.Update
 end loading
 
@@ -248,7 +272,7 @@ procedure HeadSelected
 	    elsif i = 16 then
 		headcolour := brightpurple
 	    end if
-	    colorback (oldbackcolour)
+	    colourback (oldbackcolour)
 	    if headcolour = 983 then
 		Draw.FillBox (32, maxy - 67, 62, maxy - 37, oldbackcolour)
 		Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
@@ -300,7 +324,7 @@ procedure BackgroundSelected
 	    elsif i = 16 then
 		bgcolour := brightpurple
 	    end if
-	    colorback (oldbackcolour)
+	    colourback (oldbackcolour)
 	    if bgcolour = 983 then
 		Draw.FillBox (145, maxy - 67, 175, maxy - 37, oldbackcolour)
 		Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
@@ -352,7 +376,7 @@ procedure BlocksSelected
 	    elsif i = 16 then
 		blockcolour := brightpurple
 	    end if
-	    colorback (oldbackcolour)
+	    colourback (oldbackcolour)
 	    if blockcolour = 983 then
 		Draw.FillBox (265, maxy - 67, 295, maxy - 37, oldbackcolour)
 		Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
@@ -402,12 +426,12 @@ procedure DeleteSelected
     close : savenames
     ireassign := 0
     File.Delete ("Saves\\" + menuitemdelete (idelete) + ".txt")
-    File.Delete ("Preferences\\" + menuitemdelete (idelete) + ".txt")
+    File.Delete ("Saves\\Preferences\\" + menuitemdelete (idelete) + ".txt")
     if forcedelete = false then
 	GUI.Disable (item5 (idelete))
 	GUI.Disable (item4 (idelete + 1))
-	colorback (oldbackcolour)
-	locate (13, 1)
+	colourback (oldbackcolour)
+	locate (14, 1)
 	put "Deleted ", menuitemdelete (idelete) + "                      "
     end if
 end DeleteSelected
@@ -417,7 +441,7 @@ procedure LoadSelected
     for i : 1 .. isaves
 	if item4 (i) = GUI.GetEventWidgetID then
 	    loadfile := menuitemsaves (i)
-	    colorback (oldbackcolour)
+	    colourback (oldbackcolour)
 	    locate (13, 1)
 	    if i = 1 then
 		loaded := false
@@ -434,6 +458,7 @@ end LoadSelected
 process guis
     if gmfrstmthrgh then
 	btnstrt := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Start Game", start, 30, chr (13), false)
+	btnend := GUI.CreateButtonFull (midx - 150, maxy div 9 - 20, 300, "Quit", endgame, 30, chr (13), false)
 
 	cbprev := GUI.CreateCheckBox (maxx - 80, maxy - 70, "Preview", DoNothing)
 	cbfly := GUI.CreateCheckBox (maxx - 80, maxy - 100, "Flying", DoNothing)
@@ -531,7 +556,7 @@ procedure saveWorld
 	end if
 	close : savenames
 
-	open : loadedsavepref, ("Preferences\\" + textfound + ".txt"), get, put, seek
+	open : loadedsavepref, ("Saves\\Preferences\\" + textfound + ".txt"), get, put, seek
 	put : loadedsavepref, charx / blocksize
 	put : loadedsavepref, chary / blocksize
 	put : loadedsavepref, headcolour
@@ -547,6 +572,8 @@ procedure saveWorld
 	put : loadedsavepref, mstScrnHsGnRght / blocksize
 	put : loadedsavepref, offsetupdown / blocksize
 	put : loadedsavepref, offsetleftright / blocksize
+	put : loadedsavepref, health
+	put : loadedsavepref, survival
 	close : loadedsavepref
 
 	open : saveFile, ("Saves\\" + textfound + ".txt"), get, put, seek
@@ -567,12 +594,11 @@ end saveWorld
 
 %The GUIs that are only used on pause screen
 process pauseguis
-    saveButton := GUI.CreateButton (midx - 50, midy + 30, 100, "Save", saveWorld)
-    nameTextField := GUI.CreateTextFieldFull (midx - 100, midy + 60, 200, "", NameEntered, GUI.INDENT, 0, 0)
-    nameLabel := GUI.CreateLabelFull (midx - 105, midy + 60, "Save as:", 0, 0, GUI.RIGHT, 0)
+    saveButton := GUI.CreateButton (midx - 50, (saveasguiheight - 30), 100, "Save", saveWorld)
+    nameTextField := GUI.CreateTextFieldFull (midx - 100, saveasguiheight, 200, "", NameEntered, GUI.INDENT, 0, 0) % ALTER THESE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    nameLabel := GUI.CreateLabelFull (midx - 105, saveasguiheight, "Save as:", 0, 0, GUI.RIGHT, 0)
     btncont := GUI.CreateButtonFull (midx - 150, maxy div 3, 300, "Continue", start, 30, chr (13), false)
-    mainMenuButton := GUI.CreateButtonFull (midx - 150, maxy div 4.4, 300, "Return to Main Menu", returnMain, 30, chr (13), false)
-    btnend := GUI.CreateButtonFull (midx - 150, maxy div 9, 300, "Quit", endgame, 30, chr (13), false)
+    mainMenuButton := GUI.CreateButtonFull (midx - 150, maxy div 4.4 - 10, 300, "Return to Main Menu", returnMain, 30, chr (13), false)
     GUI.SetText (nameTextField, textfound)
     loop
 	if startgame then
@@ -604,7 +630,7 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
     seek : autosave, *
 
     %Generate new ground
-    if scrdirx = 0 and scrdiry = 1 and offsetupdown + groundlevel + blocksize > 0 then   %Screen up, make ground below
+    if scrdirx = 0 and scrdiry = 1 and offsetupdown + groundlevel + blocksize > 0 then %Screen up, make ground below
 	x := -blocksize - blocksize + offsetx
 	y := -blocksize - blocksize + offsety
 	loop
@@ -617,7 +643,7 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 	    x += blocksize
 	    exit when x >= maxx + blocksize
 	end loop
-    elsif scrdirx = -1 and scrdiry = 0 and offsetupdown + groundlevel > 0 then   %Screen left, make ground right
+    elsif scrdirx = -1 and scrdiry = 0 and offsetupdown + groundlevel > 0 then %Screen left, make ground right
 	x := ((floor ((maxx - offsetx) / blocksize)) * blocksize + offsetx) + blocksize
 	y := -blocksize + offsety
 	loop
@@ -630,7 +656,7 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 	    y += blocksize
 	    exit when y >= offsetupdown + groundlevel
 	end loop
-    elsif scrdirx = 1 and scrdiry = 0 and offsetupdown + groundlevel > 0 then   %Screen right, make ground left
+    elsif scrdirx = 1 and scrdiry = 0 and offsetupdown + groundlevel > 0 then %Screen right, make ground left
 	x := -blocksize - blocksize + offsetx
 	y := -blocksize + offsety
 	loop
@@ -670,7 +696,10 @@ end screenscroll
 %Re-enables start GUIs
 procedure ReEnableStartGUIs
     if gmfrstmthrgh = false then
-	Pic.Draw (backpic, 0, maxy - 210, picCopy)
+	if returningFromPreview then
+	    Pic.Draw (backpic, 0, maxy - 210, picCopy)
+	    returningFromPreview := false
+	end if
 	GUI.Enable (menuload)
 	GUI.Enable (item1 (1))
 	GUI.Enable (item2 (1))
@@ -707,6 +736,7 @@ procedure DisableAndHideGUIs
     GUI.Disable (cbprev)
     GUI.Disable (cbfly)
     GUI.Hide (btnstrt)
+    GUI.Hide (btnend)
     GUI.HideMenuBar
     GUI.Quit
 end DisableAndHideGUIs
@@ -715,7 +745,7 @@ end DisableAndHideGUIs
 procedure GetPreferences
     if loaded then
 	open : loadedsave, ("Saves\\" + loadfile + ".txt"), get, put, seek, mod
-	open : loadedsavepref, ("Preferences\\" + loadfile + ".txt"), get, put, seek, mod
+	open : loadedsavepref, ("Saves\\Preferences\\" + loadfile + ".txt"), get, put, seek, mod
 	seek : loadedsavepref, 0
 	get : loadedsavepref, nullreal
 	charx := round (nullreal * blocksize)
@@ -759,6 +789,8 @@ procedure GetPreferences
 	offsetupdown := round (nullreal * blocksize)
 	get : loadedsavepref, nullreal
 	offsetleftright := round (nullreal * blocksize)
+	get : loadedsavepref, health
+	get : loadedsavepref, survival
 	close : loadedsavepref
     else
 	if headcolour = 983 then
@@ -770,9 +802,10 @@ procedure GetPreferences
 	if blockcolour = 983 then
 	    blockcolour := black
 	end if
-	groundlevel := ((floor ((groundlevel) / blocksize)) * blocksize)
+	groundlevel := ((floor (groundlevel / blocksize)) * blocksize)
 	mstScrnHsGnUp := groundlevel
 	mstScrnHsGnDwn := groundlevel
+	chary := groundlevel
     end if
 end GetPreferences
 
@@ -898,19 +931,21 @@ procedure WorldPreview
 		end loop
 	    end if
 	    View.Update
-	    if arrow ('a') then
+	    if arrow ('a') or arrow (KEY_LEFT_ARROW) then
 		offsetprevlr -= 10
-	    elsif arrow ('d') then
+	    elsif arrow ('d') or arrow (KEY_RIGHT_ARROW) then
 		offsetprevlr += 10
 	    end if
-	    if arrow ('w') then
+	    if arrow ('w') or arrow (KEY_UP_ARROW) then
 		offsetprevud += 10
-	    elsif arrow ('s') then
+	    elsif arrow ('s') or arrow (KEY_DOWN_ARROW) then
 		offsetprevud -= 10
 	    end if
 	    if arrow ('p') then
 		offsetprevlr := 0
 		offsetprevud := 0
+		gmfrstmthrgh := false
+		returningFromPreview := true
 		exit
 	    end if
 	end loop
@@ -1055,13 +1090,13 @@ procedure KeyAndParallelInput
     if arrow (' ') then
 	keyspc := true
     end if
-    if arrow ('a') then
+    if arrow ('a') or arrow (KEY_LEFT_ARROW) then
 	keya := true
     end if
-    if arrow ('s') then
+    if arrow ('s') or arrow (KEY_DOWN_ARROW) then
 	keys := true
     end if
-    if arrow ('d') then
+    if arrow ('d') or arrow (KEY_RIGHT_ARROW) then
 	keyd := true
     end if
     if arrow ('p') then
@@ -1141,38 +1176,47 @@ procedure AimGuideMovement
 	yinc := (ym - handheight) / Math.Distance (charx, handheight, xm, ym)
     end if
     tempi := round (reach)
-    for i : 1 .. round (reach)
-	if norcursorinput = false then
-	    rcursorxbb := ((floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize) + offsetx
-	    rcursorybb := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
-	    rcursorxpb := rcursorxbb
-	    rcursorypb := rcursorybb
-	    tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
-	    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) then
-		tempi := i
-		rcursorxbb := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
-		rcursorybb := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
-		rcursorxpb := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
-		rcursorypb := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
-		norcursorinput := true
+    if not infinatePlacing then
+	for i : 1 .. round (reach)
+	    if norcursorinput = false then
+		rcursorxbb := ((floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize) + offsetx
+		rcursorybb := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
+		rcursorxpb := rcursorxbb
+		rcursorypb := rcursorybb
+		tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
+		if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) then
+		    tempi := i
+		    rcursorxbb := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
+		    rcursorybb := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
+		    rcursorxpb := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
+		    rcursorypb := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
+		    norcursorinput := true
+		end if
+	    else %This is just to slow it down so that there is the same delay whether you are looking at a block or not. I am not convinced that it is nessecary.
+		null := ((floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize) + offsetx
+		null := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
+		null := rcursorxbb
+		null := rcursorybb
+		null := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
+		if #block (null) not= boolUnInit and block (null) then
+		    null := i
+		    null := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
+		    null := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
+		    null := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
+		    null := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
+		    null := 1
+		end if
 	    end if
-	else %This is just to slow it down so that there is the same delay whether you are looking at a block or not. I am not convinced that it is nessecary.
-	    null := ((floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize) + offsetx
-	    null := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
-	    null := rcursorxbb
-	    null := rcursorybb
-	    null := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
-	    if #block (null) not= boolUnInit and block (null) then
-		null := i
-		null := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
-		null := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
-		null := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
-		null := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
-		null := 1
-	    end if
-	end if
-    end for
+	end for
+    else
+	rcursorxbb := ((floor ((xm - offsetx) / blocksize)) * blocksize) + offsetx
+	rcursorybb := ((floor ((ym - offsety) / blocksize)) * blocksize) + offsety
+	rcursorxpb := rcursorxbb
+	rcursorypb := rcursorybb
+    end if
+
     norcursorinput := false
+    %Draw.Line (charx, handheight, round(charx + xinc * tempi), round(handheight + yinc * tempi), brightgreen)
     if Math.Distance (charx, handheight, xm, ym) < Math.Distance (charx, handheight, charx + xinc * tempi, handheight + yinc * tempi) then
 	rcursorxbb := (floor ((xm - offsetx) / blocksize)) * blocksize + offsetx
 	rcursorybb := (floor ((ym - offsety) / blocksize)) * blocksize + offsety
@@ -1183,7 +1227,7 @@ end AimGuideMovement
 
 %If player right-clicks
 procedure PlayerRightClick
-    if cm = 100 then
+    if cm = 100 and health > 0 then
 	if mclickr = 0 then
 	    mclickr := blockplacespeed
 	end if
@@ -1196,7 +1240,7 @@ procedure PlayerRightClick
 		tempcoords (3) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x - blocksize - offsetleftright) div blocksize + 4999)
 		tempcoords (4) := (((y + blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
 		tempcoords (5) := (((y - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
-		if #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) or #block (tempcoords (3)) not= boolUnInit and block (tempcoords (3)) or
+		if infinatePlacing or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) or #block (tempcoords (3)) not= boolUnInit and block (tempcoords (3)) or
 		    #block (tempcoords (4)) not= boolUnInit and block (tempcoords (4)) or #block (tempcoords (5)) not= boolUnInit and block (tempcoords (5)) then
 		    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) then
 			Draw.FillBox (rcursorxpb, rcursorypb, rcursorxpb + (blocksize - 1), rcursorypb + (blocksize - 1), blockcolour)
@@ -1219,7 +1263,7 @@ end PlayerRightClick
 
 %If player left-clicks
 procedure PlayerLeftClick
-    if cm = 1 then
+    if cm = 1 and health > 0 then
 	if mclickl = 0 then
 	    mclickl := blockbreakspeed
 	end if
@@ -1251,6 +1295,7 @@ procedure PressPKey
 	screenpic := Pic.New (0, 0, maxx, maxy)
 	Draw.FillBox (0, 0, maxx, maxy, bgcolour)
 	GUI.ResetQuit
+	GUI.Show (btnend)
 	GUI.ShowMenuBar
 	colourstringify (headcolour)
 	Draw.FillBox (32, maxy - 67, 62, maxy - 37, headcolour)
@@ -1268,7 +1313,7 @@ procedure PressPKey
 	    exit when startgame
 	end loop
 
-	%If the quit button has been clicked
+	%If the quit button has not been clicked
 	if not quitthegame then
 
 	    %Temporarily disable and hide all GUIs
@@ -1314,7 +1359,7 @@ end PressPKey
 
 %If 'd' key is pressed
 procedure PressDKey
-    if keyd then
+    if keyd and health > 0 then
 	if recentstartd then
 	    recentstartd := false
 	    if sprintpossibled2 = 0 then
@@ -1379,7 +1424,7 @@ end PressDKey
 
 %If 'a' key is pressed
 procedure PressAKey
-    if keya then
+    if keya and health > 0 then
 	if recentstarta then
 	    recentstarta := false
 	    if sprintpossiblea2 = 0 then
@@ -1446,7 +1491,7 @@ end PressAKey
 
 %If spacebar is pressed
 procedure PressSpaceKey
-    if keyspc and (onground or flying) and mustcrawl = false and hitceiling = false then
+    if keyspc and health > 0 and (onground or flying) and mustcrawl = false and hitceiling = false then
 	if flying then
 	    chary += 1
 	else
@@ -1458,7 +1503,7 @@ end PressSpaceKey
 
 %If 's' key is pressed
 procedure PressSKey
-    if keys then
+    if keys and health > 0 then
 	if onground then
 	    if keya or keyd then
 		action := "crawling"
@@ -1519,16 +1564,35 @@ procedure Gravity
 	end if
     end if
 
-    %On solid ground reset gravity
-    if onground then
+    %On solid ground reset gravity and calculate fall damage
+    if onground and gravcount not= 0 then
+	if survival then
+	    if staticfalldamage then
+		if gravcount >= blocksize * 5 then
+		    locate (1, 1)
+		    %put round (((gravcount - blocksize * 4) / (blocksize * 15)) * 1000)
+		    health -= round (((gravcount - blocksize * 4) / (blocksize * 15)) * 1000)
+		end if
+	    else
+		if gravcount >= blocksize * 5 then
+		    health -= 100
+		end if
+	    end if
+	end if
 	gravcount := 0
     end if
 end Gravity
 
+procedure SetHealth
+    if health < 0 then
+	health := 0
+    end if
+end SetHealth
+
 %Finish the first part of assigning a usable value to "action"
 procedure FinalizeAction1
     %Incorporate looking direction into action when not jumping or falling
-    if action (1 .. 7) not= "jumping" and action (1 .. 7) not= "falling" then
+    if health > 0 and action (1 .. 7) not= "jumping" and action (1 .. 7) not= "falling" then
 	if cm not= 0 then
 	    if xm >= charx then
 		facing := "right"
@@ -1538,11 +1602,21 @@ procedure FinalizeAction1
 	end if
     end if
 
-    %Incorporate motion direction into action
-    if facing not= "" then
-	action += " "
+    if health = 0 then
+	action := "dying"
     end if
-    action += facing
+
+    %Incorporate motion direction into action
+    if health = 0 and onground or health not= 0 then
+	if facing not= "" then
+	    action += " "
+	end if
+	action += facing
+    end if
+
+    if action = "dying" then
+	action += "xx"
+    end if
 
     %Incorporate looking direction into action when jumping or falling
     if action (1 .. 7) = "jumping" or action (1 .. 7) = "falling" then
@@ -1610,87 +1684,97 @@ end FinalizeAction2
 
 %What character image is being used
 procedure CharImage
-    if cm = 0 then  %Image if not clicking
-	if action = "walking left" then
-	    character := walkl (wlk)
-	elsif action = "walking right" then
-	    character := walkr (wlk)
-	elsif action = "crawlingstop" then
-	    character := crawlr (2)
-	elsif action = "crawlingstop left" then
-	    character := crawll (2)
-	elsif action = "crawlingstop right" then
-	    character := crawlr (2)
-	elsif action = "crawling left" then
-	    character := crawll (crl)
-	elsif action = "crawling right" then
-	    character := crawlr (crl)
-	elsif action = "falling" then
-	    character := fall
-	elsif action = "falling left" then
-	    character := falll
-	elsif action = "falling right" then
-	    character := fallr
-	elsif action = "jumping" then
-	    character := jump
-	elsif action = "jumping left" then
-	    character := jumpl
-	elsif action = "jumping right" then
-	    character := jumpr
-	elsif action = "standing left" then
-	    character := walkl (2)
-	elsif action = "standing right" then
-	    character := walkr (2)
-	elsif action = "standing" then
-	    character := stand
+    if health not= 0 then
+	if cm = 0 then %Image if not clicking
+	    if action = "walking left" then
+		character := walkl (wlk)
+	    elsif action = "walking right" then
+		character := walkr (wlk)
+	    elsif action = "crawlingstop" then
+		character := crawlr (2)
+	    elsif action = "crawlingstop left" then
+		character := crawll (2)
+	    elsif action = "crawlingstop right" then
+		character := crawlr (2)
+	    elsif action = "crawling left" then
+		character := crawll (crl)
+	    elsif action = "crawling right" then
+		character := crawlr (crl)
+	    elsif action = "falling" then
+		character := fall
+	    elsif action = "falling left" then
+		character := falll
+	    elsif action = "falling right" then
+		character := fallr
+	    elsif action = "jumping" then
+		character := jump
+	    elsif action = "jumping left" then
+		character := jumpl
+	    elsif action = "jumping right" then
+		character := jumpr
+	    elsif action = "standing left" then
+		character := walkl (2)
+	    elsif action = "standing right" then
+		character := walkr (2)
+	    elsif action = "standing" then
+		character := stand
+	    end if
+	else %Image if clicking
+	    if action = "walking left" then
+		character := walklc (wlk)
+	    elsif action = "walking right" then
+		character := walkrc (wlk)
+	    elsif action = "crawlingstop" then
+		character := crawlrc (2)
+	    elsif action = "crawlingstop left" then
+		character := crawllc (2)
+	    elsif action = "crawlingstop right" then
+		character := crawlrc (2)
+	    elsif action = "crawling left" then
+		character := crawllc (crl)
+	    elsif action = "crawling right" then
+		character := crawlrc (crl)
+	    elsif action = "falling" then
+		if xm >= charx then
+		    character := fallcr
+		else
+		    character := fallcl
+		end if
+	    elsif action = "falling left" then
+		character := falllc
+	    elsif action = "falling right" then
+		character := fallrc
+	    elsif action = "falling left facing right" then
+		character := falllr
+	    elsif action = "falling right facing left" then
+		character := fallrl
+	    elsif action = "jumping" then
+		if xm >= charx then
+		    character := jumpcr
+		else
+		    character := jumpcl
+		end if
+	    elsif action = "jumping left" then
+		character := jumplc
+	    elsif action = "jumping right" then
+		character := jumprc
+	    elsif action = "jumping left facing right" then
+		character := jumplr
+	    elsif action = "jumping right facing left" then
+		character := jumprl
+	    elsif action = "standing left" then
+		character := walklc (2)
+	    elsif action = "standing right" then
+		character := walkrc (2)
+	    end if
 	end if
-    else  %Image if clicking
-	if action = "walking left" then
-	    character := walklc (wlk)
-	elsif action = "walking right" then
-	    character := walkrc (wlk)
-	elsif action = "crawlingstop" then
-	    character := crawlrc (2)
-	elsif action = "crawlingstop left" then
-	    character := crawllc (2)
-	elsif action = "crawlingstop right" then
-	    character := crawlrc (2)
-	elsif action = "crawling left" then
-	    character := crawllc (crl)
-	elsif action = "crawling right" then
-	    character := crawlrc (crl)
-	elsif action = "falling" then
-	    if xm >= charx then
-		character := fallcr
-	    else
-		character := fallcl
-	    end if
-	elsif action = "falling left" then
-	    character := falllc
-	elsif action = "falling right" then
-	    character := fallrc
-	elsif action = "falling left facing right" then
-	    character := falllr
-	elsif action = "falling right facing left" then
-	    character := fallrl
-	elsif action = "jumping" then
-	    if xm >= charx then
-		character := jumpcr
-	    else
-		character := jumpcl
-	    end if
-	elsif action = "jumping left" then
-	    character := jumplc
-	elsif action = "jumping right" then
-	    character := jumprc
-	elsif action = "jumping left facing right" then
-	    character := jumplr
-	elsif action = "jumping right facing left" then
-	    character := jumprl
-	elsif action = "standing left" then
-	    character := walklc (2)
-	elsif action = "standing right" then
-	    character := walkrc (2)
+    else
+	if action = "dyingxx" then
+	    character := dead
+	elsif action = "dying left" then
+	    character := deadl
+	elsif action = "dying right" then
+	    character := deadr
 	end if
     end if
 end CharImage
@@ -1698,7 +1782,11 @@ end CharImage
 %Draw character image and head colour
 procedure CharDraw
     %Draw character's head colour
-    if action = "crawling left" or action = "crawlingstop left" then
+    if action = "dying left" then
+	Draw.FillOval (charx - 4, chary + 4, 3, 3, headcolour)
+    elsif action = "dying right" then
+	Draw.FillOval (charx + 4, chary + 4, 3, 3, headcolour)
+    elsif action = "crawling left" or action = "crawlingstop left" then
 	Draw.FillOval (charx - 4, chary + 8, 3, 3, headcolour)
     elsif action = "crawling right" or action = "crawlingstop right" or action = "crawlingstop" then
 	Draw.FillOval (charx + 4, chary + 8, 3, 3, headcolour)
@@ -1712,62 +1800,103 @@ end CharDraw
 
 %Save background behind aim guides and draw them
 procedure AimGuideBacksaveAndDraw
-    %Get blocks at block placing box and block breaking crosshairs
-    tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
-    tempcoords (2) := (((rcursorypb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxpb - offsetleftright) div blocksize + 4999)
+    if health > 0 then
+	%Get blocks at block placing box and block breaking crosshairs
+	tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
+	tempcoords (2) := (((rcursorypb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxpb - offsetleftright) div blocksize + 4999)
 
-    if tempcoords (1) not= tempcoords (2) then
-	%Save background behind crosshairs
-	backpiccross := Pic.New (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1)
+	if tempcoords (1) not= tempcoords (2) then
+	    %Save background behind crosshairs
+	    backpiccross := Pic.New (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1)
 
-	%Save background behind box
-	backpicbox := Pic.New (rcursorxpb, rcursorypb, rcursorxpb + blocksize - 1, rcursorypb + blocksize - 1)
+	    %Save background behind box
+	    backpicbox := Pic.New (rcursorxpb, rcursorypb, rcursorxpb + blocksize - 1, rcursorypb + blocksize - 1)
 
-	%Draw crosshairs for breaking blocks
-	if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) and blockcolour = black or ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and bgcolour = black
-		then
-	    Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
+	    %Draw crosshairs for breaking blocks
+	    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) and blockcolour = black or ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and bgcolour =
+		    black
+		    then
+		Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
+	    else
+		Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
+	    end if
+
+	    %Draw box for placing blocks
+	    if #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) and blockcolour = black or ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and bgcolour =
+		    black
+		    then
+		Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
+	    else
+		Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
+	    end if
 	else
-	    Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
-	end if
+	    %Save background behind crosshairs and box
+	    backpiccross := Pic.New (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1)
 
-	%Draw box for placing blocks
-	if #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) and blockcolour = black or ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and bgcolour = black
-		then
-	    Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
-	else
-	    Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
-	end if
-    else
-	%Save background behind crosshairs and box
-	backpiccross := Pic.New (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1)
-
-	%Draw crosshairs for breaking blocks and box for placing blocks
-	if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) and blockcolour = black or ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and bgcolour = black
-		then
-	    Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
-	    Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
-	else
-	    Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
-	    Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
+	    %Draw crosshairs for breaking blocks and box for placing blocks
+	    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) and blockcolour = black or ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and bgcolour =
+		    black
+		    then
+		Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
+		Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
+	    else
+		Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
+		Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
+	    end if
 	end if
     end if
 end AimGuideBacksaveAndDraw
 
+%Draw the health bar and save its background
+procedure DrawHealthBar
+    if survival then
+	Pic.Free (healthbarback)
+	healthbarback := Pic.New (maxx div 8 - 1, 19, (maxx div 4 * 3) + maxx div 8 + 1, 41)
+	if health not= 0 then
+	    if health not= healthold then
+		Window.SetActive (winID)
+		Pic.Free (healthbar)
+		healthbar := Pic.New (0, 0, round ((mainmaxx div 4 * 3 / 100) * (health / 10)), 20)
+		Window.SetActive (MainWinID)
+		healthold := health
+	    end if
+	    Pic.Draw (healthbar, maxx div 8, 20, picMerge)
+	    Draw.Box (maxx div 8, 20, (maxx div 4 * 3) + maxx div 8, 40, 10)
+	else
+	    Draw.Box (maxx div 8, 20, (maxx div 4 * 3) + maxx div 8, 40, brightred)
+	end if
+    end if
+end DrawHealthBar
+
+procedure IfDeadGameOver
+    if health = 0 then
+	Draw.Text ("Game Over", midx - 150, midy, font1, red)
+    end if
+end IfDeadGameOver
+
+%Erase the health bar by redrawing its background
+procedure EraseHealthBar
+    if survival then
+	Pic.Draw (healthbarback, maxx div 8 - 1, 19, picCopy)
+    end if
+end EraseHealthBar
+
 %Erase guide graphics
 procedure EraseAimGuide
-    if tempcoords (1) not= tempcoords (2) then
-	%Draw old unaltered block over crosshairs for breaking blocks
-	Pic.Draw (backpiccross, rcursorxbb, rcursorybb, picCopy)
-	Pic.Free (backpiccross)
+    if health > 0 then
+	if tempcoords (1) not= tempcoords (2) then
+	    %Draw old unaltered block over crosshairs for breaking blocks
+	    Pic.Draw (backpiccross, rcursorxbb, rcursorybb, picCopy)
+	    Pic.Free (backpiccross)
 
-	%Draw old unaltered block over box for placing blocks
-	Pic.Draw (backpicbox, rcursorxpb, rcursorypb, picCopy)
-	Pic.Free (backpicbox)
-    else
-	%Draw old unaltered block over crosshairs for breaking blocks and box for placing blocks
-	Pic.Draw (backpiccross, rcursorxbb, rcursorybb, picCopy)
-	Pic.Free (backpiccross)
+	    %Draw old unaltered block over box for placing blocks
+	    Pic.Draw (backpicbox, rcursorxpb, rcursorypb, picCopy)
+	    Pic.Free (backpicbox)
+	else
+	    %Draw old unaltered block over crosshairs for breaking blocks and box for placing blocks
+	    Pic.Draw (backpiccross, rcursorxbb, rcursorybb, picCopy)
+	    Pic.Free (backpiccross)
+	end if
     end if
 end EraseAimGuide
 
@@ -1800,14 +1929,15 @@ procedure resetVariables
     guidecolour := 0
     offsetx := 0
     offsety := 0
-    oldbackcolour := white
-    oldblockcolour := black
     offsetleftright := 0
     mstScrnHsGnLft := 0
     mstScrnHsGnRght := 0
     offsetprevlr := 0
     offsetprevud := 0
     offsetupdown := 0
+    healthold := 0
+    oldbackcolour := white
+    oldblockcolour := black
     gmfrstmthrgh := false
     onground := false
     onleftwall := false
@@ -1846,6 +1976,7 @@ procedure resetVariables
     charheight := Pic.Height (stand)
     charx := midx + 2
     chary := 200
+    health := 1000
     action := "standing"
     facing := ""
     oldfacing := ""
@@ -1883,21 +2014,23 @@ loop
     %Main menu loop
     loop
 
-	%open text file of all saved files' names
-	open : savenames, ("Savenames.txt"), get, put, seek, mod
+	if not returningFromPreview then
+	    %open text file of all saved files' names
+	    open : savenames, ("Savenames.txt"), get, put, seek, mod
 
-	%Create a list of all saved files' names
-	if eof (savenames) = false then
-	    loop
-		isaves += 1
-		get : savenames, menuitemsaves (isaves) : *
-		menuitemdelete (isaves - 1) := (menuitemsaves (isaves))
-		exit when eof (savenames)
-	    end loop
+	    %Create a list of all saved files' names
+	    if eof (savenames) = false then
+		loop
+		    isaves += 1
+		    get : savenames, menuitemsaves (isaves) : *
+		    menuitemdelete (isaves - 1) := (menuitemsaves (isaves))
+		    exit when eof (savenames)
+		end loop
+	    end if
+
+	    %close text file of all saved files' names
+	    close : savenames
 	end if
-
-	%close text file of all saved files' names
-	close : savenames
 
 	%Clear and open autosave file
 	open : autosave, ("Autosave.txt"), get, put, seek
@@ -1906,12 +2039,18 @@ loop
 	%Disables buffer drawing
 	View.Set ("nooffscreenonly")
 
+	colourback (white)
+	Draw.FillBox (0, 0, maxx, maxy, white)
+
 	ReEnableStartGUIs
 
 	inmainmenu := true
 
 	%Run the GUIs to be used in main and pause menus
 	fork guis
+	if #btnend not= 16#80000000 then
+	    GUI.Show (btnend)
+	end if
 
 	ShowColourPreveiwDefault
 
@@ -1919,6 +2058,10 @@ loop
 	loop
 	    exit when startgame
 	end loop
+
+	if quitthegame then
+	    exit
+	end if
 
 	%Save main menu screen
 	Pic.Free (backpic)
@@ -1982,6 +2125,10 @@ loop
 	end if
     end loop
 
+    if quitthegame then
+	exit
+    end if
+
     if canfly then
 	flying := true
     end if
@@ -2044,8 +2191,6 @@ loop
 
 	CharJump
 
-	%Turn on/off flying here
-
 	Gravity
 
 	FinalizeAction1
@@ -2070,12 +2215,20 @@ loop
 	Pic.Free (backpic)
 	backpic := Pic.New (charx - charwidth div 2 - charudpxrange, chary - charudpxrange, charx + charwidth div 2 + charudpxrange, chary + charheight + charudpxrange)
 
+	SetHealth
+
 	CharDraw
 
 	AimGuideBacksaveAndDraw
 
+	DrawHealthBar
+
+	IfDeadGameOver
+
 	%Show new screen
 	View.Update
+
+	EraseHealthBar
 
 	EraseAimGuide
 
@@ -2091,7 +2244,6 @@ loop
 		movegaptens := 1
 	    end if
 	end if
-
 	delay (0) %This delay to be adjusted with screen size and computer performance speed.
     end loop
     if quitthegame then
@@ -2101,10 +2253,10 @@ loop
 end loop
 
 View.Set ("nooffscreenonly")
-colorback (white)
+colourback (white)
 cls
 
-%Erase contents of autosave files
+%Erase contents of autosave file
 close : autosave
 open : autosave, ("Autosave.txt"), get, put, seek
 close : autosave
@@ -2113,13 +2265,17 @@ close : autosave
 GUI.Disable (menuhead)
 GUI.Disable (menubg)
 GUI.Disable (menublk)
-GUI.Disable (btncont)
 GUI.Disable (btnend)
-GUI.Disable (mainMenuButton)
-GUI.Hide (btncont)
+if #btncont not= 16#80000000 then
+    GUI.Disable (btncont)
+    GUI.Hide (btncont)
+end if
+if #mainMenuButton not= 16#80000000 then
+    GUI.Disable (mainMenuButton)
+    GUI.Hide (mainMenuButton)
+end if
 GUI.Hide (btnend)
-GUI.Hide (mainMenuButton)
 GUI.HideMenuBar
 cls
 
-put "TGIO (Thank Goodness It's Over!)"
+put "Thanks For Playing!"
