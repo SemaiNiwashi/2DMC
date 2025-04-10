@@ -12,10 +12,9 @@ buttonchoose ("multibutton")
 setscreen ("noecho")
 %Framerate goal: deltatime of 6-7 on still, 17-20 on screen scrolling
 
-%None of Bryan's levels work!
-%Can't see tnt in block list
-%Can't see all worlds in block list
-%Text for "mangroveworldsaved" overlaps save text field
+%Colors for the preview are all wrong.
+%Dropdowns go off-screen. See "CreateTextBoxChoiceCustom.t"
+%Text for "_________ saved" and other "put"s move based on user's set font size. Only use Draw.Text.
 %Make player's update box form-fit to the player by placing it at the *old* location (unless I've already done that)
 %Make screen scrolling faster by moving the background picture and just updating the blocks at the edge of the screen
 %Fix player holding click to place blocks while crawling backwards makes spacing of 1, but then when screen is scrolling, it makes spacing of 2.
@@ -34,7 +33,9 @@ setscreen ("noecho")
  -Tools other than foreground have to be unlocked/acquired/crafted
  -Rest of hotbar is blocks
  */
+%In gen version 4, add whether or not the playing is flying to the preferences file
 %Add physics to sand and water!
+%Make leaves act like ladders/water - free movement when touching them > 50%
 %Add fire switching to different shades of red, orange, and yellow randomly
 %Make time affect sky color (rgb.addcolor 256, set to whatever)
 %Add swimming
@@ -64,6 +65,7 @@ const thisGenVersion : int := 3
 const jumpheight : real := 2.3
 const reach : real := 5
 const doubletapspeed : int := 300
+const timeSpeed : real := 0.00001
 var blockplacespeed : int := 130
 var blockbreakspeed : int := 130
 const playerSpeed : real := 5 / 1000
@@ -76,12 +78,13 @@ const pxscrollclearance : int := 70
 const staticfalldamage : boolean := true
 const lethalFallHeight : int := 5
 const gravAmount : real := 0.025
+const savDir : string := "ByanSaves\\"
+const imgDir : string := "Images\\"
+const imgType : string := ".bmp"
 var trainx : real := 10
 var trainy : real := 3
 var trainLeft : boolean := true
 var trainbackpic : int := Pic.New (0, 0, 2, 2)
-var imgDir : string := "Images\\"
-var imgType : string := ".bmp"
 
 %Type declarations for blocks
 %Block class
@@ -152,7 +155,7 @@ setBlockInfo (iter, "sand", true, true, 255, 235, 182)
 setBlockInfo (iter, "sandstone", true, false, 237, 203, 92)
 setBlockInfo (iter, "mud", true, true, 255, 235, 182)
 setBlockInfo (iter, "grass", true, false, 0, 128, 0)
-setBlockInfo (iter, "leaves", true, false, 0, 255, 0)
+setBlockInfo (iter, "leaves", false, false, 0, 255, 0)
 setBlockInfo (iter, "wood", true, false, 65, 32, 0)
 setBlockInfo (iter, "planks", true, false, 196, 156, 81)
 setBlockInfo (iter, "platform", false, false, 113, 56, 0)
@@ -202,13 +205,13 @@ var healthbarback : int := Pic.New (0, 0, 2, 2)
 var deltaTime, xm, ym, cm, btnstrt, btncont, btnend, mainMenuButton, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload,
     saveButton, saveasguiheight, nameTextField, nameLabel, saveFile, menudelete, cbprev, cbcreative, genVersion, seed, popupWinID : int
 var gametimeold, mstScrnHsGnLft, mstScrnHsGnRght, mstScrnHsGnUp, mstScrnHsGnDwn : int := 0
-var loaded, quitthegame, keyspc, keya, keys, keyd, keyp, keyalt, preview, resetdefaulthead, menuReturn, returningFromPreview,
-    inPauseMenu, scrollSlow, yesDelete : boolean := false
+var loaded, quitthegame, keyspc, keya, keys, keyd, keyp, keyalt, preview, resetdefaulthead, resetdefaulttime, resetdefaultblock, menuReturn,
+    inPauseMenu, scrollSlow, yesConfirm : boolean := false
 var gmfrstmthrgh : boolean := true
 var offsetleftright, offsetupdown, slowScrollSpeed : real := 0
-var timeOfDay : real := -1
+var timeOfDay, oldTimeColorVal, oldTime : real := -1
 var isaves : int := 1
-var oldbackcolour, bgcolour : int := white
+var bgcolour : int := white
 var textfound : string
 var loadfile, importedBlockList : string := ""
 var item1 : array 1 .. 16 of int
@@ -262,6 +265,8 @@ var spritec : array 0 .. 1 of string := init ("", "c")
 var spriteb : array 0 .. 1 of string := init ("bb", "pb")
 var sprite2 : array 0 .. 1 of string := init ("", "2")
 
+%var imgDir : string := "Images\\"
+%var imgType : string := ".bmp"
 %var nullPic : int := Pic.FileNew(imgDir + "dead" + imgType)
 for action : 0 .. 7
     for frame : 0 .. 3
@@ -325,7 +330,6 @@ var crosshairsbbpre : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.isb
 var crosshairsbbpre2 : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.isbb)) (ord (cursorClr.white)) % (action)(frame)(isbb=0)(colorwhite=1)
 var crosshairspbpre : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.ispb)) (ord (cursorClr.black)) % (action)(frame)(ispb=1)(colorblack=0)
 var crosshairspbpre2 : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.ispb)) (ord (cursorClr.white)) % (action)(frame)(ispb=1)(colorwhite=1)
-
 var charwidth : real := Pic.Width (stand) / blocksize
 var charheight : real := Pic.Height (stand) / blocksize
 var pos, oldPos : vec2
@@ -572,8 +576,10 @@ function timestringify (timeCurr : real) : string
     end if
 end timestringify
 
-function timecolourify (nbr : real) : int %In progress
-    result brightcyan
+function timecolourify (nbr : real) : int
+    var val : real := (12 - abs (nbr - 12)) / 12.0
+    RGB.SetColor (blockType (ord (blk.air)).clr, 0, val, val / 2 + 0.5)
+    result blockType (ord (blk.air)).clr
 end timecolourify
 
 function timemenu (nbr : int) : int
@@ -630,6 +636,7 @@ end endgame
 %If user clicks "Return to Main Menu" button
 procedure returnMain
     GUI.Quit
+    bgcolour := white
     menuReturn := true
     delay (10)
 end returnMain
@@ -674,15 +681,14 @@ end NameEntered
 procedure DoNothing (status : boolean)
 end DoNothing
 
-
 %Show colour preview as default
 procedure ShowColourPreview
-    colourback (oldbackcolour) %needed? probably?
+    colourback (bgcolour) %Not needed once I've gotten rid of all the "put"s
 
-    Draw.FillBox (0, maxy - 94, 94, maxy - 80, oldbackcolour)
-    Draw.FillBox (24, maxy - 57, 75, maxy - 46, oldbackcolour)
+    Draw.FillBox (0, maxy - 94, 94, maxy - 80, bgcolour)
+    Draw.FillBox (24, maxy - 57, 75, maxy - 46, bgcolour)
     if headcolour = -1 then
-	Draw.FillBox (32, maxy - 67, 62, maxy - 37, oldbackcolour)
+	Draw.FillBox (32, maxy - 67, 62, maxy - 37, bgcolour)
 	Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
 	Draw.Text ("Default head", 1, maxy - 90, font2, black)
     else
@@ -692,22 +698,22 @@ procedure ShowColourPreview
     end if
 
 
-    Draw.FillBox (99, maxy - 94, 232, maxy - 80, oldbackcolour)
-    Draw.FillBox (137, maxy - 57, 188, maxy - 46, oldbackcolour)
+    Draw.FillBox (99, maxy - 94, 232, maxy - 80, bgcolour)
+    Draw.FillBox (137, maxy - 57, 188, maxy - 46, bgcolour)
     if timeOfDay = -1 then
-	Draw.FillBox (145, maxy - 67, 175, maxy - 37, oldbackcolour)
+	Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
 	Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
 	Draw.Text ("Default time", 115, maxy - 90, font2, black)
     else
-	Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
+	Draw.FillBox (145, maxy - 67, 175, maxy - 37, blockType (ord (blk.air)).clr)
 	Draw.Box (145, maxy - 67, 175, maxy - 37, black)
 	Draw.Text ("Time: " + timestringify (timeOfDay), 115, maxy - 90, font2, black)
     end if
 
-    Draw.FillBox (237, maxy - 94, 340, maxy - 80, oldbackcolour)
-    Draw.FillBox (257, maxy - 57, 308, maxy - 46, oldbackcolour)
+    Draw.FillBox (237, maxy - 94, 340, maxy - 80, bgcolour)
+    Draw.FillBox (257, maxy - 57, 308, maxy - 46, bgcolour)
     if placingBlock.id = ord (blk.error) then
-	Draw.FillBox (265, maxy - 67, 295, maxy - 37, oldbackcolour)
+	Draw.FillBox (265, maxy - 67, 295, maxy - 37, bgcolour)
 	Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
 	Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
     else
@@ -732,7 +738,13 @@ procedure TimeSelected
     for i : 1 .. 13
 	if item2 (i) = GUI.GetEventWidgetID then
 	    timeOfDay := timemenu (i)
-	    bgcolour := timecolourify (timeOfDay)
+	    if inPauseMenu then
+		bgcolour := timecolourify (timeOfDay)
+		Draw.FillBox (0, 0, maxx, maxy - 20, bgcolour) %a cls
+		GUI.Refresh
+	    else
+		var tmp : int := timecolourify (timeOfDay)
+	    end if
 	    ShowColourPreview
 	end if
     end for
@@ -748,10 +760,94 @@ procedure BlocksSelected
     end for
 end BlocksSelected
 
-procedure setDeleteFlag
-    yesDelete := true
+procedure GUIConfirm
+    yesConfirm := true
     GUI.Quit
-end setDeleteFlag
+end GUIConfirm
+
+function GUIChoose (messageIn, btn1, btn2 : string) : boolean
+    yesConfirm := false
+    var popupWinID : int := Window.Open ("position:center;center,graphics:200;100,popup")
+    colorback (grey)
+    cls
+    var font : int := Font.New ("serif:13")
+    var message : string := messageIn
+    %Quotify message
+    var inQuotes : boolean := false
+    for i : 1 .. length (message)
+	if message (i) = "\"" then
+	    inQuotes := not inQuotes
+	end if
+	if inQuotes and message (i) = " " then
+	    message := message (1 .. i - 1) + "_" + message (i + 1 .. length (message))
+	end if
+    end for
+
+    var message1 : string := ""
+    var message2 : string := ""
+    var message3 : string := ""
+    if Font.Width (message, font) < maxx then
+	message2 := message
+    else
+	var middleSpace : int := 1
+	for i : 1 .. length (message)
+	    if message (i) = " " then
+		if abs (i - length (message) div 2) < abs (middleSpace - length (message) div 2) then
+		    middleSpace := i
+		end if
+	    end if
+	end for
+	message1 := message (1 .. middleSpace - 1)
+	message2 := message (middleSpace + 1 .. length (message))
+	if Font.Width (message1, font) >= maxx or Font.Width (message2, font) >= maxx then
+	    var thirdSpace1 : int := 1
+	    var thirdSpace2 : int := 1
+	    for i : 1 .. length (message)
+		if message (i) = " " then
+		    if abs (i - length (message) div 3) < abs (thirdSpace1 - length (message) div 3) then
+			thirdSpace1 := i
+		    elsif abs (i - length (message) div 3 * 2) < abs (thirdSpace2 - length (message) div 3 * 2) then
+			thirdSpace2 := i
+		    end if
+		end if
+	    end for
+	    message1 := message (1 .. thirdSpace1 - 1)
+	    message2 := message (thirdSpace1 + 1 .. thirdSpace2 - 1)
+	    message3 := message (thirdSpace2 + 1 .. length (message))
+	end if
+    end if
+
+    %UnQuotify message
+    for i : 1 .. length (message1)
+	if message1 (i) = "_" then
+	    message1 := message1 (1 .. i - 1) + " " + message1 (i + 1 .. length (message1))
+	end if
+    end for
+    for i : 1 .. length (message2)
+	if message2 (i) = "_" then
+	    message2 := message2 (1 .. i - 1) + " " + message2 (i + 1 .. length (message2))
+	end if
+    end for
+    for i : 1 .. length (message3)
+	if message3 (i) = "_" then
+	    message3 := message3 (1 .. i - 1) + " " + message3 (i + 1 .. length (message3))
+	end if
+    end for
+    Draw.Text (message1, 10, maxy - 15, font, black)
+    Draw.Text (message2, 10, maxy - 35, font, black)
+    Draw.Text (message3, 10, maxy - 55, font, black)
+    %Font.Free(font)
+    GUI.SetDisplayWhenCreated (true)
+    var deleteBtn : int := GUI.CreateButton (20, 10, 0, "Delete", GUIConfirm)
+    var quitBtn : int := GUI.CreateButton (110, 10, 0, "Cancel", GUI.Quit)
+
+    loop
+	exit when GUI.ProcessEvent
+    end loop
+    GUI.CloseWindow (popupWinID)
+    GUI.ResetQuit
+    result yesConfirm
+end GUIChoose
 
 %If the user selects an option in the "Delete" menu
 procedure DeleteSelected
@@ -762,42 +858,19 @@ procedure DeleteSelected
 	end if
     end for
 
+    %Could also use GUI.Choose here, but it doesn't exist?
     %"Are you sure?" prompt
-    yesDelete := false
-    var popupWinID : int := Window.Open ("position:center;center,graphics:200;100,popup")
-    colorback (grey)
-    cls
-    var font : int := Font.New ("serif:13")
-    var message : string := "\"" + menuitemdelete (idelete) + "\"?"
-    Draw.Text ("Are you sure you want", 10, maxy - 15, font, black)
-    if Font.Width ("to delete world", font) + Font.Width (message, font) < maxx - 20 then
-	Draw.Text ("to delete world " + message, 10, maxy - 35, font, black)
-    else
-	Draw.Text ("to delete world", 10, maxy - 35, font, black)
-	Draw.Text (message, 10, maxy - 55, font, black)
-    end if
-    %Font.Free(font)
-    GUI.SetDisplayWhenCreated (true)
-    var deleteBtn : int := GUI.CreateButton (20, 10, 0, "Delete", setDeleteFlag)
-    var quitBtn : int := GUI.CreateButton (110, 10, 0, "Cancel", GUI.Quit)
-
-    loop
-	exit when GUI.ProcessEvent
-    end loop
-    GUI.CloseWindow (popupWinID)
-    GUI.ResetQuit
-
-    if yesDelete then
+    if GUIChoose ("Are you sure you want to delete world \"" + menuitemdelete (idelete) + "\"?", "Delete", "Cancel") then
 	if menuitemdelete (idelete) = loadfile and loaded then
 	    loadfile := ""
 	    loaded := false
 	end if
-	File.Delete ("Saves\\" + menuitemdelete (idelete) + ".txt")
-	File.Delete ("Saves\\Preferences\\" + menuitemdelete (idelete) + ".txt")
+	File.Delete (savDir + menuitemdelete (idelete) + ".txt")
+	File.Delete (savDir + "Preferences\\" + menuitemdelete (idelete) + ".txt")
 
 	GUI.Disable (item5 (idelete))
 	GUI.Disable (item4 (idelete + 1))
-	colourback (oldbackcolour)
+	colourback (bgcolour)
 	if inPauseMenu then
 	    locate (10, 1)
 	else
@@ -816,16 +889,17 @@ procedure LoadSelected
     for i : 1 .. isaves
 	if item4 (i) = GUI.GetEventWidgetID then
 	    loadfile := menuitemsaves (i)
-	    colourback (oldbackcolour)
+	    colourback (bgcolour)
 	    locate (12, 1)
 	    if i = 1 then
 		GUI.SetCheckBox (cbcreative, false)
 		loaded := false
 		put "World: New                       "
+		loadfile := ""
 	    else
 		var isSurvival : boolean := true
 		%check preferences file to find survival variable
-		open : loadedsavepref, ("Saves\\Preferences\\" + loadfile + ".txt"), get, put, seek, mod
+		open : loadedsavepref, (savDir + "Preferences\\" + loadfile + ".txt"), get, put, seek, mod
 		seek : loadedsavepref, 0
 		var instring : string
 		get : loadedsavepref, instring
@@ -1023,16 +1097,19 @@ procedure DrawBlockScrn (x, y, clr : int)
     Draw.FillBox (x, y, x + blocksize - 1, y + blocksize - 1, clr)
 end DrawBlockScrn
 
-procedure DrawBlock (x, y : int, useTerrain : boolean)
+function getBlockLocColor (x, y : int, useTerrain : boolean) : int
     var foundTypeBlock : blockStruct := getBlock (x, y, false, useTerrain)
     if not isBlock (x, y, blkGroup.any, 1, useTerrain) then %slower than necessary?
 	var foundTypeBg : blockStruct := getBlock (x, y, true, useTerrain)
 	if foundTypeBg.id not= ord (blk.void) then
-	    DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), foundTypeBg.clr)
-	    return
+	    result foundTypeBg.clr
 	end if
     end if
-    DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), foundTypeBlock.clr)
+    result foundTypeBlock.clr
+end getBlockLocColor
+
+procedure DrawBlock (x, y : int, useTerrain : boolean)
+    DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), getBlockLocColor (x, y, useTerrain))
 end DrawBlock
 
 procedure DrawBlockClr (x, y : real, clr : int)
@@ -1061,7 +1138,7 @@ procedure saveWorld
 	    exportBlockString += "," + blockType (i).name
 	end for
 
-	open : loadedsavepref, ("Saves\\Preferences\\" + textfound + ".txt"), get, put, seek
+	open : loadedsavepref, (savDir + "Preferences\\" + textfound + ".txt"), get, put, seek
 
 	put : loadedsavepref, "Gen_Ver_", thisGenVersion
 	put : loadedsavepref, pos.x
@@ -1077,7 +1154,7 @@ procedure saveWorld
 	put : loadedsavepref, exportBlockString
 	close : loadedsavepref
 
-	open : saveFile, ("Saves\\" + textfound + ".txt"), get, put, seek
+	open : saveFile, (savDir + textfound + ".txt"), get, put, seek
 	for x : mstScrnHsGnLft .. mstScrnHsGnRght
 	    for y : mstScrnHsGnDwn .. mstScrnHsGnUp
 		var blockBlock, bgBlock : int1 := 0
@@ -1174,7 +1251,7 @@ end hideMainMenuGUIs
 procedure showPauseGUIs
     GUI.Show (saveButton)
     GUI.Show (nameTextField)
-    GUI.SetText (nameTextField, textfound)
+    GUI.SetText (nameTextField, loadfile)
     GUI.Show (nameLabel)
     GUI.Show (btncont)
     GUI.Show (btnend)
@@ -1199,7 +1276,7 @@ procedure showWorld ()
     var x : int := toGameCdXR (0) - 1
     var y : int := toGameCdYR (0) - 1
     loop
-	if isBlock (x, y, blkGroup.any, 2, true) then % or isBlock (x, y, blkGroup.any, true, true) then %Edit: uhhh...?
+	if isBlock (x, y, blkGroup.any, ord(layerId.both), true) then % or isBlock (x, y, blkGroup.any, true, true) then %Edit: uhhh...?
 	    DrawBlock (x, y, true)
 	end if
 	x += 1
@@ -1210,6 +1287,25 @@ procedure showWorld ()
 	end if
     end loop
 end showWorld
+
+%Draw block on screen
+procedure showBlock (xin, yin : int1)
+    var x : int := xin
+    var y : int := yin
+    for i : 0 .. 4
+	DrawBlock (x, y, true)
+	if i = 0 then
+	    y := yin + 1
+	elsif i = 1 then
+	    y := yin - 1
+	elsif i = 2 then
+	    y := yin
+	    x := xin + 1
+	elsif i = 3 then
+	    x := xin - 1
+	end if
+    end for
+end showBlock
 
 procedure UpdateMostTravelled
     if offsetupdown + toGameCdMeasure (maxy) > mstScrnHsGnUp then
@@ -1306,10 +1402,102 @@ procedure ClampOffsetToScreen
     UpdateMostTravelled
 end ClampOffsetToScreen
 
+
+function checkFileReadability (filePathIn : string, testTooLongString : boolean) : int
+    var fileSize, attr, ftype : int
+    File.Status (filePathIn, fileSize, attr, ftype)
+    if fileSize = -1 then
+	put "Error: file \"", filePathIn, "\" not found."
+	result - 1
+    end if
+    var emptyCharsOnEnd : int := 0
+    var lastValidCharStart : int := 1
+    var instring : string
+    var file : int
+    open : file, (filePathIn), read, seek, mod
+    loop
+	var pos : int
+	tell : file, pos
+	var oldPos : int := pos
+	read : file, instring
+	tell : file, pos
+	if length (instring) < pos - oldPos then
+	    put "Something is very wrong with this text file. Are you sure it's not an image file or something? (\"", filePathIn, "\")"
+	    result - 1
+	end if
+	var numNewChars : int := pos - oldPos
+	var exitEarly : boolean := false
+
+	var emptyCharsOnEndNew : int := 0
+	for decreasing i : numNewChars .. 1
+	    if ord (instring (i)) = 10 or ord (instring (i)) = 13 then
+		emptyCharsOnEndNew += 1
+	    else
+		emptyCharsOnEnd := emptyCharsOnEndNew
+		exitEarly := true
+		exit
+	    end if
+	end for
+	if not exitEarly then
+	    emptyCharsOnEnd += emptyCharsOnEndNew
+	end if
+	if testTooLongString then
+	    for i : 1 .. numNewChars
+		if ord (instring (i)) = 10 or ord (instring (i)) = 13 then
+		    if lastValidCharStart not= -1 then
+			if ((oldPos + i) - lastValidCharStart) > 255 then
+			    put "too many characters in one line! (starting at byte ", lastValidCharStart, " until byte ", oldPos + i, " of file \"", filePathIn, "\")"
+			    result - 1
+			end if
+			lastValidCharStart := -1
+		    end if
+		else
+		    if lastValidCharStart = -1 then
+			lastValidCharStart := oldPos + i
+		    end if
+		end if
+	    end for
+	end if
+	exit when eof (file)
+    end loop
+    if lastValidCharStart not= -1 then
+	if (fileSize - lastValidCharStart + 1) > 255 then
+	    put "too many characters in one line! (starting at byte ", lastValidCharStart, " until byte ", fileSize, " of file \"", filePathIn, "\")"
+	    result - 1
+	end if
+	lastValidCharStart := -1
+    end if
+    close : file
+    if emptyCharsOnEnd > 2 then
+	put "ignoring last ", emptyCharsOnEnd, " characters"
+	result fileSize - emptyCharsOnEnd
+    else
+	put "ignoring nothing"
+	result fileSize
+    end if
+end checkFileReadability
+
+function checkFileEndChars (filePathIn : string) : int
+    result checkFileReadability (filePathIn, false)
+end checkFileEndChars
+
+function eofl (fileIn, stopPoint : int) : boolean %End Of File Long
+    var currentPos : int
+    tell : fileIn, currentPos
+    if eof (fileIn) or currentPos >= stopPoint then
+	result true
+    end if
+    result false
+end eofl
+
 %Get preferences / load world preferences
 procedure GetPreferences
     if loaded then
-	open : loadedsavepref, ("Saves\\Preferences\\" + loadfile + ".txt"), get, put, seek, mod
+	var stopPoint : int := checkFileEndChars (savDir + "Preferences\\" + loadfile + ".txt")
+	if stopPoint = -1 then
+	    return
+	end if
+	open : loadedsavepref, (savDir + "Preferences\\" + loadfile + ".txt"), get, put, seek, mod
 	seek : loadedsavepref, 0
 
 	var instring : string
@@ -1335,11 +1523,11 @@ procedure GetPreferences
 	end if
 	if timeOfDay = -1 then
 	    get : loadedsavepref, timeOfDay
+	    if genVersion < 3 then
+		timeOfDay := 12
+	    end if
 	else
 	    get : loadedsavepref, nullreal
-	end if
-	if genVersion < 3 then
-	    timeOfDay := 6 %whatevernoonis
 	end if
 	if placingBlock.id = ord (blk.error) then
 	    get : loadedsavepref, instring
@@ -1377,21 +1565,23 @@ procedure GetPreferences
 	    get : loadedsavepref, offsetleftright
 	    offsetleftright /= -blocksize
 	    get : loadedsavepref, health
-	    get : loadedsavepref, survival
+	    get : loadedsavepref, instring %survival - but I'm getting that elsewhere now
 	else
 	    get : loadedsavepref, offsetupdown
 	    get : loadedsavepref, offsetleftright
 	    get : loadedsavepref, health
-	    get : loadedsavepref, survival
+	    get : loadedsavepref, instring %survival - but I'm getting that elsewhere now
 	end if
-	loop
-	    exit when eof (loadedsavepref)
+	if health = 0 then %As there is no respawn feature yet, just heal them up if they load in dead.
+	    health := 1000
+	end if
+
+	if not eof (loadedsavepref) then
 	    get : loadedsavepref, importedBlockList : *
 	    if importedBlockList not= "" and importedBlockList (1) not= "," then
 		importedBlockList := ""
 	    end if
-	    exit
-	end loop
+	end if
 	if importedBlockList = "" then
 	    importedBlockList := ",void,boarder,air,dirt,stone,grass,leaves_nat,leaves,wood_nat,wood,platform,water,rail,ladder,wire,pressure_plate"
 	end if
@@ -1410,7 +1600,7 @@ procedure GetPreferences
 		    var a : int := 0
 		    loop
 			get : loadedsavepref, lineArray (a)
-			exit when eof (loadedsavepref)
+			exit when eofl (loadedsavepref, stopPoint)
 			a += 1
 		    end loop
 		    seek : loadedsavepref, currentPos
@@ -1429,7 +1619,7 @@ procedure GetPreferences
 	    end for
 	    close : loadedsavepref
 
-	    open : loadedsave, ("Saves\\" + loadfile + ".txt"), get, put, seek, mod
+	    open : loadedsave, (savDir + loadfile + ".txt"), get, put, seek, mod
 	    seek : loadedsave, 0
 	    loop
 		var coordcode : int
@@ -1450,7 +1640,7 @@ procedure GetPreferences
 	    headcolour := white
 	end if
 	if timeOfDay = -1 then
-	    timeOfDay := 0
+	    timeOfDay := 12
 	end if
 	if placingBlock.id = ord (blk.error) then
 	    placingBlock := blockType (ord (blk.dirt))
@@ -1529,7 +1719,7 @@ procedure GenerateWorld
 	    bestMatch (i) := getBestBlockIdMatch (importedBlockArray (i))
 	end for
 
-	open : loadedsave, ("Saves\\" + loadfile + ".txt"), get, put, seek, mod
+	open : loadedsave, (savDir + loadfile + ".txt"), get, put, seek, mod
 	var firstblock : boolean := true
 	seek : loadedsave, 0
 	if not eof (loadedsave) then
@@ -1546,7 +1736,7 @@ procedure GenerateWorld
 		    get : loadedsave, yInd
 		    var thisBlockID : int
 		    get : loadedsave, thisBlockID
-		    if thisBlockID > numItems then
+		    if thisBlockID >= numItems then
 			setBlock (xInd, yInd, ord (blk.error), false)
 		    else
 			setBlock (xInd, yInd, bestMatch (thisBlockID), false)
@@ -1582,7 +1772,6 @@ procedure GenerateWorld
 		end if
 		exit when eof (loadedsave)
 	    end loop
-	    textfound := loadfile
 	end if
 	close : loadedsave
 
@@ -1599,8 +1788,6 @@ procedure GenerateWorld
 		end for
 	    end for
 	end if
-    else
-	textfound := ""
     end if
 
     showWorld ()
@@ -1629,13 +1816,16 @@ procedure WorldPreview
 	    for cdy : mstScrnHsGnDwn .. mstScrnHsGnUp
 		var drawCondition : boolean
 		if bareBonesPreview then
-		    drawCondition := not isBlock (cdx, cdy, ord (blk.void), 2, false)
+		    drawCondition := not isBlock (cdx, cdy, ord (blk.void), ord(layerId.both), false)
 		else
-		    drawCondition := isBlock (cdx, cdy, blkGroup.any, 2, true)
+		    drawCondition := isBlock (cdx, cdy, blkGroup.any, ord(layerId.both), true)
 		end if
 		if drawCondition then
 		    var x : int := cdx - mstScrnHsGnLft
 		    var y : int := cdy - mstScrnHsGnDwn
+		    /*if isBlock (x, y, blkGroup.any, ord(layerId.both), true) then
+		     Draw.Dot (x, y, getBlockLocColor (x, y, not barebonesPreview))
+		     end if*/
 		    var foundType : int := block (cdx) (cdy).block
 		    if not bareBonesPreview then
 			if blockType (foundType).name = "void" then
@@ -1687,7 +1877,6 @@ procedure WorldPreview
 	    end if
 	    if arrow ('p') then
 		gmfrstmthrgh := false
-		returningFromPreview := true
 		exit
 	    end if
 	end loop
@@ -1696,10 +1885,18 @@ procedure WorldPreview
 	offsetleftright := 0
 	offsetupdown := 0
 
-	%Reset head colour default
+	%Reset menu option colour defaults
 	if resetdefaulthead then
 	    headcolour := -1
 	    resetdefaulthead := false
+	end if
+	if resetdefaulttime then
+	    timeOfDay := -1
+	    resetdefaulttime := false
+	end if
+	if resetdefaultblock then
+	    placingBlock := blockType (ord (blk.error))
+	    resetdefaultblock := false
 	end if
     end if
 end WorldPreview
@@ -1974,7 +2171,7 @@ procedure PressPKey
 	end for
 	inPauseMenu := true
 	View.Set ("nooffscreenonly")
-	oldbackcolour := bgcolour
+	oldTime := timeOfDay
 	Pic.Free (screenpic)
 	screenpic := Pic.New (0, 0, maxx, maxy)
 	Draw.FillBox (0, 0, maxx, maxy, bgcolour)     %a cls
@@ -2004,7 +2201,7 @@ procedure PressPKey
 	    loading (bgcolour)
 
 	    %Updates background colour
-	    if oldbackcolour not= bgcolour then
+	    if oldTime not= timeOfDay then
 		Draw.FillBox (0, 0, maxx, maxy, bgcolour)  %a cls
 		showWorld ()
 	    else
@@ -2548,6 +2745,14 @@ procedure CharImage
     elsif finalAction <= ord (sprt.crawl) and not moving then
 	finalFrame := 1
     end if
+    %locate (1, 1)
+    %put delayFrameChange
+    if finalAction <= ord (sprt.crawl) and moving and (onleftwall or onrightwall /*or delayFrameChange = 1*/) then
+	finalFrame := 2
+	%delayFrameChange += 1      %It used to bug out when I didn't have all this, but now it's fine? Whatever.
+	%else
+	%delayFrameChange := 0
+    end if
     %Fix value of facing(finalLeftRight) when there's no sprite for its current value
     if finalLeftRight = 0 and (finalAction <= ord (sprt.crawl)  %If no facing and: walk or crawl
 	    or (finalAction = ord (sprt.falljump) or finalAction = ord (sprt.stand)) and (isClick = 1)) then %or (falljump or stand) and clicking
@@ -2757,7 +2962,7 @@ procedure resetVariables
     healthold := 0
     blockplacespeed := 130
     blockbreakspeed := 130
-    oldbackcolour := white
+    oldTime := -1
     infinatePlacing := false
     gmfrstmthrgh := false
     onground := false
@@ -2779,6 +2984,8 @@ procedure resetVariables
     keyalt := false
     preview := false
     resetdefaulthead := false
+    resetdefaulttime := false
+    resetdefaultblock := false
     flying := false
     menuReturn := false
     charwidth := toGameCdMeasure (Pic.Width (character) - Pic.Width (character) mod 2)
@@ -2789,13 +2996,13 @@ procedure resetVariables
     action := ord (sprt.stand)
     facing := 0
     oldfacing := ""
-    loadfile := ""
-    if loaded then
-	headcolour := -1
-	timeOfDay := -1
-	placingBlock := blockType (ord (blk.error))
-    end if
-    loaded := false
+    /*%loadfile := ""
+     if loaded then
+     headcolour := -1
+     timeOfDay := -1
+     placingBlock := blockType (ord (blk.error))
+     end if
+     loaded := false*/
     loading (white)
     View.Update
     for i : mstScrnHsGnLft .. mstScrnHsGnRght
@@ -2839,7 +3046,7 @@ loop
 	    %Find all saved files' names
 	    var savenames : int
 	    var fileName : string
-	    savenames := Dir.Open ("Saves\\Preferences\\")
+	    savenames := Dir.Open (savDir + "Preferences\\")
 	    assert savenames > 0
 	    loop
 		fileName := Dir.Get (savenames)
@@ -2854,7 +3061,7 @@ loop
 			continue := true
 			delay (3000)
 		    end if
-		    if not continue then
+		    if not continue then %as in, the C++ command, "continue", that skips the rest of the loop
 			isaves += 1
 			menuitemsaves (isaves) := fileName
 			menuitemdelete (isaves - 1) := fileName
@@ -2913,9 +3120,15 @@ loop
 	    blockbreakspeed := 0
 	end if
 
-	%Set head default indicator
+	%Set menu option default indicator
 	if headcolour = -1 then
 	    resetdefaulthead := true
+	end if
+	if timeOfDay = -1 then
+	    resetdefaulttime := true
+	end if
+	if placingBlock.id = ord (blk.error) then
+	    resetdefaultblock := true
 	end if
 
 	hideMainMenuGUIs
@@ -2991,12 +3204,25 @@ loop
 	    exit
 	end if
 
+	%Passage of time
+	var val : real := (12 - abs (timeOfDay - 12)) / 12.0
+	bgcolour := timecolourify (timeOfDay)
+	if abs (floor (val * 100) / 100 - floor (oldTimeColorVal * 100) / 100) > 0.001 then
+	    oldTimeColorVal := val
+	    Draw.FillBox (0, 0, maxx, maxy, blockType (ord (blk.air)).clr) %a cls
+	    showWorld ()
+	end if
+	timeOfDay += timeSpeed * deltaTime
+	if timeOfDay >= 24 then
+	    timeOfDay := 0
+	end if
+
 	%Character standing by default
 	actionCurrent := action     %Save current action (continuing from last frame) for detection purposes
 	action := ord (sprt.stand)
 	moving := false
 
-	Gravity
+	
 
 	PressDKey
 
@@ -3006,6 +3232,8 @@ loop
 
 	PressSKey
 
+	Gravity
+	
 	CharJump
 
 	WorldCollisions
@@ -3064,6 +3292,20 @@ loop
 	%Draw old unaltered background over character
 	Pic.Draw (backpic, toScrnCdX (pos.x - charwidth / 2) - charudpxrange, toScrnCdY (pos.y) - charudpxrange, picCopy)
 	Pic.Draw (trainbackpic, toScrnCdX (trainx) - charudpxrange, toScrnCdY (trainy) - charudpxrange, picCopy)
+
+	%Make physics blocks fall (temp until entities added(?))
+	for xb : toGameCdXR (0) .. toGameCdXR (maxx)
+	    for yb : toGameCdYR (0) .. toGameCdYR (maxy)
+		if blockType(block (xb) (yb).block).physics then
+		%if block (xb) (yb).block = ord (blk.water) then
+		    if isBlock (xb, yb - 1, ord (blk.air), ord (layerId.foreground), true) then
+			block (xb) (yb - 1).block := block (xb) (yb).block
+			block (xb) (yb).block := ord (blk.air)
+			showBlock (xb, yb)
+		    end if
+		end if
+	    end for
+	end for
 
 	%Setting oldPos
 	oldPos.x := pos.x
