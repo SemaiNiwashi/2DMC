@@ -13,10 +13,17 @@ buttonchoose ("multibutton")
 setscreen ("noecho")
 %Framerate goal: deltatime of 6-7 on still, 17-20 on screen scrolling
 
-
-%Fix loading file overwrite your choice for creative or not (when you click load on the world, make it check or uncheck the box for you, but you can still change it before clicking play)
+%None of Bryan's levels work!
+%Can't see tnt in block list
+%Can't see all worlds in block list
+%Text for "mangroveworldsaved" overlaps save text field
+%Make screen scrolling faster by moving the background picture and just updating the blocks at the edge of the screen
 /*
- -Background makes block not infinite
+ -Background makes block not infinite IF it is a wall-type tile!
+ -Dirt, stone, any physics block that generates underground, and liquids CANNOT be used as wall tiles.
+ -Dirt and stone can still be used as background though, for decorative purposes.
+ -Liquids and physics blocks can never go on the background layer.
+ -While on the go-around layer, you cannot place blocks or walls (breaking through a wall is allowed - think breaking into your house if you are stuck out for some reason)
  -No background blocks underground
  -Only naturally occuring terrain blocks can be infinite (dirt, stone, sand, water (not ores?))
  -ORRRR! Background blocks only have a go-around effect (or can only be placed(X)) if [there is no solid block on them] || [there is an air block on the foreground within 2 squares of them]!
@@ -98,11 +105,9 @@ var blkGroup : blockGroup
 blkGroup.any := -1
 blkGroup.solid := -2
 
-type layerId : enum (background, foreground, both)
-
 %Block entry spot 1
-type blk : enum (void, boarder, air, error, dirt, stone, sand, mud, grass,
-    leaves, wood, platform, water, lava, fire, oil, rail, ladder, wire,
+type blk : enum (void, boarder, air, error, dirt, stone, sand, sandstone, mud, grass,
+    leaves, wood, planks, platform, water, lava, fire, oil, rail, ladder, wire,
     pressure_plate, tnt)
 
 var numBlockTypes : int := ord (upper (blk)) + 1
@@ -140,10 +145,12 @@ setBlockInfo (iter, "error", true, false, 255, 0, 255)
 setBlockInfo (iter, "dirt", true, false, 113, 56, 0)
 setBlockInfo (iter, "stone", true, false, 192, 192, 192)
 setBlockInfo (iter, "sand", true, true, 255, 235, 182)
+setBlockInfo (iter, "sandstone", true, false, 237, 203, 92)
 setBlockInfo (iter, "mud", true, true, 255, 235, 182)
 setBlockInfo (iter, "grass", true, false, 0, 128, 0)
 setBlockInfo (iter, "leaves", true, false, 0, 255, 0)
 setBlockInfo (iter, "wood", true, false, 65, 32, 0)
+setBlockInfo (iter, "planks", true, false, 196, 156, 81)
 setBlockInfo (iter, "platform", false, false, 113, 56, 0)
 setBlockInfo (iter, "water", false, true, 0, 125, 255)
 setBlockInfo (iter, "lava", false, true, 0, 125, 255)
@@ -170,79 +177,232 @@ type vec2i :
     record
 	x, y : int
     end record
-var blocksize : int := 16 %Must be > 15
+
+type layerId : enum (background, foreground, both)
+type sprt : enum (walk, crawl, falljump, stand, jump, fall, dead, crosshairs)
+type cursor : enum (isbb, ispb)
+type cursorClr : enum (black, white)
+type motion : enum (back)
+type backdir : enum (left, right)
+
+var blocksize : int := 16 %Must be > 15 %Edit: Oh really? Maybe now... ?
+
+%walk, 1-4, l/r, ""/c
+%crawl, 1-4, l/r, ""/c
+%falljump, ""/c, (c's)l/r
+%stand, ""/c, (c's)l/r
+%jump, l/r, (""/c)/(r/l)
+%fall, l/r, (""/c)/(r/l)
+%dead, ""/l/r
+%crosshairs, bb/pb, ""/2
+
+%Major: 1-4, ""/l/r, ""/c, bb/pb/ ""/2
+
+var sprite : array 0 .. 7 of array 0 .. 3 of array 0 .. 2 of array 0 .. 1 of int
+
+var spriteFileNames : array 0 .. 7 of string := init ("walk", "crawl", "falljump", "stand", "jump", "fall", "dead", "crosshairs")
+var spritelr : array 0 .. 2 of string := init ("", "l", "r")
+var spritec : array 0 .. 1 of string := init ("", "c")
+var spriteb : array 0 .. 1 of string := init ("bb", "pb")
+var sprite2 : array 0 .. 1 of string := init ("", "2")
+
+var imgDir : string := "Images\\"
+var imgType : string := ".bmp"
+%var nullPic : int := Pic.FileNew(imgDir + "dead" + imgType)
+for action : 0 .. 7
+    for frame : 1 .. 4
+	for leftright : 0 .. 2
+	    for isc : 0 .. 1
+		for blockborp : 0 .. 1
+		    for twoornah : 0 .. 1
+			var filename : string := "null"
+			if action <= 1 and frame <= 4 and leftright > 0 and blockborp = 0 and twoornah = 0 then %walk, crawl
+			    filename := spriteFileNames (action) + intstr (frame) + spritelr (leftright) + spritec (isc)
+			    sprite (action) (frame - 1) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
+			elsif action >= 2 and action <= 3 and frame = 1 and leftright > 0 and blockborp = 0 and twoornah = 0 then %falljump, stand
+			    if isc = 0 then
+				if leftright = 1 then
+				    filename := spriteFileNames (action) + spritec (isc)
+				    sprite (action) (frame - 1) (0) (isc) := Pic.FileNew (imgDir + filename + imgType)
+				end if
+			    else
+				filename := spriteFileNames (action) + spritec (isc) + spritelr (leftright)
+				sprite (action) (frame - 1) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
+			    end if
+			elsif action >= 4 and action <= 5 and frame = 1 and leftright > 0 and twoornah = 0 then % jump, fall
+			    if blockborp = 0 then
+				if isc = 0 then
+				    if leftright = 1 then
+					filename := spriteFileNames (action) + spritelr (leftright) + spritelr (2)
+				    else
+					filename := spriteFileNames (action) + spritelr (leftright) + spritelr (1)
+				    end if
+				    sprite (action) (frame - 1) (0) (leftright - 1) := Pic.FileNew (imgDir + filename + imgType)
+				end if
+			    else
+				filename := spriteFileNames (action) + spritelr (leftright) + spritec (isc)
+				sprite (action) (frame - 1) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
+			    end if
+			elsif action = 6 and frame = 1 and isc = 0 and blockborp = 0 and twoornah = 0 then %dead
+			    filename := spriteFileNames (action) + spritelr (leftright)
+			    sprite (action) (frame - 1) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
+			elsif action = 7 and frame = 1 and leftright = 0 and isc = 0 then %crosshairs
+			    filename := spriteFileNames (action) + spriteb (blockborp) + sprite2 (twoornah)
+			    sprite (action) (frame - 1) (blockborp) (twoornah) := Pic.FileNew (imgDir + filename + imgType)
+			end if
+			/*if filename = "null" and blockborp = 0 and twoornah = 0 then %Wouldn't work, too much changing the indicies going on up above.
+			 sprite (action) (frame - 1) (leftright) (isc) := nullPic
+			 end if*/
+		    end for
+		end for
+	    end for
+	end for
+    end for
+end for
+
+var walkr : array 1 .. 4 of int
+walkr (1) := sprite (ord (sprt.walk)) (0) (2) (0)
+walkr (2) := sprite (ord (sprt.walk)) (1) (2) (0)
+walkr (3) := sprite (ord (sprt.walk)) (2) (2) (0)
+walkr (4) := sprite (ord (sprt.walk)) (3) (2) (0)
+var walkl : array 1 .. 4 of int
+walkl (1) := sprite (ord (sprt.walk)) (0) (1) (0)
+walkl (2) := sprite (ord (sprt.walk)) (1) (1) (0)
+walkl (3) := sprite (ord (sprt.walk)) (2) (1) (0)
+walkl (4) := sprite (ord (sprt.walk)) (3) (1) (0)
+var crawlr : array 1 .. 4 of int
+crawlr (1) := sprite (ord (sprt.crawl)) (0) (2) (0)
+crawlr (2) := sprite (ord (sprt.crawl)) (1) (2) (0)
+crawlr (3) := sprite (ord (sprt.crawl)) (2) (2) (0)
+crawlr (4) := sprite (ord (sprt.crawl)) (3) (2) (0)
+var crawll : array 1 .. 4 of int
+crawll (1) := sprite (ord (sprt.crawl)) (0) (1) (0)
+crawll (2) := sprite (ord (sprt.crawl)) (1) (1) (0)
+crawll (3) := sprite (ord (sprt.crawl)) (2) (1) (0)
+crawll (4) := sprite (ord (sprt.crawl)) (3) (1) (0)
+var walkrc : array 1 .. 4 of int
+walkrc (1) := sprite (ord (sprt.walk)) (0) (2) (1)
+walkrc (2) := sprite (ord (sprt.walk)) (1) (2) (1)
+walkrc (3) := sprite (ord (sprt.walk)) (2) (2) (1)
+walkrc (4) := sprite (ord (sprt.walk)) (3) (2) (1)
+var walklc : array 1 .. 4 of int
+walklc (1) := sprite (ord (sprt.walk)) (0) (1) (1)
+walklc (2) := sprite (ord (sprt.walk)) (1) (1) (1)
+walklc (3) := sprite (ord (sprt.walk)) (2) (1) (1)
+walklc (4) := sprite (ord (sprt.walk)) (3) (1) (1)
+var crawlrc : array 1 .. 4 of int
+crawlrc (1) := sprite (ord (sprt.crawl)) (0) (2) (1)
+crawlrc (2) := sprite (ord (sprt.crawl)) (1) (2) (1)
+crawlrc (3) := sprite (ord (sprt.crawl)) (2) (2) (1)
+crawlrc (4) := sprite (ord (sprt.crawl)) (3) (2) (1)
+var crawllc : array 1 .. 4 of int
+crawllc (1) := sprite (ord (sprt.crawl)) (0) (1) (1)
+crawllc (2) := sprite (ord (sprt.crawl)) (1) (1) (1)
+crawllc (3) := sprite (ord (sprt.crawl)) (2) (1) (1)
+crawllc (4) := sprite (ord (sprt.crawl)) (3) (1) (1)
+var jump : int := sprite (ord (sprt.falljump)) (0) (0) (0)
+var jumpcr : int := sprite (ord (sprt.falljump)) (0) (2) (1)
+var jumpcl : int := sprite (ord (sprt.falljump)) (0) (1) (1)
+var jumpr : int := sprite (ord (sprt.jump)) (0) (2) (0)
+var jumpl : int := sprite (ord (sprt.jump)) (0) (1) (0)
+var jumprc : int := sprite (ord (sprt.jump)) (0) (2) (1)
+var jumplc : int := sprite (ord (sprt.jump)) (0) (1) (1)
+var jumprl : int := sprite (ord (sprt.jump)) (0) (ord (motion.back)) (ord (backdir.left)) % (action)(frame)(isSpecial=0)(spleft=0) %rl %facing left
+var jumplr : int := sprite (ord (sprt.jump)) (0) (ord (motion.back)) (ord (backdir.right)) % (action)(frame)(isSpecial=0)(spright=1) %lr %facing right
+var fallr : int := sprite (ord (sprt.fall)) (0) (2) (0)
+var falll : int := sprite (ord (sprt.fall)) (0) (1) (0)
+var fallrc : int := sprite (ord (sprt.fall)) (0) (2) (1)
+var falllc : int := sprite (ord (sprt.fall)) (0) (1) (1)
+var fallrl : int := sprite (ord (sprt.fall)) (0) (ord (motion.back)) (ord (backdir.left)) % (action)(frame)(isSpecial=0)(spleft=0) %rl %facing left
+var falllr : int := sprite (ord (sprt.fall)) (0) (ord (motion.back)) (ord (backdir.right)) % (action)(frame)(isSpecial=0)(spright=1) %lr %facing right
+var fall : int := sprite (ord (sprt.falljump)) (0) (0) (0)
+var fallcr : int := sprite (ord (sprt.falljump)) (0) (2) (1)
+var fallcl : int := sprite (ord (sprt.falljump)) (0) (1) (1)
+var stand : int := sprite (ord (sprt.stand)) (0) (0) (0)
+var standcr : int := sprite (ord (sprt.stand)) (0) (2) (1)
+var standcl : int := sprite (ord (sprt.stand)) (0) (1) (1)
+var dead : int := sprite (ord (sprt.dead)) (0) (0) (0)
+var deadl : int := sprite (ord (sprt.dead)) (0) (1) (0)
+var deadr : int := sprite (ord (sprt.dead)) (0) (2) (0)
+var crosshairsbbpre : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.isbb)) (ord (cursorClr.black)) % (action)(frame)(isbb=0)(colorblack=0)
+var crosshairsbbpre2 : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.isbb)) (ord (cursorClr.white)) % (action)(frame)(isbb=0)(colorwhite=1)
+var crosshairspbpre : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.ispb)) (ord (cursorClr.black)) % (action)(frame)(ispb=1)(colorblack=0)
+var crosshairspbpre2 : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.ispb)) (ord (cursorClr.white)) % (action)(frame)(ispb=1)(colorwhite=1)
+
+
+/*
+ var walkr : array 1 .. 4 of int
+ walkr (1) := Pic.FileNew ("Images\\walk1r.bmp")
+ walkr (2) := Pic.FileNew ("Images\\walk2r.bmp")
+ walkr (3) := Pic.FileNew ("Images\\walk3r.bmp")
+ walkr (4) := Pic.FileNew ("Images\\walk4r.bmp")
+ var walkl : array 1 .. 4 of int
+ walkl (1) := Pic.FileNew ("Images\\walk1l.bmp")
+ walkl (2) := Pic.FileNew ("Images\\walk2l.bmp")
+ walkl (3) := Pic.FileNew ("Images\\walk3l.bmp")
+ walkl (4) := Pic.FileNew ("Images\\walk4l.bmp")
+ var crawlr : array 1 .. 4 of int
+ crawlr (1) := Pic.FileNew ("Images\\crawl1r.bmp")
+ crawlr (2) := Pic.FileNew ("Images\\crawl2r.bmp")
+ crawlr (3) := Pic.FileNew ("Images\\crawl3r.bmp")
+ crawlr (4) := Pic.FileNew ("Images\\crawl4r.bmp")
+ var crawll : array 1 .. 4 of int
+ crawll (1) := Pic.FileNew ("Images\\crawl1l.bmp")
+ crawll (2) := Pic.FileNew ("Images\\crawl2l.bmp")
+ crawll (3) := Pic.FileNew ("Images\\crawl3l.bmp")
+ crawll (4) := Pic.FileNew ("Images\\crawl4l.bmp")
+ var walkrc : array 1 .. 4 of int
+ walkrc (1) := Pic.FileNew ("Images\\walk1rc.bmp") %click
+ walkrc (2) := Pic.FileNew ("Images\\walk2rc.bmp") %click
+ walkrc (3) := Pic.FileNew ("Images\\walk3rc.bmp") %click
+ walkrc (4) := Pic.FileNew ("Images\\walk4rc.bmp") %click
+ var walklc : array 1 .. 4 of int
+ walklc (1) := Pic.FileNew ("Images\\walk1lc.bmp") %click
+ walklc (2) := Pic.FileNew ("Images\\walk2lc.bmp") %click
+ walklc (3) := Pic.FileNew ("Images\\walk3lc.bmp") %click
+ walklc (4) := Pic.FileNew ("Images\\walk4lc.bmp") %click
+ var crawlrc : array 1 .. 4 of int
+ crawlrc (1) := Pic.FileNew ("Images\\crawl1rc.bmp") %click
+ crawlrc (2) := Pic.FileNew ("Images\\crawl2rc.bmp") %click
+ crawlrc (3) := Pic.FileNew ("Images\\crawl3rc.bmp") %click
+ crawlrc (4) := Pic.FileNew ("Images\\crawl4rc.bmp") %click
+ var crawllc : array 1 .. 4 of int
+ crawllc (1) := Pic.FileNew ("Images\\crawl1lc.bmp") %click
+ crawllc (2) := Pic.FileNew ("Images\\crawl2lc.bmp") %click
+ crawllc (3) := Pic.FileNew ("Images\\crawl3lc.bmp") %click
+ crawllc (4) := Pic.FileNew ("Images\\crawl4lc.bmp") %click
+ var jump : int := Pic.FileNew ("Images\\falljump.bmp")
+ var jumpcr : int := Pic.FileNew ("Images\\falljumpcr.bmp") %click
+ var jumpcl : int := Pic.FileNew ("Images\\falljumpcl.bmp") %click
+ var jumpr : int := Pic.FileNew ("Images\\jumpr.bmp")
+ var jumpl : int := Pic.FileNew ("Images\\jumpl.bmp")
+ var jumprc : int := Pic.FileNew ("Images\\jumprc.bmp") %click
+ var jumplc : int := Pic.FileNew ("Images\\jumplc.bmp") %click
+ var jumprl : int := Pic.FileNew ("Images\\jumprl.bmp") %click
+ var jumplr : int := Pic.FileNew ("Images\\jumplr.bmp") %click
+ var fallr : int := Pic.FileNew ("Images\\fallr.bmp")
+ var falll : int := Pic.FileNew ("Images\\falll.bmp")
+ var fallrc : int := Pic.FileNew ("Images\\fallrc.bmp") %click
+ var falllc : int := Pic.FileNew ("Images\\falllc.bmp") %click
+ var fallrl : int := Pic.FileNew ("Images\\fallrl.bmp") %click
+ var falllr : int := Pic.FileNew ("Images\\falllr.bmp") %click
+ var fall : int := Pic.FileNew ("Images\\falljump.bmp")
+ var fallcr : int := Pic.FileNew ("Images\\falljumpcr.bmp") %click
+ var fallcl : int := Pic.FileNew ("Images\\falljumpcl.bmp") %click
+ var stand : int := Pic.FileNew ("Images\\stand.bmp")
+ var standcr : int := Pic.FileNew ("Images\\standcr.bmp") %click
+ var standcl : int := Pic.FileNew ("Images\\standcl.bmp") %click
+ var dead : int := Pic.FileNew ("Images\\dead.bmp")
+ var deadl : int := Pic.FileNew ("Images\\deadl.bmp")
+ var deadr : int := Pic.FileNew ("Images\\deadr.bmp")
+ var crosshairsbbpre : int := Pic.FileNew ("Images\\crosshairsbb.bmp")
+ var crosshairsbbpre2 : int := Pic.FileNew ("Images\\crosshairsbb2.bmp")
+ var crosshairspbpre : int := Pic.FileNew ("Images\\crosshairspb.bmp")
+ var crosshairspbpre2 : int := Pic.FileNew ("Images\\crosshairspb2.bmp")
+ */
+var loadingScreen1 : int := Pic.FileNew ("Images\\loadingScreen.bmp")
 var font1 := Font.New ("sans serif:40:bold")
 var font2 := Font.New ("sans serif:8:bold")
-var walkr : array 1 .. 4 of int
-walkr (1) := Pic.FileNew ("Images\\walk1r.bmp")
-walkr (2) := Pic.FileNew ("Images\\walk2r.bmp")
-walkr (3) := Pic.FileNew ("Images\\walk3r.bmp")
-walkr (4) := Pic.FileNew ("Images\\walk4r.bmp")
-var walkl : array 1 .. 4 of int
-walkl (1) := Pic.FileNew ("Images\\walk1l.bmp")
-walkl (2) := Pic.FileNew ("Images\\walk2l.bmp")
-walkl (3) := Pic.FileNew ("Images\\walk3l.bmp")
-walkl (4) := Pic.FileNew ("Images\\walk4l.bmp")
-var crawlr : array 1 .. 4 of int
-crawlr (1) := Pic.FileNew ("Images\\crawl1r.bmp")
-crawlr (2) := Pic.FileNew ("Images\\crawl2r.bmp")
-crawlr (3) := Pic.FileNew ("Images\\crawl3r.bmp")
-crawlr (4) := Pic.FileNew ("Images\\crawl4r.bmp")
-var crawll : array 1 .. 4 of int
-crawll (1) := Pic.FileNew ("Images\\crawl1l.bmp")
-crawll (2) := Pic.FileNew ("Images\\crawl2l.bmp")
-crawll (3) := Pic.FileNew ("Images\\crawl3l.bmp")
-crawll (4) := Pic.FileNew ("Images\\crawl4l.bmp")
-var walkrc : array 1 .. 4 of int
-walkrc (1) := Pic.FileNew ("Images\\walk1rc.bmp") %click
-walkrc (2) := Pic.FileNew ("Images\\walk2rc.bmp") %click
-walkrc (3) := Pic.FileNew ("Images\\walk3rc.bmp") %click
-walkrc (4) := Pic.FileNew ("Images\\walk4rc.bmp") %click
-var walklc : array 1 .. 4 of int
-walklc (1) := Pic.FileNew ("Images\\walk1lc.bmp") %click
-walklc (2) := Pic.FileNew ("Images\\walk2lc.bmp") %click
-walklc (3) := Pic.FileNew ("Images\\walk3lc.bmp") %click
-walklc (4) := Pic.FileNew ("Images\\walk4lc.bmp") %click
-var crawlrc : array 1 .. 4 of int
-crawlrc (1) := Pic.FileNew ("Images\\crawl1rc.bmp") %click
-crawlrc (2) := Pic.FileNew ("Images\\crawl2rc.bmp") %click
-crawlrc (3) := Pic.FileNew ("Images\\crawl3rc.bmp") %click
-crawlrc (4) := Pic.FileNew ("Images\\crawl4rc.bmp") %click
-var crawllc : array 1 .. 4 of int
-crawllc (1) := Pic.FileNew ("Images\\crawl1lc.bmp") %click
-crawllc (2) := Pic.FileNew ("Images\\crawl2lc.bmp") %click
-crawllc (3) := Pic.FileNew ("Images\\crawl3lc.bmp") %click
-crawllc (4) := Pic.FileNew ("Images\\crawl4lc.bmp") %click
-var jump : int := Pic.FileNew ("Images\\falljump.bmp")
-var jumpcr : int := Pic.FileNew ("Images\\falljumpcr.bmp") %click
-var jumpcl : int := Pic.FileNew ("Images\\falljumpcl.bmp") %click
-var jumpr : int := Pic.FileNew ("Images\\jumpr.bmp")
-var jumpl : int := Pic.FileNew ("Images\\jumpl.bmp")
-var jumprc : int := Pic.FileNew ("Images\\jumprc.bmp") %click
-var jumplc : int := Pic.FileNew ("Images\\jumplc.bmp") %click
-var jumprl : int := Pic.FileNew ("Images\\jumprl.bmp") %click
-var jumplr : int := Pic.FileNew ("Images\\jumplr.bmp") %click
-var fallr : int := Pic.FileNew ("Images\\fallr.bmp")
-var falll : int := Pic.FileNew ("Images\\falll.bmp")
-var fallrc : int := Pic.FileNew ("Images\\fallrc.bmp") %click
-var falllc : int := Pic.FileNew ("Images\\falllc.bmp") %click
-var fallrl : int := Pic.FileNew ("Images\\fallrl.bmp") %click
-var falllr : int := Pic.FileNew ("Images\\falllr.bmp") %click
-var fall : int := Pic.FileNew ("Images\\falljump.bmp")
-var fallcr : int := Pic.FileNew ("Images\\falljumpcr.bmp") %click
-var fallcl : int := Pic.FileNew ("Images\\falljumpcl.bmp") %click
-var stand : int := Pic.FileNew ("Images\\stand.bmp")
-var standcr : int := Pic.FileNew ("Images\\standcr.bmp") %click
-var standcl : int := Pic.FileNew ("Images\\standcl.bmp") %click
-var dead : int := Pic.FileNew ("Images\\dead.bmp")
-var deadl : int := Pic.FileNew ("Images\\deadl.bmp")
-var deadr : int := Pic.FileNew ("Images\\deadr.bmp")
-var crosshairsbbpre : int := Pic.FileNew ("Images\\crosshairsbb.bmp")
-var crosshairsbbpre2 : int := Pic.FileNew ("Images\\crosshairsbb2.bmp")
-var crosshairspbpre : int := Pic.FileNew ("Images\\crosshairspb.bmp")
-var crosshairspbpre2 : int := Pic.FileNew ("Images\\crosshairspb2.bmp")
-var loadingScreen1 : int := Pic.FileNew ("Images\\loadingScreen.bmp")
-var healthbarfrst : int := Pic.FileNew ("Images\\healthbar.bmp")
 var loadingScreen : int := Pic.Scale (loadingScreen1, maxx - 20, maxy - 20)
 var charwidth : real := Pic.Width (stand) / blocksize
 var charheight : real := Pic.Height (stand) / blocksize
@@ -267,26 +427,33 @@ var onground, inground, onleftwall, onrightwall, hitceiling, sprintd, sprinta, r
     mustcrawl, recentclick, loaded, quitthegame, keyspc, keya, keys, keyd, keyp, keyalt, preview, resetdefaulthead, flying,
     menuReturn, returningFromPreview, inPauseMenu, scrollSlow, yesDelete : boolean := false
 var gmfrstmthrgh, survival : boolean := true
-var jumpcount, gravcount, frametimer, offsetleftright, offsetupdown, slowScrollSpeed, timeOfDay : real := 0
+var jumpcount, gravcount, frametimer, offsetleftright, offsetupdown, slowScrollSpeed : real := 0
+var timeOfDay : real := -1
 var ponwlk, poncrl, isaves, wlk, crl : int := 1
-var headcolour : int := 983
+var headcolour : int := -1
 var oldbackcolour, bgcolour : int := white
 var health : int := 1000
-var placingBlock : blockStruct
+var placingBlock : blockStruct := blockType (ord (blk.error))
 var textfound : string
 var facing, oldfacing, loadfile, importedBlockList : string := ""
 var action, actionCurrent : string := "standing"
 var item1 : array 1 .. 16 of int
-var item2 : array 1 .. 12 of int
+var item2 : array 1 .. 13 of int
 var item3 : array 1 .. numBlockTypes of int
 var item4 : array 0 .. 99 of int
 var item5 : array 1 .. 99 of int
 var menuitemcolours : array 1 .. 16 of string (20) := init ("Default", "White", "Light Grey", "Dark Grey", "Black",
     "Brown", "Red", "Orange", "Yellow", "Green", "Dark Green", "Turquoise", "Blue", "Dark Blue", "Purple", "Pink")
-var menuitemtime : array 1 .. 12 of string (10) := init ("12:00am", "2:00am", "4:00am", "6:00am", "8:00am", "10:00am", "12:00pm", "2:00pm", "4:00pm", "6:00pm", "8:00pm", "10:00pm")
+var menuitemtime : array 1 .. 13 of string (10) := init ("Default", "12:00am", "2:00am", "4:00am", "6:00am", "8:00am", "10:00am", "12:00pm", "2:00pm", "4:00pm", "6:00pm", "8:00pm", "10:00pm")
 var menuitemblock : array 1 .. numBlockTypes of string
 for i : 1 .. numBlockTypes
-    menuitemblock (i) := blockType (i - 1).name
+    if i = 1 then
+	menuitemblock (i) := "Default"
+    elsif i > ord (blk.error) + 1 then
+	menuitemblock (i) := blockType (i - 1).name
+    else
+	menuitemblock (i) := blockType (i - 2).name
+    end if
 end for
 var menuitemsaves : array 0 .. 99 of string (50)
 var menuitemdelete : array 1 .. 99 of string (50)
@@ -304,14 +471,6 @@ function LERP (data1, data2 : int, u : real) : int
 end LERP
 
 %Range: x: -4999 to 5000, y: -2499 to 2500
-function blockID (blockName : string) : int
-    for i : 0 .. numBlockTypes - 1
-	if blockName = blockType (i).name then
-	    result i
-	end if
-    end for
-    result 0
-end blockID
 
 function toScrnCdX (val : real) : int
     result ceil ((val - offsetleftright) * blocksize)
@@ -449,7 +608,7 @@ end colourstringify
 
 function numbercolourify (nbr : int) : int
     if nbr = 1 then
-	result 983
+	result - 1
     elsif nbr = 2 then
 	result white
     elsif nbr = 3 then
@@ -483,6 +642,42 @@ function numbercolourify (nbr : int) : int
     end if
 end numbercolourify
 
+function colourmenuify (clr : int) : int
+    if clr = -1 then
+	result 1
+    elsif clr = white then
+	result 2
+    elsif clr = grey then
+	result 3
+    elsif clr = darkgrey then
+	result 4
+    elsif clr = black then
+	result 5
+    elsif clr = 114 then
+	result 6
+    elsif clr = brightred then
+	result 7
+    elsif clr = 42 then
+	result 8
+    elsif clr = yellow then
+	result 9
+    elsif clr = brightgreen then
+	result 10
+    elsif clr = green then
+	result 11
+    elsif clr = 52 then
+	result 12
+    elsif clr = brightblue then
+	result 13
+    elsif clr = blue then
+	result 14
+    elsif clr = 34 then
+	result 15
+    elsif clr = brightpurple then
+	result 16
+    end if
+end colourmenuify
+
 function timestringify (timeCurr : real) : string
     var am : boolean := timeCurr < 12
     var hour : string := intstr (floor (timeCurr))
@@ -503,16 +698,26 @@ function timestringify (timeCurr : real) : string
     end if
 end timestringify
 
-function timecolourify (nbr : real) : int
+function timecolourify (nbr : real) : int %In progress
     result brightcyan
 end timecolourify
 
 function timemenu (nbr : int) : int
-    result (nbr - 1) * 2
+    if nbr = 1 then
+	result - 1
+    else
+	result (nbr - 2) * 2
+    end if
 end timemenu
 
 function blockmenu (nbr : int) : int
-    result nbr - 1
+    if nbr = 1 then
+	result ord (blk.error)
+    elsif nbr > ord (blk.error) + 1 then
+	result nbr - 1
+    else
+	result nbr - 2
+    end if
 end blockmenu
 
 procedure PicDrawTranslucentBox (x1, y1, x2, y2, clr : int, alpha : real)
@@ -595,54 +800,76 @@ end NameEntered
 procedure DoNothing (status : boolean)
 end DoNothing
 
-%If the user selects an opting in the "Head Colour" menu
+
+%Show colour preview as default
+procedure ShowColourPreview
+    colourback (oldbackcolour) %needed? probably?
+
+    Draw.FillBox (0, maxy - 94, 94, maxy - 80, oldbackcolour)
+    Draw.FillBox (24, maxy - 57, 75, maxy - 46, oldbackcolour)
+    if headcolour = -1 then
+	Draw.FillBox (32, maxy - 67, 62, maxy - 37, oldbackcolour)
+	Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
+	Draw.Text ("Default head", 1, maxy - 90, font2, black)
+    else
+	Draw.FillBox (32, maxy - 67, 62, maxy - 37, headcolour)
+	Draw.Box (32, maxy - 67, 62, maxy - 37, black)
+	Draw.Text (menuitemcolours (colourmenuify (headcolour)) + " head", 1, maxy - 90, font2, black)
+    end if
+
+
+    Draw.FillBox (99, maxy - 94, 232, maxy - 80, oldbackcolour)
+    Draw.FillBox (137, maxy - 57, 188, maxy - 46, oldbackcolour)
+    if timeOfDay = -1 then
+	Draw.FillBox (145, maxy - 67, 175, maxy - 37, oldbackcolour)
+	Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
+	Draw.Text ("Default time", 115, maxy - 90, font2, black)
+    else
+	Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
+	Draw.Box (145, maxy - 67, 175, maxy - 37, black)
+	Draw.Text ("Time: " + timestringify (timeOfDay), 115, maxy - 90, font2, black)
+    end if
+
+    Draw.FillBox (237, maxy - 94, 340, maxy - 80, oldbackcolour)
+    Draw.FillBox (257, maxy - 57, 308, maxy - 46, oldbackcolour)
+    if placingBlock.id = ord (blk.error) then
+	Draw.FillBox (265, maxy - 67, 295, maxy - 37, oldbackcolour)
+	Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
+	Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
+    else
+	Draw.FillBox (265, maxy - 67, 295, maxy - 37, placingBlock.clr)
+	Draw.Box (265, maxy - 67, 295, maxy - 37, black)
+	Draw.Text (placingBlock.name + " blocks", 238, maxy - 90, font2, black)
+    end if
+end ShowColourPreview
+
+%If the user selects an option in the "Head Colour" menu
 procedure HeadSelected
     for i : 1 .. 16
 	if item1 (i) = GUI.GetEventWidgetID then
 	    headcolour := numbercolourify (i)
-	    colourback (oldbackcolour)
-	    if headcolour = 983 then
-		Draw.FillBox (24, maxy - 57, 75, maxy - 46, oldbackcolour)
-		Draw.FillBox (32, maxy - 67, 62, maxy - 37, oldbackcolour)
-		Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
-	    else
-		Draw.FillBox (24, maxy - 57, 75, maxy - 46, oldbackcolour)
-		Draw.FillBox (32, maxy - 67, 62, maxy - 37, headcolour)
-		Draw.Box (32, maxy - 67, 62, maxy - 37, black)
-	    end if
-	    Draw.FillBox (0, maxy - 94, 94, maxy - 80, oldbackcolour)
-	    Draw.Text (menuitemcolours (i) + " head", 1, maxy - 90, font2, black)
+	    ShowColourPreview
 	end if
     end for
 end HeadSelected
 
-%If the user selects an opting in the "Background Colour" menu
+%If the user selects an option in the "Background Colour" menu
 procedure TimeSelected
-    for i : 1 .. 12
+    for i : 1 .. 13
 	if item2 (i) = GUI.GetEventWidgetID then
 	    timeOfDay := timemenu (i)
 	    bgcolour := timecolourify (timeOfDay)
-	    colourback (oldbackcolour)
-	    Draw.FillBox (137, maxy - 57, 188, maxy - 46, oldbackcolour)
-	    Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
-	    Draw.Box (145, maxy - 67, 175, maxy - 37, black)
-	    Draw.FillBox (99, maxy - 94, 232, maxy - 80, oldbackcolour)
-	    Draw.Text ("Time: " + timestringify (timeOfDay), 100, maxy - 90, font2, black)
+	    ShowColourPreview
 	end if
     end for
 end TimeSelected
 
-%If the user selects an opting in the "Block Colour" menu
+%If the user selects an option in the "Block Colour" menu
 procedure BlocksSelected
     for i : 1 .. numBlockTypes
 	if item3 (i) = GUI.GetEventWidgetID then
 	    placingBlock := blockType (blockmenu (i))
-	    colourback (oldbackcolour)
-	    Draw.FillBox (257, maxy - 57, 308, maxy - 46, oldbackcolour)
-	    Draw.FillBox (265, maxy - 67, 295, maxy - 37, placingBlock.clr)
-	    Draw.Box (265, maxy - 67, 295, maxy - 37, black)
-	    Draw.FillBox (237, maxy - 94, 340, maxy - 80, oldbackcolour)
-	    Draw.Text (placingBlock.name + " blocks", 238, maxy - 90, font2, black)
+	    ShowColourPreview
 	end if
     end for
 end BlocksSelected
@@ -718,10 +945,40 @@ procedure LoadSelected
 	    colourback (oldbackcolour)
 	    locate (12, 1)
 	    if i = 1 then
+		GUI.SetCheckBox (cbcreative, false)
 		loaded := false
 		put "World: New                       "
 	    else
+		var isSurvival : boolean := true
+		%check preferences file to find survival variable
+		open : loadedsavepref, ("Saves\\Preferences\\" + loadfile + ".txt"), get, put, seek, mod
+		seek : loadedsavepref, 0
+		var instring : string
+		get : loadedsavepref, instring
+		if strrealok (instring) then
+		    genVersion := 0
+		else
+		    genVersion := strint (instring (9 .. *))
+		end if
+		var numSlotsIgnore : int
+		if genVersion = 0 then
+		    numSlotsIgnore := 15
+		else
+		    numSlotsIgnore := 9
+		end if
+
+		for i2 : 1 .. numSlotsIgnore
+		    get : loadedsavepref, instring
+		end for
+		get : loadedsavepref, isSurvival
+		close : loadedsavepref
+
+		GUI.SetCheckBox (cbcreative, not isSurvival)
 		loaded := true
+		headcolour := -1
+		timeOfDay := -1
+		placingBlock := blockType (ord (blk.error))
+		ShowColourPreview
 		put "World: ", loadfile + "                      "
 	    end if
 	end if
@@ -762,23 +1019,19 @@ const YLIMIT : int := 2500 % = total of 2500 + 2500 + 1 = 5001 blocks
 var block : array - XLIMIT .. XLIMIT of array - YLIMIT .. YLIMIT of blockVec
 
 %Terrain generation rules
-function terrainQueryText (x, y : int, layer : int1) : string
+function terrainQuery (x, y : int, layer : int1) : int
     if genVersion < 4 then %Flat world terrain gen
-	if layer not= ord(layerId.background) then %foreground, or both - only okay because background gen is always void!
+	if layer not= ord (layerId.background) then %foreground, or both - only okay because background gen is always void!
 	    if y < 0 then
-		result "dirt"
+		result ord (blk.dirt)
 	    else
-		result "air"
+		result ord (blk.air)
 	    end if
 	else
-	    result "void"
+	    result ord (blk.void)
 	end if
     end if
-    result "air"
-end terrainQueryText
-
-function terrainQuery (x, y : int, layer : int1) : int
-    result blockID (terrainQueryText (x, y, layer))
+    result ord (blk.air)
 end terrainQuery
 
 %Check block function
@@ -795,7 +1048,7 @@ function isBlock (cdx, cdy : int, blockIn : int1, layer : int1, useTerrain : boo
     if layer not= ord (layerId.background) then
 	foundType := block (cdx) (cdy).block
     end if
-    if layer = ord (layerId.background) or layer = ord (layerId.both) and foundType <= ord (blk.air) then %If found invisible block (void, boarder, air)
+    if layer = ord (layerId.background) or layer = ord (layerId.both) and foundType <= ord (blk.air) then %If found invisible block (void, boarder, air) % wait is boarder invisible or not??
 	foundType := block (cdx) (cdy).bg
     end if
 
@@ -821,7 +1074,7 @@ function getBlock (x, y : real, background, useTerrain : boolean) : blockStruct
     var cdy : int := toBlock (y)
 
     if cdx < -XLIMIT or cdx > XLIMIT or cdy < -YLIMIT or cdy > YLIMIT then
-	result blockType (blockID ("boarder"))
+	result blockType (ord (blk.boarder))
     end if
     var returnBlock : blockStruct
     if background then
@@ -829,7 +1082,7 @@ function getBlock (x, y : real, background, useTerrain : boolean) : blockStruct
     else
 	returnBlock := blockType (block (cdx) (cdy).block)
     end if
-    if useTerrain and returnBlock.name = "void" then
+    if useTerrain and returnBlock.id = ord (blk.void) then
 	var layer : int1 := 0
 	if not background then
 	    layer := 1
@@ -988,7 +1241,7 @@ procedure createguis
 	item1 (i) := GUI.CreateMenuItem (menuitemcolours (i), HeadSelected)
     end for
     menubg := GUI.CreateMenu ("     Time of Day   ")
-    for i : 1 .. 12
+    for i : 1 .. 13
 	item2 (i) := GUI.CreateMenuItem (menuitemtime (i), TimeSelected)
     end for
     menublk := GUI.CreateMenu ("   Block Held   ")
@@ -1023,6 +1276,9 @@ procedure showMainMenuGUIs
     GUI.ShowMenuBar
     GUI.Enable (menuload)
     GUI.Enable (menudelete)
+    GUI.Enable (item1 (1))
+    GUI.Enable (item2 (1))
+    GUI.Enable (item3 (1))
     GUI.ResetQuit
     GUI.Refresh
 end showMainMenuGUIs
@@ -1030,6 +1286,9 @@ end showMainMenuGUIs
 procedure hideMainMenuGUIs
     GUI.Disable (menuload)
     GUI.Disable (menudelete)
+    GUI.Disable (item1 (1))
+    GUI.Disable (item2 (1))
+    GUI.Disable (item3 (1))
     GUI.Hide (btnstrt)
     GUI.Hide (btnend)
     GUI.Hide (cbprev)
@@ -1110,7 +1369,7 @@ procedure screenscroll (Scrdirx : real, Scrdiry : real)
 	end if
     end if
 
-    Draw.FillBox (0, 0, maxx, maxy, blockType (blockID ("air")).clr) %a cls
+    Draw.FillBox (0, 0, maxx, maxy, blockType (ord (blk.air)).clr) %a cls
     offsetleftright += scrdirx
     offsetupdown += scrdiry
     UpdateMostTravelled
@@ -1151,23 +1410,6 @@ procedure screenscroll (Scrdirx : real, Scrdiry : real)
 
     showWorld ()
 end screenscroll
-
-
-%Show colour preview as default
-procedure ShowColourPreveiwDefault
-    Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
-    Draw.Text ("Default head", 1, maxy - 90, font2, black)
-    Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
-    Draw.Text ("Default background", 100, maxy - 90, font2, black)
-    Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
-    Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
-    locate (12, 1)
-    if loadfile not= "" then
-	put "World: ", loadfile
-    else
-	put "World: New"
-    end if
-end ShowColourPreveiwDefault
 
 procedure CenterCamera
     offsetleftright := pos.x - toGameCdMeasure (maxx div 2)
@@ -1212,23 +1454,31 @@ procedure GetPreferences
 	    get : loadedsavepref, pos.x
 	end if
 	get : loadedsavepref, pos.y
-	if headcolour = 983 then
+	if headcolour = -1 then
 	    get : loadedsavepref, headcolour
 	else
 	    get : loadedsavepref, nullreal
 	end if
-	get : loadedsavepref, timeOfDay
+	if timeOfDay = -1 then
+	    get : loadedsavepref, timeOfDay
+	else
+	    get : loadedsavepref, nullreal
+	end if
 	if genVersion < 3 then
 	    timeOfDay := 6 %whatevernoonis
 	end if
-	get : loadedsavepref, instring
-	tempInt := strint (instring)
-	if tempInt < 0 or tempInt >= numBlockTypes then
-	    tempInt := ord (blk.dirt)
+	if placingBlock.id = ord (blk.error) then
+	    get : loadedsavepref, instring
+	    tempInt := strint (instring)
+	    if tempInt < 0 or tempInt >= numBlockTypes then
+		tempInt := ord (blk.dirt)
+	    end if
+	    placingBlock := blockType (tempInt)
+	else
+	    get : loadedsavepref, nullreal
 	end if
-	placingBlock := blockType (tempInt)
-	if genVersion < 3 then
-	    placingBlock := blockType (blockID ("stone"))
+	if genVersion <= 1 or placingBlock.id = ord (blk.error) then
+	    placingBlock := blockType (ord (blk.dirt))
 	end if
 	if keepmapblocksize then
 	    get : loadedsavepref, blocksize
@@ -1322,11 +1572,15 @@ procedure GetPreferences
 	end if
     else
 	genVersion := thisGenVersion
-	if headcolour = 983 then
+	if headcolour = -1 then
 	    headcolour := white
 	end if
-	timeOfDay := 0
-	placingBlock := blockType (blockID ("stone"))
+	if timeOfDay = -1 then
+	    timeOfDay := 0
+	end if
+	if placingBlock.id = ord (blk.error) then
+	    placingBlock := blockType (ord (blk.dirt))
+	end if
 	CenterCamera
     end if
     ClampOffsetToScreen
@@ -1373,21 +1627,6 @@ end getBestBlockIdMatch
 
 %Generate world
 procedure GenerateWorld
-    /*if genVersion >= 2 then
-     %Generate ground on screen
-     var x : int := round (smallestOf (-toGameCdXR (maxx div 2) - 1, toGameCdXR (0) - 1))
-     var y : int := round (smallestOf (-3, toGameCdYR (0)))
-     loop
-     setBlock (x, y, terrainQueryText (x, y))
-     x += 1
-     if x > toGameCdXR (maxx) then
-     x := round (smallestOf (-toGameCdXR (maxx div 2) - 1, toGameCdXR (0) - 1))
-     y += 1
-     end if
-     exit when y > toGameCdYR (maxy)
-     end loop
-     end if*/
-
     if loaded then %Load world
 	var numItems : int := 0
 	for i : 1 .. length (importedBlockList)
@@ -1433,34 +1672,18 @@ procedure GenerateWorld
 		    get : loadedsave, yInd
 		    var thisBlockID : int
 		    get : loadedsave, thisBlockID
-		    setBlock (xInd, yInd, bestMatch (thisBlockID), false)
-		    /*if thisBlockID not= 0 then
-		     if thisBlockID > 2 then
-		     thisBlockID += 1
-		     elsif thisBlockID > 4 then
-		     thisBlockID += 3
-		     elsif thisBlockID > 6 then
-		     thisBlockID += 2
-		     elsif thisBlockID > 8 then
-		     thisBlockID += 1
-		     elsif thisBlockID > 11 then
-		     thisBlockID += 4
-		     elsif thisBlockID > 15 then
-		     thisBlockID := 3
-		     end if
-		     if thisBlockID >= numBlockTypes then
-		     thisBlockID := 3
-		     end if
-		     setBlock (xInd, yInd, thisBlockID, false)
-		     end if*/
-		    if genVersion > 2 then %Ver 3 and up (this gets the background block)
+		    if thisBlockID > numItems then
+			setBlock (xInd, yInd, ord (blk.error), false)
+		    else
+			setBlock (xInd, yInd, bestMatch (thisBlockID), false)
+		    end if
+		    if genVersion >= 3 then %Ver 3 and up (this gets the background block)
 			get : loadedsave, thisBlockID
-			/*if thisBlockID not= 0 then
-			 if thisBlockID >= numBlockTypes then
-			 thisBlockID := ord(blk.error)
-			 end if*/
-			setBlock (xInd, yInd, bestMatch (thisBlockID), true)
-			%end if
+			if thisBlockID > numItems then
+			    setBlock (xInd, yInd, ord (blk.error), true)
+			else
+			    setBlock (xInd, yInd, bestMatch (thisBlockID), true)
+			end if
 		    end if
 		end if
 		if firstblock then
@@ -1524,9 +1747,9 @@ procedure WorldPreview
 	var newWinMaxy : int := mstScrnHsGnUp - mstScrnHsGnDwn
 	var previewPictureWin : int := Window.Open ("graphics:" + intstr (newWinMaxx) + ";" + intstr (newWinMaxy) + ",invisible")
 	if bareBonesPreview then
-	    Draw.FillBox (0, 0, newWinMaxx, newWinMaxy, blockType (blockID ("void")).clr) %a cls
+	    Draw.FillBox (0, 0, newWinMaxx, newWinMaxy, blockType (ord (blk.void)).clr) %a cls
 	else
-	    Draw.FillBox (0, 0, newWinMaxx, newWinMaxy, blockType (blockID ("air")).clr) %a cls
+	    Draw.FillBox (0, 0, newWinMaxx, newWinMaxy, blockType (ord (blk.air)).clr) %a cls
 	end if
 	for cdx : mstScrnHsGnLft .. mstScrnHsGnRght
 	    for cdy : mstScrnHsGnDwn .. mstScrnHsGnUp
@@ -1548,7 +1771,7 @@ procedure WorldPreview
 				if blockType (foundType).name = "void" then
 				    foundType := terrainQuery (cdx, cdy, 0)
 				    if blockType (foundType).name = "void" then
-					foundType := blockID ("air")
+					foundType := ord (blk.air)
 				    end if
 				end if
 			    end if
@@ -1573,7 +1796,7 @@ procedure WorldPreview
 	    x2 := mstScrnHsGnRght + round (offsetleftright) + (midx - midx div 16)
 	    y2 := mstScrnHsGnUp + round (offsetupdown) + (midy - midy div 16)
 
-	    Draw.FillBox (0, 0, maxx, maxy, blockType (blockID ("void")).clr) %a cls
+	    Draw.FillBox (0, 0, maxx, maxy, blockType (ord (blk.void)).clr) %a cls
 	    Pic.Draw (previewPic, x1, y1, picCopy)
 	    Draw.Box (x1 - 1, y1 - 1, x2 + 1, y2 + 1, brightred)
 	    View.Update
@@ -1601,7 +1824,7 @@ procedure WorldPreview
 
 	%Reset head colour default
 	if resetdefaulthead then
-	    headcolour := 983
+	    headcolour := -1
 	    resetdefaulthead := false
 	end if
     end if
@@ -2047,6 +2270,7 @@ procedure PressSpaceKey
 	    elsif flypossible not= 0 then
 		flypossible := 0
 		flying := not flying
+		gravcount := 0 %Reset downwards velocity
 	    end if
 	end if
 
@@ -2582,18 +2806,26 @@ end CharImage
 %Draw character image and head colour
 procedure CharDraw
     %Draw character's head colour
+    var offsetx : int := 0
+    var offsety : int := 0
     if action = "dying left" then
-	Draw.FillOval (toScrnCdX (pos.x) - 4, toScrnCdY (pos.y) + 4, 3, 3, headcolour)
+	offsetx := -4
+	offsety := 4
     elsif action = "dying right" then
-	Draw.FillOval (toScrnCdX (pos.x) + 4, toScrnCdY (pos.y) + 4, 3, 3, headcolour)
+	offsetx := 4
+	offsety := 4
     elsif action = "crawling left" or action = "crawlingstop left" then
-	Draw.FillOval (toScrnCdX (pos.x) - 4, toScrnCdY (pos.y) + 8, 3, 3, headcolour)
+	offsetx := -4
+	offsety := 8
     elsif action = "crawling right" or action = "crawlingstop right" or action = "crawlingstop" then
-	Draw.FillOval (toScrnCdX (pos.x) + 4, toScrnCdY (pos.y) + 8, 3, 3, headcolour)
+	offsetx := 4
+	offsety := 8
     else
-	Draw.FillOval (toScrnCdX (pos.x), toScrnCdY (pos.y) + 21, 3, 3, headcolour)
+	offsety := 21
     end if
 
+    Draw.FillOval (toScrnCdX (pos.x) + offsetx, toScrnCdY (pos.y) + offsety, 3, 3, headcolour)
+    
     %Draw character
     /*
      var charxcdreal : real := ((pos.x - charwidth / 2) - offsetleftright) * blocksize
@@ -2617,9 +2849,15 @@ procedure CharDraw
      put charxcdreal
      put tempMin, " ", tempMax
      put charxcd*/
-     
-     locate (1,1)
-     put action
+
+
+    /*var finalFrame : int := frame
+    var finalLeftRight : int := leftright
+    var finalIsClick : int := isClick
+    if action > sprt.crawl then
+	frame := 0
+    end if*/
+    %Pic.Draw (sprite (action) (finalFrame) (finalLeftRight) (finalIsClick), toScrnCdX (leftSide ()), toScrnCdY (pos.y), picMerge)
     Pic.Draw (character, toScrnCdX (leftSide ()), toScrnCdY (pos.y), picMerge)
 end CharDraw
 
@@ -2697,18 +2935,6 @@ procedure DrawHealthBar
 	healthbarback := Pic.New (0, 19, maxx, 41)     %Pic.New (maxx div 8 - 1, 19, (maxx div 4 * 3) + maxx div 8 + 1, 41)
 
 	if health not= 0 then
-	    /*if health not= healthold then
-	     %draw healthbar full texture over all bottom of screen
-	     Pic.Draw (healthbarfrst, 0, 20, picCopy)
-	     %take image of desired section and save as healthbar
-	     Pic.Free (healthbar)
-	     healthbar := Pic.New (maxx div 8, 20, maxx div 8 + round ((maxx div 4 * 3 / 100) * (health / 10)), 40)
-	     %restore background from healthbarback
-	     Pic.Draw (healthbarback, 0, 19, picCopy)
-	     healthold := health
-	     end if
-	     %Draw health bar portion in desired position
-	     Pic.Draw (healthbar, maxx div 8, 20, picMerge)*/
 	    PicDrawTranslucentBox (maxx div 8, 20, maxx div 8 + round ((maxx div 4 * 3 / 100) * (health / 10)), 40, brightgreen, 0.5)
 	    Draw.Box (maxx div 8, 20, (maxx div 4 * 3) + maxx div 8, 40, 10)
 	else
@@ -2785,7 +3011,6 @@ procedure resetVariables
     recentstarta := false
     mustcrawl := false
     recentclick := false
-    loaded := false
     quitthegame := false
     keyspc := false
     keya := false
@@ -2806,9 +3031,14 @@ procedure resetVariables
     facing := ""
     oldfacing := ""
     loadfile := ""
-    headcolour := 983
     ponwlk := 1
     poncrl := 1
+    if loaded then
+	headcolour := -1
+	timeOfDay := -1
+	placingBlock := blockType (ord (blk.error))
+    end if
+    loaded := false
     loading (white)
     View.Update
     for i : mstScrnHsGnLft .. mstScrnHsGnRght
@@ -2880,8 +3110,8 @@ loop
 	%Clear all blocks %This happens in resetvariables, right, so do we actually need it here?
 	for x : mstScrnHsGnLft .. mstScrnHsGnRght
 	    for y : mstScrnHsGnDwn .. mstScrnHsGnUp
-		block (x) (y).block := blockID ("void")
-		block (x) (y).bg := blockID ("void")
+		block (x) (y).block := ord (blk.void)
+		block (x) (y).bg := ord (blk.void)
 	    end for
 	end for
 	cls
@@ -2895,7 +3125,13 @@ loop
 	end if
 	showMainMenuGUIs
 
-	ShowColourPreveiwDefault
+	ShowColourPreview
+	locate (12, 1)
+	if loadfile not= "" then
+	    put "World: ", loadfile
+	else
+	    put "World: New"
+	end if
 
 	%Wait until user clicks "start" or "quit" button
 	loop
@@ -2921,7 +3157,7 @@ loop
 	end if
 
 	%Set head default indicator
-	if headcolour = 983 then
+	if headcolour = -1 then
 	    resetdefaulthead := true
 	end if
 
@@ -2940,7 +3176,7 @@ loop
 	AssignStartingVariables
 
 	%Update background colour
-	Draw.FillBox (0, 0, maxx, maxy, blockType (blockID ("air")).clr)     %a cls
+	Draw.FillBox (0, 0, maxx, maxy, blockType (ord (blk.air)).clr)    %a cls
 
 	GenerateWorld
 
@@ -2955,7 +3191,7 @@ loop
 	exit
     end if
 
-    loaded := false
+    %loaded := false
 
     %Show world
     View.Update
@@ -3057,7 +3293,7 @@ loop
 	IfDeadGameOver
 
 	%DebugDraw
-	%locate (1, 1)
+	locate (1, 1)
 	%put deltaTime
 
 	%Show new screen
