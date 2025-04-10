@@ -697,31 +697,38 @@ else %Generate ground
     textfound := ""
 end if
 
+%Error: Offsets the first block in the autosave file (that has not been glitch-offset) up one when the character is actively falling and then places a block over their head and then breaks it.
+
 %Screen scroll up
 procedure screenup
     Draw.FillBox (0, 0, maxx, maxy, bgcolour)
     seek : autosave, *
     tell : autosave, endspot
     seek : autosave, 0
+
+    locate (1, 1)
+    put "hi1"
+    View.UpdateArea (0, maxy - 20, 30, maxy)
+    delay (4000)
     loop
 	get : autosave, autocoords
 	if block (strint (autocoords)) then
 	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
 	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
-	end if
-	tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry + 4999)
-	tempcoords (2) := 100000000 + (srx + 24999) * 10000 + (sry + 1 + 4999)
-	if #block (tempcoords (1)) = boolUnInit then
-	    block (tempcoords (1)) := false
-	end if
-	if block (tempcoords (1)) then
-	    block (tempcoords (1)) := false
-	    block (tempcoords (2)) := true
+	    /*locate (4, 1)
+	     put srx
+	     put sry
+	     View.Update*/
+	    tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry + 1 + 4999)
+	    block (strint (autocoords)) := false
+	    block (tempcoords (1)) := true
 	    tell : autosave, shiftspot
 	    seek : autosave, *
-	    put : autosave, tempcoords (2)
+	    put : autosave, tempcoords (1)
 	    seek : autosave, shiftspot
 	    Draw.FillBox (srx, sry + 1, srx + (blocksize - 1), (sry + 1) + (blocksize - 1), blockcolour)
+	    %View.Update
+	    %delay (10)
 	end if
 	if shiftspot >= endspot then
 	    exit
@@ -1019,12 +1026,12 @@ loop
 	    null := ((floor ((charx + xinc * i) / blocksize)) * blocksize)
 	    null := ((floor ((handheight + yinc * i) / blocksize)) * blocksize)
 	    null := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
-	    if 1 = 1 then
+	    if block (null) then
 		null := i
-		null := ((floor ((charx + xinc * i) / blocksize)) * blocksize)
-		null := ((floor ((handheight + yinc * i) / blocksize)) * blocksize)
-		null := ((floor ((charx + xinc * (i - 1)) / blocksize)) * blocksize)
-		null := ((floor ((handheight + yinc * (i - 1)) / blocksize)) * blocksize)
+		null := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
+		null := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
+		null := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
+		null := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
 	    end if
 	end if
     end for
