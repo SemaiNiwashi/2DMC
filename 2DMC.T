@@ -3,8 +3,6 @@
 %File Name: 2DMC.t
 %Date: Feb. 11, 2013
 
-%1.0.7 was the last functional version
-
 %Make using GUI features possible
 import GUI
 
@@ -105,10 +103,11 @@ var tempcoords : array 1 .. 5 of int
 var xm, ym, cm, s, character, rcharxl, rcharyd, rcharxr, rcharyu, rcursorxbb, rcursorybb, rcursorxpb, rcursorypb, rcharydfloor, rcharyuceil,
     btnstrt, btncont, btnend, savenames, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload, quitButton, nameTextField, nameLabel,
     oldbackcolour, saveFile, autosave, menudelete, oldblockcolour, handheight, tempi, linegx, linegy, idelete, null, backpiccross, backpicbox,
-    srx, sry, slx, sly, sux, suy, sdx, sdy, shiftspot, endspot, mstScrnHsGnUp, val, autocoords : int
+    srx, sry, slx, sly, sux, suy, sdx, sdy, shiftspot, endspot, mstScrnHsGnUp, val, autocoords, cb1, bigx, bigy : int
 var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y,
     iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2,
-    crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety, offsetleftright, mstScrnHsGnLft, mstScrnHsGnRght, offsetupdown : int := 0
+    crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety, offsetleftright, mstScrnHsGnLft, mstScrnHsGnRght, offsetupdown, offsetprevlr,
+    offsetprevud : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
     mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput, keyspc, keya, keys, keyd, keyp, preview, inmainmenu, resetdefaultbg,
     resetdefaulthead, resetdefaultblk : boolean := false
@@ -131,6 +130,8 @@ var menuitemdelete : array 1 .. 99 of string (50)
 menuitemsaves (1) := "New"
 menuitemsaves (0) := "---"
 menuitemdelete (99) := ""
+
+%Range: x: -4999 to 5000, y: -2499 to 2500
 
 %Turn the integer value of a colour into a string
 procedure colourstringify (clr : int)
@@ -193,6 +194,10 @@ end loading
 %Does nothing, is just a necessary placeholder
 procedure NameEntered (text : string)
 end NameEntered
+
+%Does nothing, is just a necessary placeholder
+procedure DoNothing (status : boolean)
+end DoNothing
 
 %If the user selects an opting in the "Head Colour" menu
 procedure HeadSelected
@@ -420,6 +425,8 @@ process guis
     if frstmthrgh then
 	btnstrt := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Start Game", start, 30, chr (13), false)
 
+	cb1 := GUI.CreateCheckBox (maxx - 80, maxy - 50, "Preview", DoNothing)
+
 	menuhead := GUI.CreateMenu ("Head Colour")
 	for i : 1 .. 16
 	    item1 (i) := GUI.CreateMenuItem (menuitemcolours (i), HeadSelected)
@@ -444,7 +451,7 @@ process guis
 	end for
     end if
     loop
-	if startgame = true then
+	if startgame then
 	    exit
 	end if
 	exit when GUI.ProcessEvent
@@ -467,8 +474,9 @@ loop
 	    ym <= maxy div 6 * 5 - 32 then
 	recentclick := true
     else
-	if recentclick = true and cm = 0 and xm >= midx - Font.Width ("Welcome to 2DMC!", font1) div 2 - 10 and xm <= midx + Font.Width ("Welcome to 2DMC!", font1) div 2 + 10 and
+	if recentclick and cm = 0 and xm >= midx - Font.Width ("Welcome to 2DMC!", font1) div 2 - 10 and xm <= midx + Font.Width ("Welcome to 2DMC!", font1) div 2 + 10 and
 		ym >= maxy div 6 + 32 and ym <= maxy div 6 * 5 - 32 then
+	    recentclick := false
 	    exit
 	end if
 	recentclick := false
@@ -486,6 +494,7 @@ var block : array 0 .. 49999999 of boolean
 
 %Save feature
 procedure saveWorld
+    loading (bgcolour)
     textfound := GUI.GetText (nameTextField)
     if textfound not= "" then
 	iprevsaves := 0
@@ -553,7 +562,7 @@ process pauseguis
     btnend := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Quit", endgame, 30, chr (13), false)
     GUI.SetText (nameTextField, textfound)
     loop
-	if startgame = true then
+	if startgame then
 	    exit
 	end if
 	exit when GUI.ProcessEvent
@@ -585,9 +594,6 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 	loop
 	    tempcoords (1) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
 	    if #block (tempcoords (1)) = boolUnInit then
-		block (tempcoords (1)) := false
-	    end if
-	    if mstScrnHsGnUp = offsetupdown + groundlevel and block (tempcoords (1)) not= true then %If it has never gone down this far before
 		blkount += 1
 		block (tempcoords (1)) := true
 		put : autosave, tempcoords (1)
@@ -595,17 +601,12 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 	    x += blocksize
 	    exit when x >= maxx + blocksize
 	end loop
-	x := 0
-	y := 0
     elsif scrdirx = -1 and scrdiry = 0 and offsetupdown + groundlevel > 0 then   %Screen left, make ground right
 	x := ((floor ((maxx - offsetx) / blocksize)) * blocksize + offsetx) + blocksize
 	y := -blocksize + offsety
 	loop
 	    tempcoords (1) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
 	    if #block (tempcoords (1)) = boolUnInit then
-		block (tempcoords (1)) := false
-	    end if
-	    if mstScrnHsGnLft = offsetleftright and block (tempcoords (1)) not= true then %If it has never gone right this far before
 		blkount += 1
 		block (tempcoords (1)) := true
 		put : autosave, tempcoords (1)
@@ -613,17 +614,12 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 	    y += blocksize
 	    exit when y >= offsetupdown + groundlevel
 	end loop
-	x := 0
-	y := 0
     elsif scrdirx = 1 and scrdiry = 0 and offsetupdown + groundlevel > 0 then   %Screen right, make ground left
 	x := -blocksize - blocksize + offsetx
 	y := -blocksize + offsety
 	loop
 	    tempcoords (1) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
 	    if #block (tempcoords (1)) = boolUnInit then
-		block (tempcoords (1)) := false
-	    end if
-	    if mstScrnHsGnRght = offsetleftright and block (tempcoords (1)) not= true then %If it has never gone left this far before
 		blkount += 1
 		block (tempcoords (1)) := true
 		put : autosave, tempcoords (1)
@@ -634,18 +630,25 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
     end if
 
     %Draw blocks on screen
-    seek : autosave, 0
+    bigx := (-offsetleftright) div blocksize - 1
+    bigy := (-offsetupdown) div blocksize - 1
     loop
-	get : autosave, autocoords
-	if block (autocoords) then
-	    x := (autocoords - (floor (autocoords / 10000) * 10000) - 4999) * blocksize + offsetleftright
-	    y := (floor (autocoords / 10000) - 2499) * blocksize + offsetupdown
+	tempcoords (1) := ((bigy + 2499) * 10000) + (bigx + 4999)
+	if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) then
+	    x := (tempcoords (1) - (floor (tempcoords (1) / 10000) * 10000) - 4999) * blocksize + offsetleftright
+	    y := (floor (tempcoords (1) / 10000) - 2499) * blocksize + offsetupdown
 	    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
 	end if
-	exit when eof (autosave)
+	bigx += 1
+	if bigx > maxx div blocksize then
+	    if bigy > maxy div blocksize then
+		exit
+	    else
+		bigx := (-offsetleftright) div blocksize - 1
+		bigy += 1
+	    end if
+	end if
     end loop
-    x := 0
-    y := 0
 end screenscroll
 
 %Set colour-change-detecting variables
@@ -686,10 +689,12 @@ loop
 
     %Re-enables start GUIs
     if frstmthrgh = false then
+	Pic.Draw (backpic, 0, maxy - 210, picCopy)
 	GUI.Enable (menuload)
 	GUI.Enable (item1 (1))
 	GUI.Enable (item2 (1))
 	GUI.Enable (item3 (1))
+	GUI.Enable (cb1)
 	GUI.Show (btnstrt)
 	GUI.ShowMenuBar
 	GUI.ResetQuit
@@ -702,20 +707,34 @@ loop
     fork guis
 
     %Show colour preview as default
-    Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
-    Draw.Text ("Default head", 1, maxy - 90, font2, black)
-    Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
-    Draw.Text ("Default background", 100, maxy - 90, font2, black)
-    Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
-    Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
-
-    preview := true
+    if frstmthrgh then
+	Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
+	Draw.Text ("Default head", 1, maxy - 90, font2, black)
+	Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
+	Draw.Text ("Default background", 100, maxy - 90, font2, black)
+	Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
+	Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
+	locate (13, 1)
+	put "World: New"
+    end if
 
     %Wait until user clicks "start" button
     loop
-	exit when startgame = true
+	exit when startgame
     end loop
 
+    %Save main menu screen
+    Pic.Free (backpic)
+    backpic := Pic.New (0, maxy - 210, 310, maxy - 35)
+
+    %Get checkbox state
+    if GUI.GetCheckBox (cb1) then
+	preview := true
+    else
+	preview := false
+    end if
+
+    %Set default indicators
     if bgcolour = 983 then
 	resetdefaultbg := true
     end if
@@ -733,6 +752,7 @@ loop
     GUI.Disable (item1 (1))
     GUI.Disable (item2 (1))
     GUI.Disable (item3 (1))
+    GUI.Disable (cb1)
     GUI.Hide (btnstrt)
     GUI.HideMenuBar
     GUI.Quit
@@ -805,8 +825,8 @@ loop
     Draw.FillBox (0, 0, maxx, maxy, bgcolour)
 
     if loaded then %Load world
+	seek : loadedsave, 0
 	if eof (loadedsave) = false then
-	    seek : loadedsave, 0
 	    loop
 		get : loadedsave, textfound
 		block (strint (textfound)) := true
@@ -818,9 +838,6 @@ loop
 	    end loop
 	    textfound := loadfile
 	end if
-	x := 0
-	y := 0
-	loaded := false
 	close : loadedsave
     else %Generate ground
 	x := 0
@@ -838,8 +855,6 @@ loop
 	    end if
 	    exit when y >= blocksize * 3
 	end loop
-	x := 0
-	y := 0
 	textfound := ""
     end if
 
@@ -851,19 +866,13 @@ loop
 	    loop
 		tempcoords (1) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
 		if #block (tempcoords (1)) = boolUnInit then
-		    block (tempcoords (1)) := false
-		end if
-		if block (tempcoords (1)) not= true then %If it has never gone down this far before
 		    blkount += 1
-		    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
 		    block (tempcoords (1)) := true
 		    put : autosave, tempcoords (1)
 		end if
 		x += blocksize
 		exit when x >= maxx
 	    end loop
-	    x := 0
-	    y := 0
 	end if
 
 	%Generate one row of to-the-right-of-screen ground if screen is at the furthest it has gone right.
@@ -873,19 +882,13 @@ loop
 	    loop
 		tempcoords (1) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
 		if #block (tempcoords (1)) = boolUnInit then
-		    block (tempcoords (1)) := false
-		end if
-		if block (tempcoords (1)) not= true then %If it has never gone right this far before
 		    blkount += 1
-		    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
 		    block (tempcoords (1)) := true
 		    put : autosave, tempcoords (1)
 		end if
 		y += blocksize
 		exit when y >= offsetupdown + groundlevel
 	    end loop
-	    x := 0
-	    y := 0
 	end if
 
 	%Generate one row of to-the-left-of-screen ground if screen is at the furthest it has gone left.
@@ -895,63 +898,75 @@ loop
 	    loop
 		tempcoords (1) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
 		if #block (tempcoords (1)) = boolUnInit then
-		    block (tempcoords (1)) := false
-		end if
-		if block (tempcoords (1)) not= true then %If it has never gone left this far before
 		    blkount += 1
-		    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), Rand.Int (33, 55)) %blockcolour)
 		    block (tempcoords (1)) := true
 		    put : autosave, tempcoords (1)
 		end if
 		y += blocksize
 		exit when y >= offsetupdown + groundlevel
 	    end loop
-	    x := 0
-	    y := 0
 	end if
     end if
 
     %World preview feature
     if preview then
 	cls
-	Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-	seek : autosave, 0
-	if eof (autosave) = false then
-	    loop
-		get : autosave, autocoords
-		if block (autocoords) then
-		    x := (autocoords - (floor (autocoords / 10000) * 10000) - 4999) + (midx - midx div 16)
-		    y := (floor (autocoords / 10000) - 2499) + (midy - midy div 16)
-		    Draw.Dot (x, y, blockcolour)
-		end if
-		exit when eof (autosave)
-	    end loop
-	end if
+	loop
+	    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+	    Input.KeyDown (arrow)
+	    seek : autosave, 0
+	    if eof (autosave) = false then
+		loop
+		    get : autosave, autocoords
+		    if block (autocoords) then
+			x := (autocoords - (floor (autocoords / 10000) * 10000) - 4999) + offsetprevlr + (midx - midx div 16)
+			y := (floor (autocoords / 10000) - 2499) + offsetprevud + (midy - midy div 16)
+			Draw.Dot (x, y, blockcolour)
+		    end if
+		    exit when eof (autosave)
+		end loop
+	    end if
+	    View.Update
+	    if arrow ('a') then
+		offsetprevlr -= 10
+	    elsif arrow ('d') then
+		offsetprevlr += 10
+	    end if
+	    if arrow ('w') then
+		offsetprevud += 10
+	    elsif arrow ('s') then
+		offsetprevud -= 10
+	    end if
+	    if arrow ('p') then
+		offsetprevlr := 0
+		offsetprevud := 0
+		exit
+	    end if
+	end loop
 
-	View.Update
-	delay (5000)
-
-	if resetdefaultbg = true then
+	%Reset colour defaults
+	if resetdefaultbg then
 	    bgcolour := 983
 	    resetdefaultbg := false
 	end if
-	if resetdefaulthead = true then
+	if resetdefaulthead then
 	    headcolour := 983
 	    resetdefaulthead := false
 	end if
-	if resetdefaultblk = true then
+	if resetdefaultblk then
 	    blockcolour := 983
 	    resetdefaultblk := false
 	end if
 	close : autosave
     end if
 
-
     frstmthrgh := false
     if preview = false then
 	exit
     end if
 end loop
+
+loaded := false
 
 %Show world
 View.Update
@@ -978,62 +993,48 @@ loop
     else
 	tempcoords (1) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
     end if
-    if #block (tempcoords (1)) = boolUnInit then
-	block (tempcoords (1)) := false
-    end if
     if charheight <= blocksize then
 	tempcoords (2) := (((rcharyuceil - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
     else
 	tempcoords (2) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
     end if
-    if #block (tempcoords (2)) = boolUnInit then
-	block (tempcoords (2)) := false
-    end if
-    if (block (tempcoords (1)) or block (tempcoords (2))) and onground then
+    if ( #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2))) and onground then
 	mustcrawl := true
     else
 	mustcrawl := false
     end if
-    if block (tempcoords (2)) = false and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx)) then
+    if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx)
+	    / blocksize + offsetx)) then
 	mustcrawl := false
     end if
-    if block (tempcoords (1)) = false and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) / blocksize + offsetx)) then
+    if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (1)) = false) and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) /
+	    blocksize + offsetx)) then
 	mustcrawl := false
     end if
 
     %If character is on the ground
     tempcoords (1) := (((rcharyd - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
-    if #block (tempcoords (1)) = boolUnInit then
-	block (tempcoords (1)) := false
-    end if
-    tempcoords (2) := (((rcharyd - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
-    if #block (tempcoords (2)) = boolUnInit then
-	block (tempcoords (2)) := false
-    end if
-    if (block (tempcoords (1)) or block (tempcoords (2))) and (chary - offsety) / blocksize + offsety = (chary - offsety) div blocksize + offsety or chary = 0 then
+    if ( #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) = boolUnInit and block (tempcoords (2))) and (chary - offsety) / blocksize + offsety = (chary -
+	    offsety) div blocksize + offsety or chary = 0 then
 	onground := true
     else
 	onground := false
     end if
-    if block (tempcoords (2)) = false and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx)) and chary > 0 then
+    if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx)
+	    / blocksize + offsetx)) and chary > 0 then
 	onground := false
     end if
-    if block (tempcoords (1)) = false and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) / blocksize + offsetx)) and chary > 0 then
+    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) /
+	    blocksize + offsetx)) and chary > 0 then
 	onground := false
     end if
 
     %If character is against a wall to the left
     tempcoords (1) := (((rcharydfloor - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
     tempcoords (2) := (((rcharydfloor + blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
-    if #block (tempcoords (1)) = boolUnInit then
-	block (tempcoords (1)) := false
-    end if
-    if #block (tempcoords (2)) = boolUnInit then
-	block (tempcoords (2)) := false
-    end if
-    if block (tempcoords (1)) or charx - charwidth div 2 = 0 then
+    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or charx - charwidth div 2 = 0 then
 	onleftwall := true
-    elsif charheight > blocksize and block (tempcoords (2)) then
+    elsif charheight > blocksize and #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) then
 	onleftwall := true
     else
 	onleftwall := false
@@ -1042,15 +1043,9 @@ loop
     %If character is against a wall to the right
     tempcoords (1) := (((rcharydfloor - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
     tempcoords (2) := (((rcharydfloor + blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
-    if #block (tempcoords (1)) = boolUnInit then
-	block (tempcoords (1)) := false
-    end if
-    if #block (tempcoords (2)) = boolUnInit then
-	block (tempcoords (2)) := false
-    end if
-    if block (tempcoords (1)) or charx + charwidth div 2 = maxx then
+    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or charx + charwidth div 2 = maxx then
 	onrightwall := true
-    elsif charheight > blocksize and block (tempcoords (2)) then
+    elsif charheight > blocksize and #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) then
 	onrightwall := true
     else
 	onrightwall := false
@@ -1059,22 +1054,17 @@ loop
     %If character is against the ceiling
     tempcoords (1) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
     tempcoords (2) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
-    if #block (tempcoords (1)) = boolUnInit then
-	block (tempcoords (1)) := false
-    end if
-    if #block (tempcoords (2)) = boolUnInit then
-	block (tempcoords (2)) := false
-    end if
-    if block (tempcoords (1)) or block (tempcoords (2)) or rcharyu >= maxy then
+    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) or rcharyu >= maxy then
 	hitceiling := true
     else
 	hitceiling := false
     end if
-    if block (tempcoords (2)) = false and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx)) and rcharyu < maxy
-	    then
+    if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx)
+	    / blocksize + offsetx)) and rcharyu < maxy then
 	hitceiling := false
     end if
-    if block (tempcoords (1)) = false and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) / blocksize + offsetx)) and rcharyu < maxy then
+    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) /
+	    blocksize + offsetx)) and rcharyu < maxy then
 	hitceiling := false
     end if
 
@@ -1183,10 +1173,7 @@ loop
 	    rcursorxpb := rcursorxbb
 	    rcursorypb := rcursorybb
 	    tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
-	    if #block (tempcoords (1)) = boolUnInit then
-		block (tempcoords (1)) := false
-	    end if
-	    if block (tempcoords (1)) then
+	    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) then
 		tempi := i
 		rcursorxbb := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
 		rcursorybb := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
@@ -1200,10 +1187,7 @@ loop
 	    null := rcursorxbb
 	    null := rcursorybb
 	    null := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
-	    if #block (null) = boolUnInit then
-		null := 0
-	    end if
-	    if block (null) then
+	    if #block (null) not= boolUnInit and block (null) then
 		null := i
 		null := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
 		null := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
@@ -1229,36 +1213,20 @@ loop
 	if mclickr = blockplacespeed then
 	    if (rcursorxpb not= rcharxl and rcursorxpb not= rcharxr) or rcursorypb not= rcharydfloor then
 		tempcoords (1) := (((rcursorypb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxpb - offsetleftright) div blocksize + 4999)
-		if #block (tempcoords (1)) = boolUnInit then
-		    block (tempcoords (1)) := false
-		end if
 		x := (tempcoords (1) - (floor (tempcoords (1) / 10000) * 10000) - 4999) * blocksize + offsetleftright
 		y := (floor (tempcoords (1) / 10000) - 2499) * blocksize + offsetupdown
 		tempcoords (2) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x + blocksize - offsetleftright) div blocksize + 4999)
 		tempcoords (3) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x - blocksize - offsetleftright) div blocksize + 4999)
 		tempcoords (4) := (((y + blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
 		tempcoords (5) := (((y - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
-		if #block (tempcoords (2)) = boolUnInit then
-		    block (tempcoords (2)) := false
-		end if
-		if #block (tempcoords (3)) = boolUnInit then
-		    block (tempcoords (3)) := false
-		end if
-		if #block (tempcoords (4)) = boolUnInit then
-		    block (tempcoords (4)) := false
-		end if
-		if #block (tempcoords (5)) = boolUnInit then
-		    block (tempcoords (5)) := false
-		end if
-		if block (tempcoords (2)) or block (tempcoords (3)) or block (tempcoords (4)) or block (tempcoords (5)) then
-		    if block (tempcoords (1)) = false then
+		if #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) or #block (tempcoords (3)) not= boolUnInit and block (tempcoords (3)) or
+		    #block (tempcoords (4)) not= boolUnInit and block (tempcoords (4)) or #block (tempcoords (5)) not= boolUnInit and block (tempcoords (5)) then
+		    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) then
 			Draw.FillBox (rcursorxpb, rcursorypb, rcursorxpb + (blocksize - 1), rcursorypb + (blocksize - 1), blockcolour)
 			block (tempcoords (1)) := true
 			blkount += 1
 			put : autosave, tempcoords (1)
 		    end if
-		    x := 0
-		    y := 0
 		end if
 	    end if
 	end if
@@ -1280,7 +1248,7 @@ loop
 	    if #block (tempcoords (1)) = boolUnInit then
 		block (tempcoords (1)) := false
 	    end if
-	    if block (tempcoords (1)) = true then
+	    if block (tempcoords (1)) then
 		Draw.FillBox (rcursorxbb, rcursorybb, rcursorxbb + (blocksize - 1), rcursorybb + (blocksize - 1), bgcolour)
 		block (tempcoords (1)) := false
 		blkount -= 1
@@ -1318,7 +1286,7 @@ loop
 	Draw.Box (265, maxy - 67, 295, maxy - 37, black)
 	Draw.Text (tempcolourstr + " blocks", 238, maxy - 90, font2, black)
 	loop
-	    exit when startgame = true
+	    exit when startgame
 	end loop
 
 	%If the quit button has been clicked
@@ -1358,8 +1326,6 @@ loop
 		    exit when eof (autosave)
 		end loop
 	    end if
-	    x := 0
-	    y := 0
 	    seek : autosave, *
 	else
 	    Pic.Draw (screenpic, 0, 0, picCopy)
