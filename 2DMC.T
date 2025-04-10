@@ -102,10 +102,10 @@ var tempcoords : array 1 .. 5 of int
 var xm, ym, cm, s, character, rcharxl, rcharyd, rcharxr, rcharyu, rcursorxbb, rcursorybb, rcursorxpb, rcursorypb, rcharydfloor, rcharyuceil,
     btnstrt, btncont, btnend, savenames, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload, quitButton, nameTextField, nameLabel,
     oldbackcolour, saveFile, autosave, menudelete, oldblockcolour, handheight, tempi, linegx, linegy, idelete, null, backpiccross, backpicbox,
-    srx, sry, slx, sly, sux, suy, sdx, sdy, autosave2, shiftspot, endspot : int
+    srx, sry, slx, sly, sux, suy, sdx, sdy, autosave2, shiftspot, endspot, mstScrnHsGnUp : int
 var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y,
     iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2,
-    crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety, offsetleftright : int := 0
+    crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety, offsetleftright, mstScrnHsGnLft, mstScrnHsGnRght : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
     mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput : boolean := false
 var action : string := "standing"
@@ -646,6 +646,7 @@ end if
 
 %Assign values to variables that are calculated using "blocksize"
 groundlevel := ((floor ((groundlevel - offsetx) / blocksize)) * blocksize + offsetx)
+mstScrnHsGnUp := groundlevel
 crosshairsbb := Pic.Scale (crosshairsbbpre, blocksize, blocksize)
 crosshairsbb2 := Pic.Scale (crosshairsbbpre2, blocksize, blocksize)
 crosshairspb := Pic.Scale (crosshairspbpre, blocksize, blocksize)
@@ -699,7 +700,6 @@ end if
 procedure screenscroll (scrdirx : int, scrdiry : int)
     Draw.FillBox (0, 0, maxx, maxy, bgcolour)
     seek : autosave, 0
-    open : autosave2, ("Autosave2.txt"), get, put, seek
     seek : autosave2, 0
     loop
 	get : autosave, autocoords
@@ -720,29 +720,35 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
     offsety += scrdiry
     offsetleftright += scrdirx
     groundlevel += scrdiry
-
-    %Generate new ground
-    if scrdirx = 0 and scrdiry = 1 and groundlevel > 0 then %Screen up, make ground below
-	x := -blocksize + offsetx
-	y := -blocksize + offsety
-	loop
-	    tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
-	    if #block (tempcoords (1)) = boolUnInit then
-		blkount += 1
-		Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), Rand.Int (33, 55)) %blockcolour)
-		block (tempcoords (1)) := true
-		put : autosave2, tempcoords (1)
-	    end if
-	    x += blocksize
-	    exit when x >= maxx
-	end loop
-	x := 0
-	y := 0
-    elsif scrdirx = 1 and scrdiry = 0 and groundlevel > 0 then %Screen left, make ground right
-
-    elsif scrdirx = -1 and scrdiry = 0 and groundlevel > 0 then %Screen right, make ground left
-
+    if groundlevel > mstScrnHsGnUp then
+	mstScrnHsGnUp := groundlevel
     end if
+    /*
+     %Generate new ground
+     if scrdirx = 0 and scrdiry = 1 and groundlevel > 0 then %Screen up, make ground below
+     x := -blocksize + offsetx
+     y := -blocksize + offsety
+     loop
+     tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+     if #block (tempcoords (1)) = boolUnInit then
+     block (tempcoords (1)) := false
+     end if
+     if mstScrnHsGnUp = groundlevel and block (tempcoords (1)) not= true then  %If it has never gone down this far before
+     blkount += 1
+     Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), Rand.Int (33, 55)) %blockcolour)
+     block (tempcoords (1)) := true
+     put : autosave2, tempcoords (1)
+     end if
+     x += blocksize
+     exit when x >= maxx
+     end loop
+     x := 0
+     y := 0
+     elsif scrdirx = 1 and scrdiry = 0 and groundlevel > 0 then %Screen left, make ground right
+
+     elsif scrdirx = -1 and scrdiry = 0 and groundlevel > 0 then %Screen right, make ground left
+
+     end if*/
 end screenscroll
 
 %Show world
@@ -877,6 +883,7 @@ loop
     %Screen sliding
     seek : autosave, 0
     if eof (autosave) = false and (charx <= 20 or charx >= maxx - 20 or chary <= 20 or chary + charheight >= maxy - 20) then
+	open : autosave2, ("Autosave2.txt"), get, put, seek
 	if charx <= 20 then
 	    screenscroll (1, 0)
 	    charx += 1
@@ -1506,10 +1513,9 @@ loop
 	    Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
 	end if
     end if
-    %end if
 
     locate (1, 1)
-    put groundlevel
+    put mstScrnHsGnUp
 
     %Show new screen
     View.Update
