@@ -105,7 +105,7 @@ var xm, ym, cm, s, character, rcharxl, rcharyd, rcharxr, rcharyu, rcursorxbb, rc
     srx, sry, slx, sly, sux, suy, sdx, sdy, autosave2, shiftspot, endspot : int
 var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y,
     iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2,
-    crosshairspb, mclickr, mclickl, guidecolour, offsetx : int := 0
+    crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
     mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput : boolean := false
 var action : string := "standing"
@@ -118,6 +118,7 @@ var item4, item5 : array 1 .. 99 of int
 var oktosavenew, inmainmenu, forcedelete : boolean := true
 var previoussaves : array 1 .. 99 of string (30)
 var xinc, yinc, reach : real
+var groundlevel : int := 50
 var menuitemcolours : array 1 .. 16 of string (20) :=
     init ("Default", "White", "Light Grey", "Dark Grey", "Black", "Brown", "Red", "Orange", "Yellow", "Green", "Dark Green", "Turquoise", "Blue", "Dark Blue", "Purple", "Pink")
 var menuitemsaves, menuitemdelete : array 1 .. 99 of string (50)
@@ -565,6 +566,7 @@ procedure saveWorld
 	put : loadedsavepref, blockcolour
 	put : loadedsavepref, blocksize
 	put : loadedsavepref, offsetx
+	put : loadedsavepref, offsety
 	close : loadedsavepref
 
 	open : saveFile, ("Saves\\" + textfound + ".txt"), get, put, seek
@@ -623,6 +625,7 @@ if loaded then
     end if
     get : loadedsavepref, blocksize
     get : loadedsavepref, offsetx
+    get : loadedsavepref, offsety
     close : loadedsavepref
 else
     if headcolour = 983 then
@@ -637,6 +640,9 @@ else
 end if
 
 %Assign values to variables that are calculated using "blocksize"
+if groundlevel < blocksize then
+    groundlevel := blocksize
+end if
 crosshairsbb := Pic.Scale (crosshairsbbpre, blocksize, blocksize)
 crosshairsbb2 := Pic.Scale (crosshairsbbpre2, blocksize, blocksize)
 crosshairspb := Pic.Scale (crosshairspbpre, blocksize, blocksize)
@@ -686,18 +692,83 @@ else %Generate ground
     textfound := ""
 end if
 
+%Screen scroll up
+procedure screenup
+    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+    seek : autosave, *
+    tell : autosave, endspot
+    seek : autosave, 0
+    loop
+	get : autosave, autocoords
+	if block (strint (autocoords)) then
+	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
+	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
+	end if
+	tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry + 4999)
+	tempcoords (2) := 100000000 + (srx + 24999) * 10000 + (sry + 1 + 4999)
+	if #block (tempcoords (1)) = boolUnInit then
+	    block (tempcoords (1)) := false
+	end if
+	if block (tempcoords (1)) then
+	    block (tempcoords (1)) := false
+	    block (tempcoords (2)) := true
+	    tell : autosave, shiftspot
+	    seek : autosave, *
+	    put : autosave, tempcoords (2)
+	    seek : autosave, shiftspot
+	    Draw.FillBox (srx, sry + 1, srx + (blocksize - 1), (sry + 1) + (blocksize - 1), blockcolour)
+	end if
+	if shiftspot >= endspot then
+	    exit
+	end if
+    end loop
+    srx := 0
+    sry := 0
+    seek : autosave, *
+	offsety += 1
+    groundlevel += 1
+end screenup
 
-
-
-
-
-
-
-
+%Screen scroll down
+procedure screendown
+    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+    seek : autosave, *
+    tell : autosave, endspot
+    seek : autosave, 0
+    loop
+	get : autosave, autocoords
+	if block (strint (autocoords)) then
+	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
+	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
+	end if
+	tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry + 4999)
+	tempcoords (2) := 100000000 + (srx + 24999) * 10000 + (sry - 1 + 4999)
+	if #block (tempcoords (1)) = boolUnInit then
+	    block (tempcoords (1)) := false
+	end if
+	if block (tempcoords (1)) then
+	    block (tempcoords (1)) := false
+	    block (tempcoords (2)) := true
+	    tell : autosave, shiftspot
+	    seek : autosave, *
+	    put : autosave, tempcoords (2)
+	    seek : autosave, shiftspot
+	    Draw.FillBox (srx, sry - 1, srx + (blocksize - 1), (sry - 1) + (blocksize - 1), blockcolour)
+	end if
+	if shiftspot >= endspot then
+	    exit
+	end if
+    end loop
+    srx := 0
+    sry := 0
+    seek : autosave, *
+	offsety -= 1
+    groundlevel -= 1
+end screendown
 
 %Screen scroll right
 procedure screenright
-    cls
+    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
     seek : autosave, *
     tell : autosave, endspot
     seek : autosave, 0
@@ -729,11 +800,24 @@ procedure screenright
     sry := 0
     seek : autosave, *
 	offsetx += 1
+
+
+
+    if groundlevel >= 0 then
+
+
+
+
+
+
+    end if
+
+
 end screenright
 
 %Screen scroll left
 procedure screenleft
-    cls
+    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
     seek : autosave, *
     tell : autosave, endspot
     seek : autosave, 0
@@ -767,15 +851,6 @@ procedure screenleft
 	offsetx -= 1
 end screenleft
 
-
-
-
-
-
-
-
-
-
 %Show world
 View.Update
 
@@ -787,11 +862,11 @@ loop
 
     %Character rounded position
     rcharxl := (floor ((charx - charwidth div 2 - offsetx) / blocksize)) * blocksize + offsetx
-    rcharyd := (ceil ((chary) / blocksize)) * blocksize
+    rcharyd := (ceil ((chary - offsety) / blocksize)) * blocksize + offsety
     rcharxr := (floor ((charx + charwidth div 2 - offsetx) / blocksize)) * blocksize + offsetx
-    rcharyu := (floor ((chary + charheight + 1) / blocksize)) * blocksize
-    rcharyuceil := (ceil ((chary + charheight + 1) / blocksize)) * blocksize
-    rcharydfloor := (floor (chary / blocksize)) * blocksize
+    rcharyu := (floor ((chary + charheight + 1 - offsety) / blocksize)) * blocksize + offsety
+    rcharyuceil := (ceil ((chary + charheight + 1 - offsety) / blocksize)) * blocksize + offsety
+    rcharydfloor := (floor ((chary - offsety) / blocksize)) * blocksize + offsety
 
     %If character must crawl
     if charheight <= blocksize then
@@ -831,7 +906,7 @@ loop
     if #block (tempcoords (2)) = boolUnInit then
 	block (tempcoords (2)) := false
     end if
-    if (block (tempcoords (1)) or block (tempcoords (2))) and chary / blocksize = chary div blocksize or chary = 0 then
+    if (block (tempcoords (1)) or block (tempcoords (2))) and (chary - offsety) / blocksize + offsety = (chary - offsety) div blocksize + offsety or chary = 0 then
 	onground := true
     else
 	onground := false
@@ -919,8 +994,8 @@ loop
     tempi := round (reach)
     for i : 1 .. round (reach)
 	if norcursorinput = false then
-	    rcursorxbb := ((floor (((charx + xinc * i) - offsetx) / blocksize)) * blocksize) + offsetx
-	    rcursorybb := ((floor ((handheight + yinc * i) / blocksize)) * blocksize)
+	    rcursorxbb := ((floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize) + offsetx
+	    rcursorybb := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
 	    rcursorxpb := rcursorxbb
 	    rcursorypb := rcursorybb
 	    tempcoords (1) := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
@@ -929,10 +1004,10 @@ loop
 	    end if
 	    if block (tempcoords (1)) then
 		tempi := i
-		rcursorxbb := (floor (((charx + xinc * i) - offsetx) / blocksize)) * blocksize + offsetx
-		rcursorybb := (floor ((handheight + yinc * i) / blocksize)) * blocksize
-		rcursorxpb := (floor (((charx + xinc * (i - 1)) - offsetx) / blocksize)) * blocksize + offsetx
-		rcursorypb := (floor ((handheight + yinc * (i - 1)) / blocksize)) * blocksize
+		rcursorxbb := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
+		rcursorybb := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
+		rcursorxpb := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
+		rcursorypb := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
 		norcursorinput := true
 	    end if
 	else
@@ -951,9 +1026,9 @@ loop
     norcursorinput := false
     if Math.Distance (charx, handheight, xm, ym) < Math.Distance (charx, handheight, charx + xinc * tempi, handheight + yinc * tempi) then
 	rcursorxbb := (floor ((xm - offsetx) / blocksize)) * blocksize + offsetx
-	rcursorybb := (floor (ym / blocksize)) * blocksize
+	rcursorybb := (floor ((ym - offsety) / blocksize)) * blocksize + offsety
 	rcursorxpb := (floor ((xm - offsetx) / blocksize)) * blocksize + offsetx
-	rcursorypb := (floor (ym / blocksize)) * blocksize
+	rcursorypb := (floor ((ym - offsety) / blocksize)) * blocksize + offsety
     end if
 
     %If player right-clicks
@@ -1427,27 +1502,35 @@ loop
 
     %Screen sliding
     seek : autosave, 0
-    if eof (autosave) = false and (charx <= 20 or charx >= maxx - 20 /*or chary <= 20 or chary >= maxy - 20*/) then
+    if eof (autosave) = false and (charx <= 20 or charx >= maxx - 20 or chary <= 20 or chary + charheight >= maxy - 20) then
 	if charx <= 20 then
 	    screenright %fork?
 	    charx += 1
 	elsif charx >= maxx - 20 then
-	    charx -= 1
 	    screenleft %fork?
-	end if /*
-	 if chary <= 20 then
-	 chary += 1
-	 screenup %fork?
-	 elsif chary >= maxy - 20 then
-	 chary -= 1
-	 screendown %fork?
-	 end if*/
+	    charx -= 1
+	end if
+	if chary <= 20 then
+	    screenup %fork?
+	    chary += 1
+	elsif chary + charheight >= maxy - 20 then
+	    chary -= 1
+	    screendown %fork?
+	end if
+
+	%reset x and y offsets
 	if offsetx > blocksize - 1 then
 	    offsetx := 0
 	elsif offsetx < 0 then
 	    offsetx := blocksize - 1
 	end if
+	if offsety > blocksize - 1 then
+	    offsety := 0
+	elsif offsety < 0 then
+	    offsety := blocksize - 1
+	end if
 
+	%Update autosave file with new moved coordinates
 	open : autosave2, ("Autosave2.txt"), get, put, seek
 	seek : autosave, 0
 	loop
@@ -1569,8 +1652,9 @@ loop
     delay (1)     %This delay to be adjusted with screen size and computer performance speed.
 end loop
 
-%Disable all active GUI functions
 close : autosave
+
+%Disable all active GUI functions
 GUI.Disable (menuhead)
 GUI.Disable (menubg)
 GUI.Disable (menublk)
