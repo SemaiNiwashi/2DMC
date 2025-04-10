@@ -10,28 +10,27 @@
 import GUI
 
 %Program settings
-var MainWinID : int := Window.Open ("position:top;right,graphics:640;400") %Smallest advisable:450,330
+View.Set ("position:top;right,graphics:640;400") %Smallest advisable:450,330
 buttonchoose ("multibutton")
 setscreen ("noecho")
 
-%Fix jitter when screen scrolling?
-%Fix screen bugging out when suffocating due to updating the health bar too frequently / updating health bar makes screen flicker
-
-%Add being able to click on a block if it is at all visible to the character - not just in a straight line to the mouse!
-%Make screen scroll a little more slowly if you suddenly end up a block into the zone? (aka when you snap-down-crouch-fall)
-%Add alter jump height by amount space pressed
 %Switch from using autosave (saves duplicate blocks) to going through narrowed array of blocks (2D)
-%replace savenames with Dir.Get
-%Prevent that little "hop" when holding space when hits ground and dies
+%Add alter jump height by amount space pressed
 %Make character an instance of a class
 %Add second player
 %Add seed in preferences(?) file?
 %   Change world generation in old version to only save blocks differing from the flat terrain generation
 %   Change world generation in new version to only save blocks differing from the seed terrain generation
 %Add different block types (solid, platform, decoration)
+%Add background blocks?
 %Add physics blocks!
 %Add entity class (for things like train)!
-%Optimize preview screen lagging when rendering large worlds
+%Add ability to step "around" objects - would work really well if I have background tiles like terraria, where they could
+%   be assumed duplicated to the front, too. Only visible when the player steps forward, then they can't step back in
+%   there. Go "around" the house! :D
+
+var tempMin, tempMax : real := 68
+var timer : int := 0
 
 %Declaration Statements
 %Constant declarations
@@ -41,10 +40,10 @@ const boolUnInit := 16#FF
 const jumpheight : real := 2.3
 const reach : real := 5
 const doubletapspeed : int := 100
-const blockplacespeed : int := 130
-const blockbreakspeed : int := 130
-const playerSpeed : real := 0.005
-const infinatePlacing : boolean := false
+var blockplacespeed : int := 130
+var blockbreakspeed : int := 130
+const playerSpeed : real := 5 / 1000
+var infinatePlacing : boolean := false
 const charudpxrange := 30
 const parallelinput : boolean := false
 const keepmapblocksize : boolean := true
@@ -189,16 +188,16 @@ var backpic : int := Pic.New (0, 0, 2, 2)
 var screenpic : int := Pic.New (0, 0, 2, 2)
 var healthbar : int := Pic.New (0, 0, 2, 2)
 var healthbarback : int := Pic.New (0, 0, 2, 2)
-var deltaTime, xm, ym, cm, character, btnstrt, btncont, btnend, mainMenuButton, savenames, loadedsave, loadedsavepref, menuhead,
+var deltaTime, xm, ym, cm, character, btnstrt, btncont, btnend, mainMenuButton, loadedsave, loadedsavepref, menuhead,
     menubg, menublk, menuload, saveButton, saveasguiheight, nameTextField, nameLabel, saveFile, autosave, menudelete, backpiccross,
-    backpicbox, autocoords, cbprev, cbfly, genVersion, seed : int
-var gametimeold, sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blkount, ireassign, mclickr, mclickl, healthold,
+    backpicbox, autocoords, cbprev, cbfly, cbcreative, genVersion, seed, popupWinID : int
+var gametimeold, sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blkount, mclickr, mclickl, healthold,
     crosshairsbb2, crosshairsbb, crosshairspb2, crosshairspb, mstScrnHsGnLft, mstScrnHsGnRght, mstScrnHsGnUp, mstScrnHsGnDwn : int := 0
 var onground, inground, onleftwall, onrightwall, hitceiling, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
     mustcrawl, startgame, recentclick, loaded, quitthegame, keyspc, keya, keys, keyd, keyp, preview, resetdefaultbg, resetdefaulthead,
-    resetdefaultblk, canfly, flying, menuReturn, forcedelete, returningFromPreview, inPauseMenu : boolean := false
-var oktosavenew, frstmthrgh, gmfrstmthrgh, survival : boolean := true
-var jumpcount, gravcount, frametimer, offsetleftright, offsetupdown : real := 0
+    resetdefaultblk, canfly, flying, menuReturn, returningFromPreview, inPauseMenu, scrollSlow, yesDelete : boolean := false
+var frstmthrgh, gmfrstmthrgh, survival : boolean := true
+var jumpcount, gravcount, frametimer, offsetleftright, offsetupdown, slowScrollSpeed : real := 0
 var ponwlk, poncrl, isaves, wlk, crl : int := 1
 var headcolour, bgcolour, blockcolour : int := 983
 var oldbackcolour : int := white
@@ -210,7 +209,6 @@ var action, actionCurrent : string := "standing"
 var item1, item2, item3 : array 1 .. 16 of int
 var item4 : array 0 .. 99 of int
 var item5 : array 1 .. 99 of int
-var previoussaves : array 1 .. 99 of string (30)
 var menuitemcolours : array 1 .. 16 of string (20) := init ("Default", "White", "Light Grey", "Dark Grey", "Black",
     "Brown", "Red", "Orange", "Yellow", "Green", "Dark Green", "Turquoise", "Blue", "Dark Blue", "Purple", "Pink")
 var menuitemsaves : array 0 .. 99 of string (50)
@@ -224,14 +222,7 @@ else
     saveasguiheight := maxy - 120
 end if
 
-var winID : int := Window.Open ("position:center;center,graphics:836;73")
-Window.Hide (winID)
-Window.SetActive (winID)
-Pic.Draw (healthbarfrst, 0, 0, picCopy)
-Window.SetActive (MainWinID)
-
 %Range: x: -4999 to 5000, y: -2499 to 2500
-
 function blockID (blockName : string) : int
     for i : 0 .. numBlockTypes - 1
 	if blockName = blockType (i).name then
@@ -545,8 +536,13 @@ procedure BlocksSelected
     end for
 end BlocksSelected
 
+procedure setDeleteFlag
+    yesDelete := true
+    GUI.Quit
+end setDeleteFlag
+
 %If the user selects an option in the "Delete" menu
-procedure DeleteSelected
+procedure DeleteSelectedLong (forcedelete : boolean)
     var idelete : int
     if forcedelete then
 	idelete := 99
@@ -557,44 +553,58 @@ procedure DeleteSelected
 	    end if
 	end for
     end if
-    if menuitemdelete (idelete) = loadfile and loaded then
-	loadfile := ""
-	loaded := false
-    end if
-    open : savenames, ("Savenames.txt"), get, put, seek, mod
-    seek : savenames, 0
-    if eof (savenames) = false then
-	var deletesaveread : string
-	loop
-	    get : savenames, deletesaveread : *
-	    if menuitemdelete (idelete) not= deletesaveread then
-		ireassign += 1
-		previoussaves (ireassign) := deletesaveread
-	    end if
-	    exit when eof (savenames)
-	end loop
-    end if
-    close : savenames
-    open : savenames, ("Savenames.txt"), get, put, seek
-    for i2 : 1 .. ireassign
-	put : savenames, previoussaves (i2)
-    end for
-    close : savenames
-    ireassign := 0
-    File.Delete ("Saves\\" + menuitemdelete (idelete) + ".txt")
-    File.Delete ("Saves\\Preferences\\" + menuitemdelete (idelete) + ".txt")
-    if forcedelete = false then
-	GUI.Disable (item5 (idelete))
-	GUI.Disable (item4 (idelete + 1))
-	colourback (oldbackcolour)
-	if inPauseMenu then
-	    locate (10, 1)
+
+    %"Are you sure?" prompt
+    yesDelete := false
+    if not forcedelete then
+	var popupWinID : int := Window.Open ("position:center;center,graphics:200;100,popup")
+	colorback (grey)
+	cls
+	var font : int := Font.New ("serif:13")
+	var message : string := "\"" + menuitemdelete (idelete) + "\"?"
+	Draw.Text ("Are you sure you want", 10, maxy - 15, font, black)
+	if Font.Width ("to delete world", font) + Font.Width (message, font) < maxx - 20 then
+	    Draw.Text ("to delete world " + message, 10, maxy - 35, font, black)
 	else
-	    locate (12, 1)
+	    Draw.Text ("to delete world", 10, maxy - 35, font, black)
+	    Draw.Text (message, 10, maxy - 55, font, black)
 	end if
-	put "Deleted ", menuitemdelete (idelete) + "                      "
+	var deleteBtn : int := GUI.CreateButton (20, 10, 0, "Delete", setDeleteFlag)
+	var quitBtn : int := GUI.CreateButton (110, 10, 0, "Cancel", GUI.Quit)
+
+	loop
+	    exit when GUI.ProcessEvent
+	end loop
+	GUI.CloseWindow (popupWinID)
+	GUI.ResetQuit
     end if
+
+    if yesDelete then
+	if menuitemdelete (idelete) = loadfile and loaded then
+	    loadfile := ""
+	    loaded := false
+	end if
+	File.Delete ("Saves\\" + menuitemdelete (idelete) + ".txt")
+	File.Delete ("Saves\\Preferences\\" + menuitemdelete (idelete) + ".txt")
+	if not forcedelete then
+	    GUI.Disable (item5 (idelete))
+	    GUI.Disable (item4 (idelete + 1))
+	    colourback (oldbackcolour)
+	    if inPauseMenu then
+		locate (10, 1)
+	    else
+		locate (12, 1)
+	    end if
+	    put "Deleted ", menuitemdelete (idelete) + "                      "
+	end if
+    end if
+end DeleteSelectedLong
+
+
+procedure DeleteSelected
+    DeleteSelectedLong (false)
 end DeleteSelected
+
 
 %If the user selects an opting in the "Load" menu
 procedure LoadSelected
@@ -622,6 +632,8 @@ process guis
 
 	cbprev := GUI.CreateCheckBox (maxx - 80, maxy - 70, "Preview", DoNothing)
 	cbfly := GUI.CreateCheckBox (maxx - 80, maxy - 100, "Flying", DoNothing)
+	cbcreative := GUI.CreateCheckBox (maxx - 80, maxy - 130, "Creative", DoNothing)
+
 
 	menuhead := GUI.CreateMenu ("Head Colour")
 	for i : 1 .. 16
@@ -662,9 +674,7 @@ put "Click to continue"
 Draw.Box (midx - welcomeWidth div 2 - 10, maxy div 6 + 32, midx + welcomeWidth div 2 + 10, maxy div 6 * 5 - 32, black)
 
 %Delete blanks from saves
-forcedelete := true
-DeleteSelected
-forcedelete := false
+DeleteSelectedLong (true)
 
 %Wait for click
 loop
@@ -716,6 +726,45 @@ function isBlock (xin : real, yin : real, blockIn : string) : boolean
     end if
 end isBlock
 
+function raycastLine (x1, y1, x2, y2, rangeIn : real, var rayHit, rayBefore : vec2, onlyThisSegment : boolean) : boolean
+    var xinc, yinc : real := 0
+    rayHit.x := x1
+    rayHit.y := y1
+    var range : real := rangeIn
+    var reachingLength : real := Math.Distance (x1, y1, x2, y2)
+    if reachingLength = 0 then
+	range := 0
+    else
+	if onlyThisSegment and reachingLength < rangeIn then
+	    range := reachingLength
+	end if
+	xinc := (x2 - x1) / reachingLength
+	yinc := (y2 - y1) / reachingLength
+    end if
+    var i : real := 0
+    loop
+	rayHit.x := x1 + xinc * i
+	rayHit.y := y1 + yinc * i
+	%Draw.Dot (toScrnCdX (rayHit.x), toScrnCdY (rayHit.y), brightgreen)
+	if isBlock (rayHit.x, rayHit.y, "solid") then
+	    rayBefore.x := x1 + xinc * (i - toGameCdMeasure (1))
+	    rayBefore.y := y1 + yinc * (i - toGameCdMeasure (1))
+	    result true
+	end if
+	if i = range then
+	    rayHit.x := x1 + xinc * range
+	    rayHit.y := y1 + yinc * range
+	    rayBefore.x := rayHit.x
+	    rayBefore.y := rayHit.y
+	    result false
+	end if
+	i += toGameCdMeasure (1)
+	if i > range then
+	    i := range
+	end if
+    end loop
+end raycastLine
+
 procedure setBlock (x, y : real, blockIn : string)
     var coordcode : int := encode (x, y)
     if coordcode < 0 or coordcode > 49999999 then
@@ -753,29 +802,6 @@ procedure saveWorld
     loading (bgcolour)
     textfound := GUI.GetText (nameTextField)
     if textfound not= "" then
-	var iprevsaves : int := 0
-	open : savenames, ("Savenames.txt"), get, put, seek, mod
-	seek : savenames, 0
-	if eof (savenames) = false then
-	    loop
-		iprevsaves += 1
-		get : savenames, previoussaves (iprevsaves) : *
-		exit when eof (savenames)
-	    end loop
-	end if
-	oktosavenew := true
-	for i : 1 .. iprevsaves
-	    if previoussaves (i) = textfound then
-		oktosavenew := false
-	    end if
-	end for
-	if oktosavenew then
-	    seek : savenames, *
-	    put : savenames, ""
-	    put : savenames, textfound
-	end if
-	close : savenames
-
 	open : loadedsavepref, ("Saves\\Preferences\\" + textfound + ".txt"), get, put, seek
 
 	put : loadedsavepref, "Gen_Ver_", 1
@@ -856,7 +882,22 @@ procedure UpdateMostTravelled
 end UpdateMostTravelled
 
 %Screen scroll
-procedure screenscroll (scrdirx : real, scrdiry : real)
+procedure screenscroll (Scrdirx : real, Scrdiry : real)
+    var scrdirx : real := Scrdirx
+    var scrdiry : real := Scrdiry
+    if scrollSlow then
+	if scrdirx > slowScrollSpeed then
+	    scrdirx := slowScrollSpeed
+	elsif scrdirx < -slowScrollSpeed then
+	    scrdirx := -slowScrollSpeed
+	end if
+	if scrdiry > slowScrollSpeed then
+	    scrdiry := slowScrollSpeed
+	elsif scrdiry < -slowScrollSpeed then
+	    scrdiry := -slowScrollSpeed
+	end if
+    end if
+
     Draw.FillBox (0, 0, maxx, maxy, bgcolour)
     offsetleftright += scrdirx
     offsetupdown += scrdiry
@@ -902,7 +943,7 @@ end screenscroll
 
 %Re-enables start GUIs
 procedure ReEnableStartGUIs
-    if gmfrstmthrgh = false then
+    if not gmfrstmthrgh then
 	if returningFromPreview then
 	    Pic.Draw (backpic, 0, maxy - 210, picCopy)
 	    returningFromPreview := false
@@ -913,6 +954,7 @@ procedure ReEnableStartGUIs
 	GUI.Enable (item3 (1))
 	GUI.Enable (cbprev)
 	GUI.Enable (cbfly)
+	GUI.Enable (cbcreative)
 	GUI.Show (btnstrt)
 	GUI.ShowMenuBar
 	GUI.ResetQuit
@@ -942,6 +984,7 @@ procedure DisableAndHideGUIs
     GUI.Disable (item3 (1))
     GUI.Disable (cbprev)
     GUI.Disable (cbfly)
+    GUI.Disable (cbcreative)
     GUI.Hide (btnstrt)
     GUI.Hide (btnend)
     GUI.HideMenuBar
@@ -1089,7 +1132,7 @@ procedure GenerateWorld
 	%remains accurate even if the preferences file is lost.
 	var firstblock : boolean := true
 	seek : loadedsave, 0
-	if eof (loadedsave) = false then
+	if not eof (loadedsave) then
 	    loop
 		get : loadedsave, textfound
 		setBlock (decodeX (strint (textfound)), decodeY (strint (textfound)), "dirt")
@@ -1162,32 +1205,49 @@ procedure WorldPreview
 	cls
 	offsetleftright := 0
 	offsetupdown := 0
+	%loop
+	deltaTime := Time.Elapsed - gametimeold
+	gametimeold := Time.Elapsed
+	if deltaTime > 100 or deltaTime < 1 then
+	    deltaTime := 1
+	end if
+	%Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+	var oldmaxx : int := maxx + 1
+	var oldmaxy : int := maxy + 1
+	var previewPictureWin : int := Window.Open ("graphics:" + intstr (mstScrnHsGnRght - mstScrnHsGnLft) + ";" + intstr (mstScrnHsGnUp - mstScrnHsGnDwn) + ",invisible")
+
+	seek : autosave, 0
+	if not eof (autosave) then
+	    loop
+		get : autosave, autocoords
+		if isBlock (decodeX (autocoords), decodeY (autocoords), "any") then
+		    var x : int := decodeX (autocoords) - mstScrnHsGnLft % + round (offsetleftright) + (midx - midx div 16)
+		    var y : int := decodeY (autocoords) - mstScrnHsGnDwn % + round (offsetupdown) + (midy - midy div 16)
+		    Draw.Dot (x, y, blockcolour)
+		end if
+		exit when eof (autosave)
+	    end loop
+	end if
+	var x1 : int := mstScrnHsGnLft + round (offsetleftright) + (midx - midx div 16)
+	var y1 : int := mstScrnHsGnDwn + round (offsetupdown) + (midy - midy div 16)
+	var x2 : int := mstScrnHsGnRght + round (offsetleftright) + (midx - midx div 16)
+	var y2 : int := mstScrnHsGnUp + round (offsetupdown) + (midy - midy div 16)
+
+	var previewPic : int := Pic.New (0, 0, maxx, maxy)
+
+	Window.Close (previewPictureWin)
+
 	loop
-	    deltaTime := Time.Elapsed - gametimeold
-	    gametimeold := Time.Elapsed
-	    if deltaTime > 100 or deltaTime < 1 then
-		deltaTime := 1
-	    end if
+	    x1 := mstScrnHsGnLft + round (offsetleftright) + (midx - midx div 16)
+	    y1 := mstScrnHsGnDwn + round (offsetupdown) + (midy - midy div 16)
+	    x2 := mstScrnHsGnRght + round (offsetleftright) + (midx - midx div 16)
+	    y2 := mstScrnHsGnUp + round (offsetupdown) + (midy - midy div 16)
+
 	    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-	    Input.KeyDown (arrow)
-	    seek : autosave, 0
-	    if eof (autosave) = false then
-		loop
-		    get : autosave, autocoords
-		    if isBlock (decodeX (autocoords), decodeY (autocoords), "any") then
-			var x : int := decodeX (autocoords) + round (offsetleftright) + (midx - midx div 16)
-			var y : int := decodeY (autocoords) + round (offsetupdown) + (midy - midy div 16)
-			Draw.Dot (x, y, blockcolour)
-		    end if
-		    exit when eof (autosave)
-		end loop
-	    end if
-	    var x1 : int := mstScrnHsGnLft + round (offsetleftright) + (midx - midx div 16)
-	    var y1 : int := mstScrnHsGnDwn + round (offsetupdown) + (midy - midy div 16)
-	    var x2 : int := mstScrnHsGnRght + round (offsetleftright) + (midx - midx div 16)
-	    var y2 : int := mstScrnHsGnUp + round (offsetupdown) + (midy - midy div 16)
+	    Pic.Draw (previewPic, x1, y1, picCopy)
 	    Draw.Box (x1, y1, x2, y2, brightred)
 	    View.Update
+	    Input.KeyDown (arrow)
 	    if arrow ('a') or arrow (KEY_LEFT_ARROW) then
 		offsetleftright -= 0.3 * deltaTime
 	    elsif arrow ('d') or arrow (KEY_RIGHT_ARROW) then
@@ -1204,6 +1264,8 @@ procedure WorldPreview
 		exit
 	    end if
 	end loop
+	Pic.Free (previewPic)
+
 	offsetleftright := 0
 	offsetupdown := 0
 
@@ -1294,19 +1356,24 @@ end KeyAndParallelInput
 %Screen sliding
 procedure ScreenSlide
     seek : autosave, 0
-    if eof (autosave) = false and (toScrnCdX (leftSide ()) < pxscrollclearance or toScrnCdX (rightSide ()) > maxx - pxscrollclearance
+    if not eof (autosave) and (toScrnCdX (leftSide ()) < pxscrollclearance or toScrnCdX (rightSide ()) > maxx - pxscrollclearance
 	    or toScrnCdY (pos.y) < pxscrollclearance or toScrnCdY (topSide ()) > maxy - pxscrollclearance) then
 	if toScrnCdX (leftSide ()) < pxscrollclearance then
-	    screenscroll (-toGameCdMeasure (pxscrollclearance - toScrnCdX (leftSide ())), 0)
+	    screenscroll (- (toGameCdX (pxscrollclearance) - leftSide ()), 0)
 	elsif toScrnCdX (rightSide ()) > maxx - pxscrollclearance then
-	    screenscroll (toGameCdMeasure (toScrnCdX (rightSide ()) - (maxx - pxscrollclearance)), 0)
+	    screenscroll (rightSide () - toGameCdX ((maxx - pxscrollclearance)), 0)
 	end if
 	if toScrnCdY (pos.y) < pxscrollclearance then
-	    screenscroll (0, -toGameCdMeasure (pxscrollclearance - toScrnCdY (pos.y)))
+	    screenscroll (0, - (toGameCdY (pxscrollclearance) - pos.y))
 	elsif toScrnCdY (topSide ()) > maxy - pxscrollclearance then
-	    screenscroll (0, toGameCdMeasure (toScrnCdY (topSide ()) - (maxy - pxscrollclearance)))
+	    screenscroll (0, topSide () - toGameCdY (maxy - pxscrollclearance))
+	end if
+	if scrollSlow then
+	    slowScrollSpeed *= 1.05
 	end if
     else
+	scrollSlow := false
+	slowScrollSpeed := 0.02
 	seek : autosave, *
     end if
 end ScreenSlide
@@ -1314,44 +1381,101 @@ end ScreenSlide
 %How the aim guide moves in accordance with the mouse
 procedure AimGuideMovement
     var handheight : real := pos.y + charheight / 3 * 2 %Height that the character's hands are
-    var xinc, yinc : real := 0
-    if not Math.Distance (pos.x, handheight, toGameCdX (xm), toGameCdY (ym)) = 0 then
-	xinc := (toGameCdX (xm) - pos.x) / Math.Distance (pos.x, handheight, toGameCdX (xm), toGameCdY (ym))
-	yinc := (toGameCdY (ym) - handheight) / Math.Distance (pos.x, handheight, toGameCdX (xm), toGameCdY (ym))
-    end if
-    var tempi : real := reach
-    if not infinatePlacing then
-	var i : real := 0
-	loop
-	    i += toGameCdMeasure (1)
-	    rcursorbb.x := round (toScrnCdX (toBlock (pos.x + xinc * i)))
-	    rcursorbb.y := round (toScrnCdY (toBlock (handheight + yinc * i)))
-	    rcursorpb.x := rcursorbb.x
-	    rcursorpb.y := rcursorbb.y
-	    if isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "solid") then
-		tempi := i
-		rcursorbb.x := round (toScrnCdX (toBlock (pos.x + xinc * i)))
-		rcursorbb.y := round (toScrnCdY (toBlock (handheight + yinc * i)))
-		rcursorpb.x := round (toScrnCdX (toBlock (pos.x + xinc * (i - toGameCdMeasure (1)))))
-		rcursorpb.y := round (toScrnCdY (toBlock (handheight + yinc * (i - toGameCdMeasure (1)))))
-		exit
-	    end if
-	    exit when i > reach
-	end loop
+    if infinatePlacing then
+	rcursorbb.x := toScrnCdX (toGameCdXR (xm))
+	rcursorbb.y := toScrnCdY (toGameCdYR (ym))
+	rcursorpb.x := rcursorbb.x
+	rcursorpb.y := rcursorbb.y
     else
-	rcursorbb.x := toScrnCdX (toGameCdXR (xm))
-	rcursorbb.y := toScrnCdY (toGameCdYR (ym))
-	rcursorpb.x := rcursorbb.x
-	rcursorpb.y := rcursorbb.y
-    end if
+	var rayHit, rayBefore : vec2
+	var collides : boolean := raycastLine (pos.x, handheight, toGameCdX (xm), toGameCdY (ym), reach, rayHit, rayBefore, true)
+	rcursorbb.x := toScrnCdX (toBlock (rayHit.x))
+	rcursorbb.y := toScrnCdY (toBlock (rayHit.y))
+	rcursorpb.x := toScrnCdX (toBlock (rayBefore.x))
+	rcursorpb.y := toScrnCdY (toBlock (rayBefore.y))
+	%If the block the ray hit is not the one the user was aiming for
+	if not (toBlock (rayHit.x) = toBlock (toGameCdX (xm)) and toBlock (rayHit.y) = toBlock (toGameCdY (ym))) then
+	    var closestCorner : vec2
+	    closestCorner.x := toBlock (toGameCdX (xm))
+	    closestCorner.y := toBlock (toGameCdY (ym))
+	    if handheight > closestCorner.y + 0.5 then
+		closestCorner.y += 1
+	    end if
+	    if pos.x > closestCorner.x + 0.5 then
+		closestCorner.x += 1
+	    end if
+	    %If you could technically be able to reach the block
+	    if Math.Distance (pos.x, handheight, closestCorner.x, closestCorner.y) <= reach then
+		var tempReach : real := reach
+		var dist : real := Math.Distance (pos.x, handheight, closestCorner.x, closestCorner.y) + 0.5
+		if dist < reach then
+		    tempReach := dist
+		end if
+		collides := raycastLine (pos.x, handheight, closestCorner.x, closestCorner.y, tempReach, rayHit, rayBefore, false)
+		%if the closest point on the block your mouse is on is in line of sight
+		if not collides or (toBlock (rayHit.x) = toBlock (toGameCdX (xm)) and toBlock (rayHit.y) = toBlock (toGameCdY (ym))) then
+		    rcursorbb.x := toScrnCdX (toBlock (toGameCdX (xm)))
+		    rcursorbb.y := toScrnCdY (toBlock (toGameCdY (ym)))
+		    if not collides then
+			rcursorpb.x := rcursorbb.x
+			rcursorpb.y := rcursorbb.y
+		    end if
+		end if
+	    end if
+	end if
 
-    %Draw.Line (toScrnCdX (pos.x), toScrnCdY (handheight), round (toScrnCdX (pos.x+ xinc * tempi)), round (toScrnCdY (handheight+ yinc * tempi)), brightgreen)
-    if Math.Distance (pos.x, handheight, toGameCdX (xm), toGameCdY (ym))
-	    < Math.Distance (pos.x, handheight, pos.x + xinc * tempi, handheight + yinc * tempi) then
-	rcursorbb.x := toScrnCdX (toGameCdXR (xm))
-	rcursorbb.y := toScrnCdY (toGameCdYR (ym))
-	rcursorpb.x := rcursorbb.x
-	rcursorpb.y := rcursorbb.y
+	%Fix block placing indicator if diagonal
+	if abs (toGameCdX (rcursorbb.x) - toGameCdX (rcursorpb.x)) + abs (toGameCdY (rcursorbb.y) - toGameCdY (rcursorpb.y)) > 1 then
+	    if not isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "solid") then
+		rcursorpb.x := rcursorbb.x
+		rcursorpb.y := rcursorbb.y
+	    else
+		var optionA, optionB, playerClosestSide : vec2i
+		var mouseClosestSide : vec2
+		mouseClosestSide.x := toGameCdX (xm) - (toBlock (toGameCdX (rcursorbb.x)) + 0.5)
+		mouseClosestSide.y := toGameCdY (ym) - (toBlock (toGameCdY (rcursorbb.y)) + 0.5)
+		playerClosestSide.x := toBlock (pos.x) - toBlock (toGameCdX (rcursorbb.x))
+		playerClosestSide.y := toBlock (handheight) - toBlock (toGameCdY (rcursorbb.y))
+		var noOptionB : boolean := false
+		if playerClosestSide.x = 0 or playerClosestSide.y = 0 then
+		    noOptionB := true
+		end if
+		if abs (mouseClosestSide.x) > abs (mouseClosestSide.y) then
+		    if playerClosestSide.x > 0 then
+			optionA.x := toBlock (toGameCdX (rcursorbb.x)) + 1
+		    elsif playerClosestSide.x < 0 then
+			optionA.x := toBlock (toGameCdX (rcursorbb.x)) - 1
+		    end if
+		    optionA.y := toBlock (toGameCdY (rcursorbb.y))
+		    if playerClosestSide.y > 0 then
+			optionB.y := toBlock (toGameCdY (rcursorbb.y)) + 1
+		    elsif playerClosestSide.y < 0 then
+			optionB.y := toBlock (toGameCdY (rcursorbb.y)) - 1
+		    end if
+		    optionB.x := toBlock (toGameCdX (rcursorbb.x))
+		else
+		    if playerClosestSide.y > 0 then
+			optionA.y := toBlock (toGameCdY (rcursorbb.y)) + 1
+		    elsif playerClosestSide.y < 0 then
+			optionA.y := toBlock (toGameCdY (rcursorbb.y)) - 1
+		    end if
+		    optionA.x := toBlock (toGameCdX (rcursorbb.x))
+		    if playerClosestSide.x > 0 then
+			optionB.x := toBlock (toGameCdX (rcursorbb.x)) + 1
+		    elsif playerClosestSide.x < 0 then
+			optionB.x := toBlock (toGameCdX (rcursorbb.x)) - 1
+		    end if
+		    optionB.y := toBlock (toGameCdY (rcursorbb.y))
+		end if
+		if not isBlock (optionA.x, optionA.y, "solid") then
+		    rcursorpb.x := toScrnCdX (optionA.x)
+		    rcursorpb.y := toScrnCdY (optionA.y)
+		elsif not noOptionB and not isBlock (optionB.x, optionB.y, "solid") then
+		    rcursorpb.x := toScrnCdX (optionB.x)
+		    rcursorpb.y := toScrnCdY (optionB.y)
+		end if
+	    end if
+	end if
     end if
 end AimGuideMovement
 
@@ -1455,20 +1579,6 @@ procedure PressPKey
 	    if oldblockcolour not= blockcolour or oldbackcolour not= bgcolour then
 		Draw.FillBox (0, 0, maxx, maxy, bgcolour)
 		showWorld ()
-		/*seek : autosave, 0
-		 if eof (autosave) = false then
-		 loop
-		 get : autosave, autocoords
-		 if block (autocoords) then
-		 x := decodeX (autocoords, true)
-		 y := decodeY (autocoords, true)
-		 DrawBlock(x,y,blockcolour)
-		 end if
-		 exit when eof (autosave)
-		 end loop
-		 end if
-		 seek : autosave, *
-		 */
 	    else
 		Pic.Draw (screenpic, 0, 0, picCopy)
 	    end if
@@ -1612,7 +1722,7 @@ end PressAKey
 
 %If spacebar is pressed
 procedure PressSpaceKey
-    if keyspc and health > 0 and (onground or flying) and mustcrawl = false and hitceiling = false then
+    if keyspc and health > 0 and (onground or flying) and not mustcrawl and not hitceiling then
 	if flying then
 	    pos.y += playerSpeed * 8 * deltaTime
 	else
@@ -1638,7 +1748,7 @@ end PressSKey
 
 %Jumping
 procedure CharJump
-    if mustcrawl = false and flying = false then
+    if not mustcrawl and not flying then
 	if jumpcount = jumpheight then
 	    facing := ""
 	end if
@@ -1656,6 +1766,10 @@ procedure CharJump
 	    end if
 	elsif jumpcount < 0 then
 	    jumpcount := 0
+	end if
+
+	if not onground and jumpcount = 0 then
+	    action := "falling"
 	end if
     end if
 end CharJump
@@ -1825,7 +1939,7 @@ procedure CharInBlock
 		inground := true
 		health -= 1
 		if health <= 0 then
-		    health := 1000
+		    health := 0
 		end if
 		exit
 	    end if
@@ -1875,6 +1989,7 @@ procedure CharSnapDownFall
 	    end for
 	    if canStand then
 		pos.y := desiredBottom
+		scrollSlow := true
 	    end if
 	end if
 	if canStand then
@@ -1899,14 +2014,11 @@ end WorldCollisions
 
 %Gravity
 procedure Gravity
-    if onground = false and jumpcount = 0 and flying = false then
-	if not mustcrawl then
-	    action := "falling"
-	end if
+    if not onground and jumpcount = 0 and not flying then
 	var gravScalar : real := 1
-	if gravcount = 0 then
+	if gravcount = 0 then  %The "if = 0" is starting fall amount - still not sure what to make of this
 	    gravScalar := 0.4
-	elsif gravcount < lethalFallHeight then %The "if = 0" is starting fall amount - still not sure what to make of this
+	elsif gravcount < lethalFallHeight then
 	    gravScalar := gravcount / lethalFallHeight + 0.01
 	end if
 	pos.y -= gravAmount * gravScalar * deltaTime
@@ -2013,7 +2125,7 @@ end Animations
 %Finish the second part of assigning a usable value to "action"
 procedure FinalizeAction2
     %Directionless fall
-    if (action = "falling left" or action = "falling right") and keya = false and keyd = false and onground = false then
+    if (action = "falling left" or action = "falling right") and not keya and not keyd and not onground then
 	action := "falling"
     end if
 
@@ -2146,11 +2258,32 @@ procedure CharDraw
     end if
 
     %Draw character
+    /*
+     var charxcdreal : real := ((pos.x - charwidth / 2) - offsetleftright) * blocksize
+     var charxcd : int := ceil (((pos.x - charwidth / 2) - offsetleftright) * blocksize)
+
+     if timer > 500 then
+     timer := 0
+     tempMin := charxcdreal
+     tempMax := charxcdreal
+     end if
+     timer += 1
+
+     if charxcdreal < tempMin then
+     tempMin := charxcdreal
+     end if
+     if charxcdreal > tempMax then
+     tempMax := charxcdreal
+     end if
+
+     locate (1, 1)
+     put charxcdreal
+     put tempMin, " ", tempMax
+     put charxcd*/
     Pic.Draw (character, toScrnCdX (leftSide ()), toScrnCdY (pos.y), picMerge)
 end CharDraw
 
 procedure TrainCompute
-
     if not isBlock (trainx, trainy - 0.01, "solid") then
 	trainy -= 0.01
     end if
@@ -2217,16 +2350,19 @@ end AimGuideBacksaveAndDraw
 procedure DrawHealthBar
     if survival then
 	Pic.Free (healthbarback)
-	healthbarback := Pic.New (maxx div 8 - 1, 19, (maxx div 4 * 3) + maxx div 8 + 1, 41)
+	healthbarback := Pic.New (0, 19, maxx, 41) %Pic.New (maxx div 8 - 1, 19, (maxx div 4 * 3) + maxx div 8 + 1, 41)
 	if health not= 0 then
 	    if health not= healthold then
-		var mainmaxx : int := maxx
-		Window.SetActive (winID)
+		%draw healthbar full texture over all bottom of screen
+		Pic.Draw (healthbarfrst, 0, 20, picCopy)
+		%take image of desired section and save as healthbar
 		Pic.Free (healthbar)
-		healthbar := Pic.New (0, 0, round ((mainmaxx div 4 * 3 / 100) * (health / 10)), 20)
-		Window.SetActive (MainWinID)
+		healthbar := Pic.New (maxx div 8, 20, maxx div 8 + round ((maxx div 4 * 3 / 100) * (health / 10)), 40)
+		%restore background from healthbarback
+		Pic.Draw (healthbarback, 0, 19, picCopy)
 		healthold := health
 	    end if
+	    %Draw health bar portion in desired position
 	    Pic.Draw (healthbar, maxx div 8, 20, picMerge)
 	    Draw.Box (maxx div 8, 20, (maxx div 4 * 3) + maxx div 8, 40, 10)
 	else
@@ -2236,7 +2372,8 @@ procedure DrawHealthBar
 end DrawHealthBar
 
 procedure IfDeadGameOver
-    if health = 0 then
+    if health <= 0 then
+	health := 0
 	Draw.Text ("Game Over", midx - 150, midy, font1, red)
     end if
 end IfDeadGameOver
@@ -2244,7 +2381,7 @@ end IfDeadGameOver
 %Erase the health bar by redrawing its background
 procedure EraseHealthBar
     if survival then
-	Pic.Draw (healthbarback, maxx div 8 - 1, 19, picCopy)
+	Pic.Draw (healthbarback, 0, 19, picCopy)
     end if
 end EraseHealthBar
 
@@ -2281,7 +2418,6 @@ procedure resetVariables
     wlk := 1
     crl := 1
     blkount := 0
-    ireassign := 0
     crosshairsbb2 := 0
     crosshairsbb := 0
     crosshairspb2 := 0
@@ -2291,8 +2427,11 @@ procedure resetVariables
     offsetupdown := 0
     offsetleftright := 0
     healthold := 0
+    blockplacespeed := 130
+    blockbreakspeed := 130
     oldbackcolour := white
     oldblockcolour := black
+    infinatePlacing := false
     gmfrstmthrgh := false
     onground := false
     onleftwall := false
@@ -2321,7 +2460,6 @@ procedure resetVariables
     canfly := false
     flying := false
     menuReturn := false
-    forcedelete := false
     charwidth := toGameCdMeasure (Pic.Width (character) - Pic.Width (character) mod 2)
     charheight := toGameCdMeasure (Pic.Height (character))
     pos.x := 0
@@ -2337,7 +2475,6 @@ procedure resetVariables
     ponwlk := 1
     poncrl := 1
     isaves := 1
-    oktosavenew := true
     frstmthrgh := true
     loading (white)
     View.Update
@@ -2358,21 +2495,22 @@ loop
     loop
 
 	if not returningFromPreview then
-	    %open text file of all saved files' names
-	    open : savenames, ("Savenames.txt"), get, put, seek, mod
-
-	    %Create a list of all saved files' names
-	    if eof (savenames) = false then
-		loop
+	    %Find all saved files' names
+	    var savenames : int
+	    var fileName : string
+	    savenames := Dir.Open ("Saves\\Preferences\\")
+	    assert savenames > 0
+	    loop
+		fileName := Dir.Get (savenames)
+		exit when fileName = ""
+		if fileName not= "." and fileName not= ".." then
+		    fileName := fileName (1 .. (length (fileName) - 4))
 		    isaves += 1
-		    get : savenames, menuitemsaves (isaves) : *
-		    menuitemdelete (isaves - 1) := (menuitemsaves (isaves))
-		    exit when eof (savenames)
-		end loop
-	    end if
-
-	    %close text file of all saved files' names
-	    close : savenames
+		    menuitemsaves (isaves) := fileName
+		    menuitemdelete (isaves - 1) := fileName
+		end if
+	    end loop
+	    Dir.Close (savenames)
 	end if
 
 	%Clear and open autosave file
@@ -2422,6 +2560,13 @@ loop
 	    canfly := false
 	end if
 
+	%Get iscreative checkbox state
+	if GUI.GetCheckBox (cbcreative) then
+	    infinatePlacing := true
+	    blockplacespeed := 0
+	    blockbreakspeed := 0
+	end if
+
 	%Set default indicators
 	if bgcolour = 983 then
 	    resetdefaultbg := true
@@ -2458,7 +2603,7 @@ loop
 	WorldPreview
 
 	frstmthrgh := false
-	if preview = false then
+	if not preview then
 	    exit
 	end if
     end loop
@@ -2495,11 +2640,7 @@ loop
 	%Get keyboard input
 	Input.KeyDown (arrow)
 
-
-
 	KeyAndParallelInput
-
-	ScreenSlide
 
 	AimGuideMovement
 
@@ -2516,11 +2657,11 @@ loop
 	    exit
 	end if
 
-
-
 	%Character standing by default
 	actionCurrent := action %Save current action (continuing from last frame) for detection purposes
 	action := "standing"
+
+	Gravity
 
 	PressDKey
 
@@ -2532,9 +2673,11 @@ loop
 
 	CharJump
 
-	Gravity
+
 
 	WorldCollisions
+
+	ScreenSlide
 
 	FinalizeAction1
 
@@ -2614,7 +2757,7 @@ loop
 	oldPos.y := pos.y
 
 	%Movement timer
-	frametimer += playerSpeed * 17 * deltaTime
+	frametimer += playerSpeed * 140 * deltaTime
     end loop
     if quitthegame then
 	exit
