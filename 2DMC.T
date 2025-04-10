@@ -101,12 +101,12 @@ var screenpic : int := Pic.New (0, 0, 2, 2)
 var tempcoords : array 1 .. 5 of int
 var xm, ym, cm, s, character, rcharxl, rcharyd, rcharxr, rcharyu, rcursorxbb, rcursorybb, rcursorxpb, rcursorypb, rcharydfloor, rcharyuceil,
     btnstrt, btncont, btnend, savenames, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload, quitButton, nameTextField, nameLabel,
-    oldbackcolour, saveFile, autosave, menudelete, oldblockcolour, handheight, tempi, linegx, linegy, idelete : int
+    oldbackcolour, saveFile, autosave, menudelete, oldblockcolour, handheight, tempi, linegx, linegy, idelete, null, backpiccross, backpicbox : int
 var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y,
     iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2,
     crosshairspb, mclickr, mclickl, guidecolour : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
-    mustcrawl, startgame, recentclick, loaded, quitthegame, lineguide : boolean := false
+    mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput : boolean := false
 var action : string := "standing"
 var loadfile, textfound, autocoords, deletesaveread, nullget, headcolourstr, bgcolourstr, blockcolourstr, tempcolourstr : string
 var facing, oldfacing : string := ""
@@ -440,17 +440,6 @@ locatexy (midx - length ("Click to continue") * 8 div 2, midy - 40)
 put "Click to continue"
 Draw.Box (midx - Font.Width ("Welcome to 2DMC!", font1) div 2 - 10, maxy div 6 + 32, midx + Font.Width ("Welcome to 2DMC!", font1) div 2 + 10, maxy div 6 * 5 - 32, black)
 
-
-
-
-
-
-lineguide := false %!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-
-
-
 %Delete blanks from saves
 DeleteSelected
 
@@ -695,7 +684,6 @@ else %Generate ground
     textfound := ""
 end if
 
-
 %Show world
 View.Update
 
@@ -837,37 +825,42 @@ loop
     end if
     tempi := round (reach)
     for i : 1 .. round (reach)
-	rcursorxbb := ((floor ((charx + xinc * i) / blocksize)) * blocksize)
-	rcursorybb := ((floor ((handheight + yinc * i) / blocksize)) * blocksize)
-	rcursorxpb := rcursorxbb
-	rcursorypb := rcursorybb
-	tempcoords (1) := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
-	if #block (tempcoords (1)) = boolUnInit then
-	    block (tempcoords (1)) := false
-	end if
-	if block (tempcoords (1)) then
-	    tempi := i
+	if norcursorinput = false then
 	    rcursorxbb := ((floor ((charx + xinc * i) / blocksize)) * blocksize)
 	    rcursorybb := ((floor ((handheight + yinc * i) / blocksize)) * blocksize)
-	    rcursorxpb := ((floor ((charx + xinc * (i - 1)) / blocksize)) * blocksize)
-	    rcursorypb := ((floor ((handheight + yinc * (i - 1)) / blocksize)) * blocksize)
-	    exit
+	    rcursorxpb := rcursorxbb
+	    rcursorypb := rcursorybb
+	    tempcoords (1) := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
+	    if #block (tempcoords (1)) = boolUnInit then
+		block (tempcoords (1)) := false
+	    end if
+	    if block (tempcoords (1)) then
+		tempi := i
+		rcursorxbb := ((floor ((charx + xinc * i) / blocksize)) * blocksize)
+		rcursorybb := ((floor ((handheight + yinc * i) / blocksize)) * blocksize)
+		rcursorxpb := ((floor ((charx + xinc * (i - 1)) / blocksize)) * blocksize)
+		rcursorypb := ((floor ((handheight + yinc * (i - 1)) / blocksize)) * blocksize)
+		norcursorinput := true
+	    end if
+	else
+	    null := ((floor ((charx + xinc * i) / blocksize)) * blocksize)
+	    null := ((floor ((handheight + yinc * i) / blocksize)) * blocksize)
+	    null := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
+	    if 1 = 1 then
+		null := i
+		null := ((floor ((charx + xinc * i) / blocksize)) * blocksize)
+		null := ((floor ((handheight + yinc * i) / blocksize)) * blocksize)
+		null := ((floor ((charx + xinc * (i - 1)) / blocksize)) * blocksize)
+		null := ((floor ((handheight + yinc * (i - 1)) / blocksize)) * blocksize)
+	    end if
 	end if
     end for
-    if lineguide then
-	linegx := floor (charx + xinc * (tempi - 2))
-	linegy := floor (handheight + yinc * (tempi - 2))
-    end if
+    norcursorinput := false
     if Math.Distance (charx, handheight, xm, ym) < Math.Distance (charx, handheight, charx + xinc * tempi, handheight + yinc * tempi) then
-	if lineguide then
-	    linegx := xm
-	    linegy := ym
-	else
-	    rcursorxbb := (floor (xm / blocksize)) * blocksize
-	    rcursorybb := (floor (ym / blocksize)) * blocksize
-	    rcursorxpb := (floor (xm / blocksize)) * blocksize
-	    rcursorypb := (floor (ym / blocksize)) * blocksize
-	end if
+	rcursorxbb := (floor (xm / blocksize)) * blocksize
+	rcursorybb := (floor (ym / blocksize)) * blocksize
+	rcursorxpb := (floor (xm / blocksize)) * blocksize
+	rcursorypb := (floor (ym / blocksize)) * blocksize
     end if
 
     %If player right-clicks
@@ -876,7 +869,7 @@ loop
 	    mclickr := blockplacespeed
 	end if
 	if mclickr = blockplacespeed then
-	    if (rcursorxpb not= rcharxl and rcursorxpb not= rcharxr) or rcursorypb not= rcharyd then
+	    if (rcursorxpb not= rcharxl and rcursorxpb not= rcharxr) or rcursorypb not= rcharydfloor then
 		tempcoords (1) := 100000000 + (rcursorxpb + 24999) * 10000 + (rcursorypb + 4999)
 		if #block (tempcoords (1)) = boolUnInit then
 		    block (tempcoords (1)) := false
@@ -986,6 +979,7 @@ loop
 	GUI.Hide (btnend)
 	GUI.HideMenuBar
 
+	%Reset game-continuing variable
 	startgame := false
 	View.Set ("offscreenonly")
 
@@ -1339,11 +1333,42 @@ loop
 	end if
     end if
 
+
+
+    %Screen sliding
+    if charx <= 20 then
+	charx += 1
+    elsif charx >= maxx - 20 then
+	charx -= 1
+    end if
+    if chary <= 20 then
+	chary += 1
+    elsif chary >= maxy - 20 then
+	chary -= 1
+    end if
+    /*
+     seek : autosave, 0
+     if eof (autosave) = false then
+     loop
+     get : autosave, autocoords
+     if block (strint (autocoords)) then
+     x := floor (strint (autocoords) / 10000) - 24999 - 10000
+     y := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
+     Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+     end if
+     exit when eof (autosave)
+     end loop
+     end if
+     x := 0
+     y := 0
+     seek : autosave, *
+     */
+
     %Get character dimensions
     charwidth := Pic.Width (character)
     charheight := Pic.Height (character)
 
-    %Save Background behind character
+    %Save background behind character
     Pic.Free (backpic)
     backpic := Pic.New (charx - charwidth div 2 - charudpxrange, chary - charudpxrange, charx + charwidth div 2 + charudpxrange, chary + charheight + charudpxrange)
 
@@ -1359,87 +1384,68 @@ loop
     %Draw character
     Pic.Draw (character, charx - charwidth div 2, chary, picMerge)
 
-    %Determine what guide to use
-    if lineguide then
-	if bgcolour = black then
-	    guidecolour := white
-	else
-	    guidecolour := black
-	end if
-	Draw.Line (charx, handheight, linegx, linegy, guidecolour)
+    %Get blocks at block placing box and block breaking crosshairs
+    tempcoords (1) := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
     end if
-    if lineguide = false then
-	%Get blocks at block placing box and block breaking crosshairs
-	tempcoords (1) := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
-	if #block (tempcoords (1)) = boolUnInit then
-	    block (tempcoords (1)) := false
-	end if
-	tempcoords (2) := 100000000 + (rcursorxpb + 24999) * 10000 + (rcursorypb + 4999)
-	if #block (tempcoords (2)) = boolUnInit then
-	    block (tempcoords (2)) := false
-	end if
-	if tempcoords (1) not= tempcoords (2) then
+    tempcoords (2) := 100000000 + (rcursorxpb + 24999) * 10000 + (rcursorypb + 4999)
+    if #block (tempcoords (2)) = boolUnInit then
+	block (tempcoords (2)) := false
+    end if
+    if tempcoords (1) not= tempcoords (2) then
+	%Save background behind crosshairs
+	backpiccross := Pic.New (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1)
 
-	    %Draw crosshairs for breaking blocks
-	    if block (tempcoords (1)) and blockcolour = black or block (tempcoords (1)) = false and bgcolour = black then
-		Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
-	    else
-		Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
-	    end if
+	%Save background behind box
+	backpicbox := Pic.New (rcursorxpb, rcursorypb, rcursorxpb + blocksize - 1, rcursorypb + blocksize - 1)
 
-	    %Draw box for placing blocks
-	    if block (tempcoords (2)) and blockcolour = black or block (tempcoords (2)) = false and bgcolour = black then
-		Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
-	    else
-		Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
-	    end if
+	%Draw crosshairs for breaking blocks
+	if block (tempcoords (1)) and blockcolour = black or block (tempcoords (1)) = false and bgcolour = black then
+	    Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
 	else
-	    %Draw crosshairs for breaking blocks and box for placing blocks
-	    if block (tempcoords (1)) and blockcolour = black or block (tempcoords (1)) = false and bgcolour = black then
-		Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
-		Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
-	    else
-		Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
-		Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
-	    end if
+	    Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
+	end if
+
+	%Draw box for placing blocks
+	if block (tempcoords (2)) and blockcolour = black or block (tempcoords (2)) = false and bgcolour = black then
+	    Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
+	else
+	    Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
+	end if
+    else
+	%Save background behind crosshairs and box
+	backpiccross := Pic.New (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1)
+
+	%Draw crosshairs for breaking blocks and box for placing blocks
+	if block (tempcoords (1)) and blockcolour = black or block (tempcoords (1)) = false and bgcolour = black then
+	    Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
+	    Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
+	else
+	    Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
+	    Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
 	end if
     end if
+    %end if
 
     %Show new screen
     View.Update
 
     %Erase guide graphics
-    if lineguide then
-	%Erase guide line
-	Draw.Line (charx, handheight, linegx, linegy, bgcolour)
-	%Draw old unaltered blocks over guide line
-	if block (tempcoords (1)) then
-	    Draw.FillBox (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1, blockcolour)
-	end if
-    else
-	if tempcoords (1) not= tempcoords (2) then
-	    %Draw old unaltered block over crosshairs for breaking blocks
-	    if block (tempcoords (1)) then
-		Draw.FillBox (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1, blockcolour)
-	    else
-		Draw.FillBox (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1, bgcolour)
-	    end if
+    if tempcoords (1) not= tempcoords (2) then
+	%Draw old unaltered block over crosshairs for breaking blocks
+	Pic.Draw (backpiccross, rcursorxbb, rcursorybb, picCopy)
+	Pic.Free (backpiccross)
 
-	    %Draw old unaltered block over box for placing blocks
-	    if block (tempcoords (2)) then
-		Draw.FillBox (rcursorxpb, rcursorypb, rcursorxpb + blocksize - 1, rcursorypb + blocksize - 1, blockcolour)
-	    else
-		Draw.FillBox (rcursorxpb, rcursorypb, rcursorxpb + blocksize - 1, rcursorypb + blocksize - 1, bgcolour)
-	    end if
-	else
-	    %Draw old unaltered block over crosshairs for breaking blocks and box for placing blocks
-	    if block (tempcoords (1)) then
-		Draw.FillBox (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1, blockcolour)
-	    else
-		Draw.FillBox (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1, bgcolour)
-	    end if
-	end if
+	%Draw old unaltered block over box for placing blocks
+	Pic.Draw (backpicbox, rcursorxpb, rcursorypb, picCopy)
+	Pic.Free (backpicbox)
+    else
+	%Draw old unaltered block over crosshairs for breaking blocks and box for placing blocks
+	Pic.Draw (backpiccross, rcursorxbb, rcursorybb, picCopy)
+	Pic.Free (backpiccross)
     end if
+    %end if
 
     %Draw old unaltered background over character
     Pic.Draw (backpic, charx - charwidth div 2 - charudpxrange, chary - charudpxrange, picCopy)
@@ -1457,7 +1463,7 @@ loop
     delay (1)     %This delay to be adjusted with screen size and computer performance speed.
 end loop
 
-%Disable all active program functions
+%Disable all active GUI functions
 close : autosave
 GUI.Disable (menuhead)
 GUI.Disable (menubg)
