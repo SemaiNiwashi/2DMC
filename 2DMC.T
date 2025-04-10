@@ -3,319 +3,818 @@
 %File Name: 2DMC.t
 %Date: Feb. 11, 2013
 
+%Make using GUI features possible
+import GUI
+
 %Program settings
 View.Set ("graphics:637;403")
-View.Set ("offscreenonly")
 buttonchoose ("multibutton")
 setscreen ("noecho")
+
 %Declaration Statements
 %Constant declarations
 const midx : int := maxx div 2
 const midy : int := maxy div 2
+const boolUnInit := 16#FF
 const numblockscanjump : int := 2
 const doubletapspeed : int := 100
 const blocksize : int := 16
-const coords : boolean := true
 %Variable declarations
-var jumpheight : int := blocksize * numblockscanjump + blocksize div 3
 var font1 := Font.New ("sans serif:40:bold")
+var font2 := Font.New ("sans serif:8:bold")
 var walkr : array 1 .. 4 of int
-walkr (1) := Pic.FileNew ("Images\\walk1r.bmp")
-walkr (2) := Pic.FileNew ("Images\\walk2r.bmp")
-walkr (3) := Pic.FileNew ("Images\\walk3r.bmp")
-walkr (4) := Pic.FileNew ("Images\\walk4r.bmp")
+walkr (1) := Pic.FileNew ("walk1r.bmp")
+walkr (2) := Pic.FileNew ("walk2r.bmp")
+walkr (3) := Pic.FileNew ("walk3r.bmp")
+walkr (4) := Pic.FileNew ("walk4r.bmp")
 var walkl : array 1 .. 4 of int
-walkl (1) := Pic.FileNew ("Images\\walk1l.bmp")
-walkl (2) := Pic.FileNew ("Images\\walk2l.bmp")
-walkl (3) := Pic.FileNew ("Images\\walk3l.bmp")
-walkl (4) := Pic.FileNew ("Images\\walk4l.bmp")
+walkl (1) := Pic.FileNew ("walk1l.bmp")
+walkl (2) := Pic.FileNew ("walk2l.bmp")
+walkl (3) := Pic.FileNew ("walk3l.bmp")
+walkl (4) := Pic.FileNew ("walk4l.bmp")
 var crawlr : array 1 .. 4 of int
-crawlr (1) := Pic.FileNew ("Images\\crawl1r.bmp")
-crawlr (2) := Pic.FileNew ("Images\\crawl2r.bmp")
-crawlr (3) := Pic.FileNew ("Images\\crawl3r.bmp")
-crawlr (4) := Pic.FileNew ("Images\\crawl4r.bmp")
+crawlr (1) := Pic.FileNew ("crawl1r.bmp")
+crawlr (2) := Pic.FileNew ("crawl2r.bmp")
+crawlr (3) := Pic.FileNew ("crawl3r.bmp")
+crawlr (4) := Pic.FileNew ("crawl4r.bmp")
 var crawll : array 1 .. 4 of int
-crawll (1) := Pic.FileNew ("Images\\crawl1l.bmp")
-crawll (2) := Pic.FileNew ("Images\\crawl2l.bmp")
-crawll (3) := Pic.FileNew ("Images\\crawl3l.bmp")
-crawll (4) := Pic.FileNew ("Images\\crawl4l.bmp")
+crawll (1) := Pic.FileNew ("crawl1l.bmp")
+crawll (2) := Pic.FileNew ("crawl2l.bmp")
+crawll (3) := Pic.FileNew ("crawl3l.bmp")
+crawll (4) := Pic.FileNew ("crawl4l.bmp")
 var walkrc : array 1 .. 4 of int
-walkrc (1) := Pic.FileNew ("Images\\walk1rc.bmp") %click
-walkrc (2) := Pic.FileNew ("Images\\walk2rc.bmp") %click
-walkrc (3) := Pic.FileNew ("Images\\walk3rc.bmp") %click
-walkrc (4) := Pic.FileNew ("Images\\walk4rc.bmp") %click
+walkrc (1) := Pic.FileNew ("walk1rc.bmp") %click
+walkrc (2) := Pic.FileNew ("walk2rc.bmp") %click
+walkrc (3) := Pic.FileNew ("walk3rc.bmp") %click
+walkrc (4) := Pic.FileNew ("walk4rc.bmp") %click
 var walklc : array 1 .. 4 of int
-walklc (1) := Pic.FileNew ("Images\\walk1lc.bmp") %click
-walklc (2) := Pic.FileNew ("Images\\walk2lc.bmp") %click
-walklc (3) := Pic.FileNew ("Images\\walk3lc.bmp") %click
-walklc (4) := Pic.FileNew ("Images\\walk4lc.bmp") %click
+walklc (1) := Pic.FileNew ("walk1lc.bmp") %click
+walklc (2) := Pic.FileNew ("walk2lc.bmp") %click
+walklc (3) := Pic.FileNew ("walk3lc.bmp") %click
+walklc (4) := Pic.FileNew ("walk4lc.bmp") %click
 var crawlrc : array 1 .. 4 of int
-crawlrc (1) := Pic.FileNew ("Images\\crawl1rc.bmp") %click
-crawlrc (2) := Pic.FileNew ("Images\\crawl2rc.bmp") %click
-crawlrc (3) := Pic.FileNew ("Images\\crawl3rc.bmp") %click
-crawlrc (4) := Pic.FileNew ("Images\\crawl4rc.bmp") %click
+crawlrc (1) := Pic.FileNew ("crawl1rc.bmp") %click
+crawlrc (2) := Pic.FileNew ("crawl2rc.bmp") %click
+crawlrc (3) := Pic.FileNew ("crawl3rc.bmp") %click
+crawlrc (4) := Pic.FileNew ("crawl4rc.bmp") %click
 var crawllc : array 1 .. 4 of int
-crawllc (1) := Pic.FileNew ("Images\\crawl1lc.bmp") %click
-crawllc (2) := Pic.FileNew ("Images\\crawl2lc.bmp") %click
-crawllc (3) := Pic.FileNew ("Images\\crawl3lc.bmp") %click
-crawllc (4) := Pic.FileNew ("Images\\crawl4lc.bmp") %click
-var jump : int := Pic.FileNew ("Images\\falljump.bmp")
-var jumpcr : int := Pic.FileNew ("Images\\falljumpcr.bmp") %click
-var jumpcl : int := Pic.FileNew ("Images\\falljumpcl.bmp") %click
-var jumpr : int := Pic.FileNew ("Images\\jumpr.bmp")
-var jumpl : int := Pic.FileNew ("Images\\jumpl.bmp")
-var jumprc : int := Pic.FileNew ("Images\\jumprc.bmp") %click
-var jumplc : int := Pic.FileNew ("Images\\jumplc.bmp") %click
-var jumprl : int := Pic.FileNew ("Images\\jumprl.bmp") %click
-var jumplr : int := Pic.FileNew ("Images\\jumplr.bmp") %click
-var fallr : int := Pic.FileNew ("Images\\fallr.bmp")
-var falll : int := Pic.FileNew ("Images\\falll.bmp")
-var fallrc : int := Pic.FileNew ("Images\\fallrc.bmp") %click
-var falllc : int := Pic.FileNew ("Images\\falllc.bmp") %click
-var fallrl : int := Pic.FileNew ("Images\\fallrl.bmp") %click
-var falllr : int := Pic.FileNew ("Images\\falllr.bmp") %click
-var fall : int := Pic.FileNew ("Images\\falljump.bmp")
-var fallcr : int := Pic.FileNew ("Images\\falljumpcr.bmp") %click
-var fallcl : int := Pic.FileNew ("Images\\falljumpcl.bmp") %click
-var stand : int := Pic.FileNew ("Images\\stand.bmp")
-var standcr : int := Pic.FileNew ("Images\\standcr.bmp") %click
-var standcl : int := Pic.FileNew ("Images\\standcl.bmp") %click
+crawllc (1) := Pic.FileNew ("crawl1lc.bmp") %click
+crawllc (2) := Pic.FileNew ("crawl2lc.bmp") %click
+crawllc (3) := Pic.FileNew ("crawl3lc.bmp") %click
+crawllc (4) := Pic.FileNew ("crawl4lc.bmp") %click
+var jump : int := Pic.FileNew ("falljump.bmp")
+var jumpcr : int := Pic.FileNew ("falljumpcr.bmp") %click
+var jumpcl : int := Pic.FileNew ("falljumpcl.bmp") %click
+var jumpr : int := Pic.FileNew ("jumpr.bmp")
+var jumpl : int := Pic.FileNew ("jumpl.bmp")
+var jumprc : int := Pic.FileNew ("jumprc.bmp") %click
+var jumplc : int := Pic.FileNew ("jumplc.bmp") %click
+var jumprl : int := Pic.FileNew ("jumprl.bmp") %click
+var jumplr : int := Pic.FileNew ("jumplr.bmp") %click
+var fallr : int := Pic.FileNew ("fallr.bmp")
+var falll : int := Pic.FileNew ("falll.bmp")
+var fallrc : int := Pic.FileNew ("fallrc.bmp") %click
+var falllc : int := Pic.FileNew ("falllc.bmp") %click
+var fallrl : int := Pic.FileNew ("fallrl.bmp") %click
+var falllr : int := Pic.FileNew ("falllr.bmp") %click
+var fall : int := Pic.FileNew ("falljump.bmp")
+var fallcr : int := Pic.FileNew ("falljumpcr.bmp") %click
+var fallcl : int := Pic.FileNew ("falljumpcl.bmp") %click
+var stand : int := Pic.FileNew ("stand.bmp")
+var standcr : int := Pic.FileNew ("standcr.bmp") %click
+var standcl : int := Pic.FileNew ("standcl.bmp") %click
+var crosshairspre : int := Pic.FileNew ("crosshairs.bmp")
+var crosshairspre2 : int := Pic.FileNew ("crosshairs2.bmp")
+var crosshairs : int := Pic.Scale (crosshairspre, blocksize, blocksize)
+var crosshairs2 : int := Pic.Scale (crosshairspre2, blocksize, blocksize)
 var charwidth : int := Pic.Width (stand)
 var charheight : int := Pic.Height (stand)
+var jumpheight : int := blocksize * numblockscanjump + blocksize div 3
 var arrow : array char of boolean
 var charx : int := midx + 2
-var chary : int := 70
+var chary : int := 200
 var backpic : int := Pic.New (0, 0, 2, 2)
-var xm, ym, cm, character, rcharx, rchary, rheady, rcharyhorizontal : int
-var blkx, blky : array 1 .. 9999999 of int
-var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y : int := 0
+var screenpic : int := Pic.New (0, 0, 2, 2)
+var tempcoords : array 1 .. 5 of int
+var xm, ym, cm, s, character, rcharx, rchary, rheady, rmousex, rmousey, rcharyhorizontal, btnstrt, btncont, btnend, savenames, loadedsave, loadedsavepref, menuhead, menubg,
+    menublk, menuload, quitButton, nameTextField, nameLabel, oldbackcolour, saveFile, autosave, menudelete, oldblockcolour : int
+var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y,
+    iprevsaves, ireassign, rmousexold, rmouseyold : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
-    mustcrawl, bluedot, reddot, bluedotup, reddotup : boolean := false
+    mustcrawl, bluedot, reddot, bluedotup, reddotup, startgame, recentclick, loaded, quitthegame, mustcrawlstart : boolean := false
 var action : string := "standing"
+var loadfile, textfound, autocoords, deletesaveread, nullget, headcolourstr, bgcolourstr, blockcolourstr, tempcolourstr : string
 var facing, oldfacing : string := ""
-var headcolour : int := white
-var ponwlk, poncrl, movegaptens : int := 1
+var headcolour, bgcolour, blockcolour : int := 983
+var ponwlk, poncrl, movegaptens, isaves : int := 1
+var item1, item2, item3 : array 1 .. 16 of int
+var item4, item5 : array 1 .. 99 of int
+var oktosavenew, inmainmenu : boolean := true
+var previoussaves : array 1 .. 99 of string (30)
+var menuitemcolours : array 1 .. 16 of string (20) :=
+    init ("Default", "White", "Light Grey", "Dark Grey", "Black", "Brown", "Red", "Orange", "Yellow", "Green", "Dark Green", "Turquoise", "Blue", "Dark Blue", "Purple", "Pink")
+var menuitemsaves, menuitemdelete : array 1 .. 99 of string (50)
+menuitemsaves (1) := "New"
 
-/*
- %Artificially high block count
- for i : 1 .. 1000
- blkx (i) := -blocksize
- blky (i) := -blocksize
- end for
- */
-
-%Setup world
-headcolour := 52
-
-%Create box-y environment
-loop
-    blkount += 1
-    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), black)
-    blkx (blkount) := x
-    blky (blkount) := y
-    x += blocksize
-    if x >= maxx then
-	x := 0
-	y += blocksize
+procedure colourstringify (clr : int)
+    if clr = 0 then
+	tempcolourstr := "White"
+    elsif clr = 8 then
+	tempcolourstr := "Light Grey"
+    elsif clr = 15 then
+	tempcolourstr := "Dark Grey"
+    elsif clr = 7 then
+	tempcolourstr := "Black"
+    elsif clr = 114 then
+	tempcolourstr := "Brown"
+    elsif clr = 12 then
+	tempcolourstr := "Red"
+    elsif clr = 42 then
+	tempcolourstr := "Orange"
+    elsif clr = 14 then
+	tempcolourstr := "Yellow"
+    elsif clr = 10 then
+	tempcolourstr := "Green"
+    elsif clr = 2 then
+	tempcolourstr := "Dark Green"
+    elsif clr = 52 then
+	tempcolourstr := "Turquoise"
+    elsif clr = 9 then
+	tempcolourstr := "Blue"
+    elsif clr = 1 then
+	tempcolourstr := "Dark Blue"
+    elsif clr = 34 then
+	tempcolourstr := "Purple"
+    elsif clr = 13 then
+	tempcolourstr := "Pink"
     end if
+end colourstringify
+
+%If the game is to continue and menus to close
+procedure start
+    startgame := true
+    delay (10)
+end start
+
+%If user clicks "quit" button
+procedure endgame
+    startgame := true
+    quitthegame := true
+    GUI.Quit
+    delay (10)
+end endgame
+
+%Loading screen
+procedure loading (loadscreencolour : int)
+    Draw.FillBox (0, 0, maxx, maxy, loadscreencolour)
+    put "LOADING..."
     View.Update
-    exit when y >= blocksize * 3 and x > 66
+end loading
+
+%Does nothing, is just a necessary placeholder
+procedure NameEntered (text : string)
+end NameEntered
+
+procedure HeadSelected
+    for i : 1 .. 16
+	if item1 (i) = GUI.GetEventWidgetID then
+	    if i = 1 then
+		headcolour := 983
+	    elsif i = 2 then
+		headcolour := white
+	    elsif i = 3 then
+		headcolour := grey
+	    elsif i = 4 then
+		headcolour := darkgrey
+	    elsif i = 5 then
+		headcolour := black
+	    elsif i = 6 then
+		headcolour := 114
+	    elsif i = 7 then
+		headcolour := brightred
+	    elsif i = 8 then
+		headcolour := 42
+	    elsif i = 9 then
+		headcolour := yellow
+	    elsif i = 10 then
+		headcolour := brightgreen
+	    elsif i = 11 then
+		headcolour := green
+	    elsif i = 12 then
+		headcolour := 52
+	    elsif i = 13 then
+		headcolour := brightblue
+	    elsif i = 14 then
+		headcolour := blue
+	    elsif i = 15 then
+		headcolour := 34
+	    elsif i = 16 then
+		headcolour := brightpurple
+	    end if
+	    colorback (oldbackcolour)
+	    if headcolour = 983 then
+		Draw.FillBox (32, maxy - 67, 62, maxy - 37, oldbackcolour)
+		Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
+	    else
+		Draw.FillBox (24, maxy - 57, 75, maxy - 46, oldbackcolour)
+		Draw.FillBox (32, maxy - 67, 62, maxy - 37, headcolour)
+		Draw.Box (32, maxy - 67, 62, maxy - 37, black)
+	    end if
+	    Draw.FillBox (0, maxy - 94, 94, maxy - 80, oldbackcolour)
+	    Draw.Text (menuitemcolours (i) + " head", 1, maxy - 90, font2, black)
+	end if
+    end for
+end HeadSelected
+
+procedure BackgroundSelected
+    for i : 1 .. 16
+	if item2 (i) = GUI.GetEventWidgetID then
+	    if i = 1 then
+		bgcolour := 983
+	    elsif i = 2 then
+		bgcolour := white
+	    elsif i = 3 then
+		bgcolour := grey
+	    elsif i = 4 then
+		bgcolour := darkgrey
+	    elsif i = 5 then
+		bgcolour := black
+	    elsif i = 6 then
+		bgcolour := 114
+	    elsif i = 7 then
+		bgcolour := brightred
+	    elsif i = 8 then
+		bgcolour := 42
+	    elsif i = 9 then
+		bgcolour := yellow
+	    elsif i = 10 then
+		bgcolour := brightgreen
+	    elsif i = 11 then
+		bgcolour := green
+	    elsif i = 12 then
+		bgcolour := 52
+	    elsif i = 13 then
+		bgcolour := brightblue
+	    elsif i = 14 then
+		bgcolour := blue
+	    elsif i = 15 then
+		bgcolour := 34
+	    elsif i = 16 then
+		bgcolour := brightpurple
+	    end if
+	    colorback (oldbackcolour)
+	    if bgcolour = 983 then
+		Draw.FillBox (145, maxy - 67, 175, maxy - 37, oldbackcolour)
+		Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
+	    else
+		Draw.FillBox (137, maxy - 57, 188, maxy - 46, oldbackcolour)
+		Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
+		Draw.Box (145, maxy - 67, 175, maxy - 37, black)
+	    end if
+	    Draw.FillBox (99, maxy - 94, 232, maxy - 80, oldbackcolour)
+	    Draw.Text (menuitemcolours (i) + " background", 100, maxy - 90, font2, black)
+	end if
+    end for
+end BackgroundSelected
+
+procedure BlocksSelected
+    for i : 1 .. 16
+	if item3 (i) = GUI.GetEventWidgetID then
+	    if i = 1 then
+		blockcolour := 983
+	    elsif i = 2 then
+		blockcolour := white
+	    elsif i = 3 then
+		blockcolour := grey
+	    elsif i = 4 then
+		blockcolour := darkgrey
+	    elsif i = 5 then
+		blockcolour := black
+	    elsif i = 6 then
+		blockcolour := 114
+	    elsif i = 7 then
+		blockcolour := brightred
+	    elsif i = 8 then
+		blockcolour := 42
+	    elsif i = 9 then
+		blockcolour := yellow
+	    elsif i = 10 then
+		blockcolour := brightgreen
+	    elsif i = 11 then
+		blockcolour := green
+	    elsif i = 12 then
+		blockcolour := 52
+	    elsif i = 13 then
+		blockcolour := brightblue
+	    elsif i = 14 then
+		blockcolour := blue
+	    elsif i = 15 then
+		blockcolour := 34
+	    elsif i = 16 then
+		blockcolour := brightpurple
+	    end if
+	    colorback (oldbackcolour)
+	    if blockcolour = 983 then
+		Draw.FillBox (265, maxy - 67, 295, maxy - 37, oldbackcolour)
+		Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
+	    else
+		Draw.FillBox (257, maxy - 57, 308, maxy - 46, oldbackcolour)
+		Draw.FillBox (265, maxy - 67, 295, maxy - 37, blockcolour)
+		Draw.Box (265, maxy - 67, 295, maxy - 37, black)
+	    end if
+	    Draw.FillBox (237, maxy - 94, 340, maxy - 80, oldbackcolour)
+	    Draw.Text (menuitemcolours (i) + " blocks", 238, maxy - 90, font2, black)
+	end if
+    end for
+end BlocksSelected
+
+
+procedure DeleteSelected
+    for i : 1 .. isaves - 1
+	if item5 (i) = GUI.GetEventWidgetID then
+	    if inmainmenu = false then
+		open : savenames, ("Savenames.txt"), get, put, seek, mod
+	    end if
+	    seek : savenames, 0
+	    loop
+		get : savenames, deletesaveread
+		if menuitemdelete (i) not= deletesaveread then
+		    ireassign += 1
+		    previoussaves (ireassign) := deletesaveread
+		end if
+		exit when eof (savenames)
+	    end loop
+	    close : savenames
+	    open : savenames, ("Savenames.txt"), get, put, seek
+	    for i2 : 1 .. ireassign
+		put : savenames, previoussaves (i2)
+	    end for
+	    if inmainmenu = false then
+		close : savenames
+	    end if
+	    ireassign := 0
+	    File.Delete ("Saves\\" + menuitemdelete (i) + ".txt")
+	    File.Delete ("Preferences\\" + menuitemdelete (i) + ".txt")
+	    GUI.Disable (item5 (i))
+	    GUI.Disable (item4 (i + 1))
+	    colorback (oldbackcolour)
+	    locate (13, 1)
+	    put "Deleted ", menuitemdelete (i) + "                      "
+	end if
+    end for
+end DeleteSelected
+
+procedure LoadSelected
+    for i : 1 .. isaves
+	if item4 (i) = GUI.GetEventWidgetID then
+	    loadfile := menuitemsaves (i)
+	    colorback (oldbackcolour)
+	    locate (13, 1)
+	    if i = 1 then
+		loaded := false
+		put "World: New                       "
+	    else
+		loaded := true
+		put "World: ", menuitemsaves (i) + "                      "
+	    end if
+	end if
+    end for
+end LoadSelected
+
+%The GUIs that are used for main and pause menus
+process guis
+    btnstrt := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Start Game", start, 30, chr (13), false)
+
+    menuhead := GUI.CreateMenu ("Head Colour")
+    for i : 1 .. 16
+	item1 (i) := GUI.CreateMenuItem (menuitemcolours (i), HeadSelected)
+    end for
+    menubg := GUI.CreateMenu ("Background Colour")
+    for i : 1 .. 16
+	item2 (i) := GUI.CreateMenuItem (menuitemcolours (i), BackgroundSelected)
+    end for
+    menublk := GUI.CreateMenu ("Block Colour")
+    for i : 1 .. 16
+	item3 (i) := GUI.CreateMenuItem (menuitemcolours (i), BlocksSelected)
+    end for
+    menudelete := GUI.CreateMenu ("Delete")
+    for i : 1 .. isaves - 1
+	item5 (i) := GUI.CreateMenuItem (menuitemdelete (i), DeleteSelected)
+    end for
+    menuload := GUI.CreateMenu ("Load")
+    for i : 1 .. isaves
+	item4 (i) := GUI.CreateMenuItem (menuitemsaves (i), LoadSelected)
+    end for
+    loop
+	if startgame = true then
+	    exit
+	end if
+	exit when GUI.ProcessEvent
+    end loop
+end guis
+
+%Welcome screen
+Draw.Text ("Welcome to 2DMC!", midx - (Font.Width ("Welcome to 2DMC!", font1) div 2), midy - 20, font1, black)
+locatexy (midx - (length ("Click to continue") * 8 div 2), midy - 40)
+put "Click to continue"
+
+%Wait for click
+loop
+    Mouse.Where (xm, ym, cm)
+    if cm = 1 then
+	recentclick := true
+    else
+	if recentclick = true then
+	    exit
+	end if
+	recentclick := false
+    end if
 end loop
-/*
- %Artificially high block count
- blkount := 1000
- */
+cls
 
-%QuickBlocks%
-var TotlBlks := 11
-var xcoord : array 1 .. TotlBlks of int
-var ycoord : array 1 .. TotlBlks of int
+%Set colour-change-detecting variables
+if bgcolour = 983 then
+    oldbackcolour := white
+else
+    oldbackcolour := bgcolour
+end if
+if blockcolour = 983 then
+    oldblockcolour := black
+else
+    oldblockcolour := blockcolour
+end if
 
-xcoord (1) := 14
-ycoord (1) := 4
+%Clear and open autosave file
+open : autosave, ("Autosave.txt"), get, put, seek
+close : autosave
+open : autosave, ("Autosave.txt"), get, put, seek, mod
 
-xcoord (2) := 16
-ycoord (2) := 3
+%open text file of all saved files' names
+open : savenames, ("Savenames.txt"), get, put, seek, mod
 
-xcoord (3) := 27
-ycoord (3) := 3
+%Create a list of all saved files' names
+loop
+    isaves += 1
+    get : savenames, menuitemsaves (isaves)
+    menuitemdelete (isaves - 1) := (menuitemsaves (isaves))
+    exit when eof (savenames)
+end loop
 
-xcoord (4) := 29
-ycoord (4) := 4
+%Run the GUIs to be used in main and pause menus
+fork guis
 
-xcoord (5) := 30
-ycoord (5) := 5
+Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
+Draw.Text ("Default head", 1, maxy - 90, font2, black)
+Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
+Draw.Text ("Default background", 100, maxy - 90, font2, black)
+Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
+Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
 
-xcoord (6) := 37
-ycoord (6) := 3
+%Wait until user clicks "start" button
+loop
+    exit when startgame = true
+end loop
 
-xcoord (7) := 35
-ycoord (7) := 4
+%close text file of all saved files' names
+close : savenames
 
-xcoord (8) := 34
-ycoord (8) := 5
+%Set program variables and disable and hide all GUIs
+inmainmenu := false
+startgame := false
+GUI.Disable (menuload)
+GUI.Disable (item1 (1))
+GUI.Disable (item2 (1))
+GUI.Disable (item3 (1))
+GUI.Hide (btnstrt)
+GUI.HideMenuBar
+GUI.Quit
+cls
 
-xcoord (9) := 33
-ycoord (9) := 6
+%Allows for smooth animation
+View.Set ("offscreenonly")
 
-xcoord (10) := 12
-ycoord (10) := 4
+%Beginning loading screen
+if bgcolour = 983 then
+    loading (white)
+else
+    loading (bgcolour)
+end if
 
-xcoord (11) := 13
-ycoord (11) := 4
+%Declaration statement for the array of blocks: down here because it takes a really long time
+var block : array 100000000 .. 499999999 of boolean
 
-for i : 1 .. TotlBlks
-    blkount += 1
-    xcoord (i) *= blocksize
-    ycoord (i) *= blocksize
-    Draw.FillBox (xcoord (i), ycoord (i), xcoord (i) + (blocksize - 1), ycoord (i) + (blocksize - 1), black)
-    blkx (blkount) := xcoord (i)
-    blky (blkount) := ycoord (i)
-end for
-%QuickBlocks%
+%Save feature
+procedure saveWorld
+    textfound := GUI.GetText (nameTextField)
+    if textfound not= "" then
+	iprevsaves := 0
+	open : savenames, ("Savenames.txt"), get, put, seek, mod
+	seek : savenames, 0
+	loop
+	    iprevsaves += 1
+	    get : savenames, previoussaves (iprevsaves)
+	    exit when eof (savenames)
+	end loop
+	oktosavenew := true
+	for i : 1 .. iprevsaves
+	    if previoussaves (i) = textfound then
+		oktosavenew := false
+	    end if
+	end for
+	if oktosavenew then
+	    seek : savenames, *
+	    put : savenames, ""
+	    put : savenames, textfound
+	end if
+	close : savenames
+
+	open : loadedsavepref, ("Preferences\\" + textfound + ".txt"), get, put, seek
+	put : loadedsavepref, charx
+	put : loadedsavepref, chary
+	put : loadedsavepref, headcolour
+	put : loadedsavepref, bgcolour
+	put : loadedsavepref, blockcolour
+	put : loadedsavepref, mustcrawl
+	close : loadedsavepref
+
+	open : saveFile, ("Saves\\" + textfound + ".txt"), get, put, seek
+	seek : autosave, 0
+	loop
+	    get : autosave, autocoords
+	    if block (strint (autocoords)) then
+		put : saveFile, autocoords
+	    end if
+	    exit when eof (autosave)
+	end loop
+	close : saveFile
+	GUI.Quit
+    end if
+    seek : autosave, *
+	startgame := true
+end saveWorld
+
+%The GUIs that are only used on pause screen
+process pauseguis
+    quitButton := GUI.CreateButton (midx - 50, midy + 30, 100, "Save", saveWorld)
+    nameTextField := GUI.CreateTextFieldFull (midx - 100, midy + 60, 200, "", NameEntered, GUI.INDENT, 0, 0)
+    nameLabel := GUI.CreateLabelFull (midx - 105, midy + 60, "Save as:", 0, 0, GUI.RIGHT, 0)
+    btncont := GUI.CreateButtonFull (midx - 150, maxy div 3, 300, "Continue", start, 30, chr (13), false)
+    btnend := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Quit", endgame, 30, chr (13), false)
+    GUI.SetText (nameTextField, textfound)
+    loop
+	if startgame = true then
+	    exit
+	end if
+	exit when GUI.ProcessEvent
+    end loop
+end pauseguis
+
+%Get preferences
+if loaded then
+    open : loadedsave, ("Saves\\" + loadfile + ".txt"), get, put, seek, mod
+    open : loadedsavepref, ("Preferences\\" + loadfile + ".txt"), get, put, seek, mod
+    seek : loadedsavepref, 0
+    get : loadedsavepref, charx
+    get : loadedsavepref, chary
+    if headcolour = 983 then
+	get : loadedsavepref, headcolour
+    else
+	get : loadedsavepref, nullget
+    end if
+    if bgcolour = 983 then
+	get : loadedsavepref, bgcolour
+    else
+	get : loadedsavepref, nullget
+    end if
+    if blockcolour = 983 then
+	get : loadedsavepref, blockcolour
+    else
+	get : loadedsavepref, nullget
+    end if
+    get : loadedsavepref, mustcrawlstart
+    close : loadedsavepref
+else
+    if headcolour = 983 then
+	headcolour := white
+    end if
+    if bgcolour = 983 then
+	bgcolour := white
+    end if
+    if blockcolour = 983 then
+	blockcolour := black
+    end if
+end if
+
+%Update background colour
+Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+
+if loaded then         %Load world
+    if eof (loadedsave) = false then
+	seek : loadedsave, 0
+	loop
+	    get : loadedsave, textfound
+	    block (strint (textfound)) := true
+	    x := floor (strint (textfound) / 10000) - 24999 - 10000
+	    y := strint (textfound) - (floor (strint (textfound) / 10000)) * 10000 - 4999
+	    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+	    put : autosave, textfound
+	    exit when eof (loadedsave)
+	end loop
+	textfound := loadfile
+    end if
+    x := 0
+    y := 0
+    loaded := false
+    close : loadedsave
+else     %Generate ground
+    loop
+	blkount += 1
+	Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+	tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	block (tempcoords (1)) := true
+	put : autosave, tempcoords (1)
+	x += blocksize
+	if x >= maxx then
+	    x := 0
+	    y += blocksize
+	end if
+	exit when y >= blocksize * 3
+    end loop
+    x := 0
+    y := 0
+    textfound := ""
+end if
+
 
 %Show world
 View.Update
 
 loop
-    if coords then
-	%Character standing by default
-	action := "standing"
-
-
-	if charheight <= blocksize then
-	    mustcrawl := false
-	    for i : 1 .. blkount
-		if (blkx (i) = rcharx or blkx (i) = rcharx + blocksize) and blky (i) = rchary + blocksize or chary = 0 then
-		    mustcrawl := true
-		end if
-	    end for
-	end if
-
-	%Character rounded position
-	rcharx := (floor ((charx - charwidth div 2) / blocksize)) * blocksize
-	rchary := (ceil ((chary) / blocksize)) * blocksize
-	rcharyhorizontal := (floor (chary / blocksize)) * blocksize
-	rheady := (ceil ((chary + charheight) / blocksize)) * blocksize
-
-	%If character is on the ground
-	reddot := false
-	bluedot := false
-	for i : 1 .. blkount
-	    if blkx (i) = rcharx and blky (i) = rchary - blocksize then
-		reddot := true
-	    end if
-	    if blkx (i) = rcharx + blocksize and blky (i) = rchary - blocksize then
-		bluedot := true
-	    end if
-	end for
-	onground := false
-	for i : 1 .. blkount
-	    if (blkx (i) = rcharx or blkx (i) = rcharx + blocksize) and blky (i) = rchary - blocksize and chary / blocksize = chary div blocksize or chary = 0 then
-		onground := true
-	    end if
-	end for
-	if bluedot = false and ((charx + 1 - charwidth div 2) / blocksize) = (round ((charx + 1 - charwidth div 2) / blocksize)) then
-	    onground := false
-	end if
-	if reddot = false and ((charx - charwidth div 2) / blocksize) = (round ((charx - charwidth div 2) / blocksize)) then
-	    onground := false
-	end if
-
-	%If character is against a wall to the left
-	onleftwall := false
-	for i : 1 .. blkount
-	    if blkx (i) = rcharx and blky (i) = rcharyhorizontal or charx - charwidth div 2 = 0 then
-		onleftwall := true
-	    elsif charheight > blocksize and blkx (i) = rcharx and blky (i) = rcharyhorizontal + blocksize then
-		onleftwall := true
-	    end if
-	end for
-
-	%If character is against a wall to the right
-	onrightwall := false
-	for i : 1 .. blkount
-	    if blkx (i) = rcharx + blocksize and blky (i) = rcharyhorizontal or charx + charwidth div 2 = maxx then
-		onrightwall := true
-	    elsif charheight > 20 and blkx (i) = rcharx + blocksize and blky (i) = rcharyhorizontal + blocksize then
-		onrightwall := true
-	    end if
-	end for
-
-	%If character is against the ceiling
-	reddotup := false
-	bluedotup := false
-	for i : 1 .. blkount
-	    if blkx (i) = rcharx and blky (i) = rheady - blocksize then
-		reddotup := true
-	    end if
-	    if blkx (i) = rcharx + blocksize and blky (i) = rheady - blocksize then
-		bluedotup := true
-	    end if
-	end for
-	hitceiling := false
-	for i : 1 .. blkount
-	    if (blkx (i) = rcharx or blkx (i) = rcharx + blocksize) and blky (i) = rheady - blocksize /* and (chary + charheight) / blocksize = (chary + charheight) div blocksize*/ or rheady >= maxy
-		    then
-		hitceiling := true
-	    end if
-	end for
-	if bluedotup = false and ((charx + 1 - charwidth div 2) / blocksize) = (round ((charx + 1 - charwidth div 2) / blocksize)) then
-	    hitceiling := false
-	end if
-	if reddotup = false and ((charx - charwidth div 2) / blocksize) = (round ((charx - charwidth div 2) / blocksize)) then
-	    hitceiling := false
-	end if
+    if mustcrawlstart then
+	action := "crawlingstop"
+	mustcrawlstart := false
     else
-	%Character standing by default
-	if action = "crawlingstop" or action = "crawlingstop left" or action = "crawlingstop right" or action = "crawling left" or action = "crawling right" then
-	    for i : 0 .. charwidth
-		mustcrawl := false
-		if View.WhatDotColour (charx - charwidth div 2 + i, chary + charheight + 5) not= white then
-		    mustcrawl := true
-		    exit
-		else
-		    action := "standing"
-		end if
-	    end for
-	else
-	    action := "standing"
+	action := "standing" %Character standing by default
+    end if
+
+    %Character rounded position
+    rcharx := (floor ((charx - charwidth div 2) / blocksize)) * blocksize
+    rchary := (ceil ((chary) / blocksize)) * blocksize
+    rcharyhorizontal := (floor (chary / blocksize)) * blocksize
+    rheady := (ceil ((chary + charheight) / blocksize)) * blocksize
+
+    %If character must crawl
+    tempcoords (1) := 100000000 + (rcharx + 24999) * 10000 + (rheady + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+    if block (tempcoords (1)) then
+	reddot := true
+    else
+	reddot := false
+    end if
+    tempcoords (1) := 100000000 + (rcharx + blocksize + 24999) * 10000 + (rheady + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+    if block (tempcoords (1)) then
+	bluedot := true
+    else
+	bluedot := false
+    end if
+    if charheight <= blocksize then
+	tempcoords (1) := 100000000 + (rcharx + 24999) * 10000 + (rchary + blocksize + 4999)
+	tempcoords (2) := 100000000 + (rcharx + blocksize + 24999) * 10000 + (rchary + blocksize + 4999)
+	if #block (tempcoords (1)) = boolUnInit then
+	    block (tempcoords (1)) := false
 	end if
-	%If character is in the air
-	for i : 0 .. charwidth
-	    onground := false
-	    if View.WhatDotColour (charx - charwidth div 2 + i, chary - 1) not= white or chary = 0 then
-		onground := true
-		exit
-	    end if
-	end for
+	if #block (tempcoords (2)) = boolUnInit then
+	    block (tempcoords (2)) := false
+	end if
+	if block (tempcoords (1)) or block (tempcoords (2)) then
+	    mustcrawl := true
+	else
+	    mustcrawl := false
+	end if
+    end if
+    if bluedot = false and ((charx + 1 - charwidth div 2) / blocksize) = (round ((charx + 1 - charwidth div 2) / blocksize)) then
+	mustcrawl := false
+    end if
+    if reddot = false and ((charx - charwidth div 2) / blocksize) = (round ((charx - charwidth div 2) / blocksize)) then
+	mustcrawl := false
+    end if
 
-	%If character is against a wall to the left
-	for i : 0 .. charheight
-	    onleftwall := false
-	    if View.WhatDotColour (charx - 1 - charwidth div 2, chary + i) not= white or charx - charwidth div 2 = 0 then
-		onleftwall := true
-		exit
-	    end if
-	end for
 
-	%If character is against a wall to the right
-	for i : 0 .. charheight
-	    onrightwall := false
-	    if View.WhatDotColour (charx + 1 + charwidth div 2, chary + i) not= white or charx + charwidth div 2 = maxx then
-		onrightwall := true
-		exit
-	    end if
-	end for
+    %If character is on the ground
+    tempcoords (1) := 100000000 + (rcharx + 24999) * 10000 + (rchary - blocksize + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+    if block (tempcoords (1)) then
+	reddot := true
+    else
+	reddot := false
+    end if
+    tempcoords (1) := 100000000 + (rcharx + blocksize + 24999) * 10000 + (rchary - blocksize + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+    if block (tempcoords (1)) then
+	bluedot := true
+    else
+	bluedot := false
+    end if
+    tempcoords (1) := 100000000 + (rcharx + 24999) * 10000 + (rchary - blocksize + 4999)
+    tempcoords (2) := 100000000 + (rcharx + blocksize + 24999) * 10000 + (rchary - blocksize + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+    if #block (tempcoords (2)) = boolUnInit then
+	block (tempcoords (2)) := false
+    end if
+    if (block (tempcoords (1)) or block (tempcoords (2))) and chary / blocksize = chary div blocksize or chary = 0 then
+	onground := true
+    else
+	onground := false
+    end if
+    if bluedot = false and ((charx + 1 - charwidth div 2) / blocksize) = (round ((charx + 1 - charwidth div 2) / blocksize)) and chary > 0 then
+	onground := false
+    end if
+    if reddot = false and ((charx - charwidth div 2) / blocksize) = (round ((charx - charwidth div 2) / blocksize)) and chary > 0 then
+	onground := false
+    end if
 
-	%If character is against the ceiling
-	for i : 0 .. charwidth
-	    hitceiling := false
-	    if View.WhatDotColour (charx - charwidth div 2 + i, chary + charheight + 1) not= white or chary + charheight = maxy then
-		hitceiling := true
-		exit
-	    end if
-	end for
+    %If character is against a wall to the left
+    tempcoords (1) := 100000000 + (rcharx + 24999) * 10000 + (rcharyhorizontal + 4999)
+    tempcoords (2) := 100000000 + (rcharx + 24999) * 10000 + (rcharyhorizontal + blocksize + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+    if #block (tempcoords (2)) = boolUnInit then
+	block (tempcoords (2)) := false
+    end if
+    if block (tempcoords (1)) or charx - charwidth div 2 = 0 then
+	onleftwall := true
+    elsif charheight > blocksize and block (tempcoords (2)) then
+	onleftwall := true
+    else
+	onleftwall := false
+    end if
+
+    %If character is against a wall to the right
+    tempcoords (1) := 100000000 + (rcharx + blocksize + 24999) * 10000 + (rcharyhorizontal + 4999)
+    tempcoords (2) := 100000000 + (rcharx + blocksize + 24999) * 10000 + (rcharyhorizontal + blocksize + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+    if #block (tempcoords (2)) = boolUnInit then
+	block (tempcoords (2)) := false
+    end if
+    if block (tempcoords (1)) or charx + charwidth div 2 = maxx then
+	onrightwall := true
+    elsif charheight > 20 and block (tempcoords (2)) then
+	onrightwall := true
+    else
+	onrightwall := false
+    end if
+
+    %If character is against the ceiling
+    tempcoords (1) := 100000000 + (rcharx + 24999) * 10000 + (rheady - blocksize + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+    if block (tempcoords (1)) then
+	reddot := true
+    else
+	reddot := false
+    end if
+    tempcoords (1) := 100000000 + (rcharx + blocksize + 24999) * 10000 + (rheady - blocksize + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+    if block (tempcoords (1)) then
+	bluedot := true
+    else
+	bluedot := false
+    end if
+    tempcoords (1) := 100000000 + (rcharx + 24999) * 10000 + (rheady - blocksize + 4999)
+    tempcoords (2) := 100000000 + (rcharx + blocksize + 24999) * 10000 + (rheady - blocksize + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+    if #block (tempcoords (2)) = boolUnInit then
+	block (tempcoords (2)) := false
+    end if
+    if block (tempcoords (1)) or block (tempcoords (2)) or rheady >= maxy then
+	hitceiling := true
+    else
+	hitceiling := false
+    end if
+    if bluedot = false and ((charx + 1 - charwidth div 2) / blocksize) = (round ((charx + 1 - charwidth div 2) / blocksize)) and rheady < maxy then
+	hitceiling := false
+    end if
+    if reddot = false and ((charx - charwidth div 2) / blocksize) = (round ((charx - charwidth div 2) / blocksize)) and rheady < maxy then
+	hitceiling := false
     end if
 
     %Get mouse input
@@ -323,6 +822,133 @@ loop
 
     %Get keyboard input
     Input.KeyDown (arrow)
+
+    %Mouse rounded position
+    rmousex := ((floor (xm / blocksize)) * blocksize)
+    rmousey := ((ceil (ym / blocksize)) * blocksize) - blocksize
+
+    %If player right-clicks
+    if cm = 100 then
+	tempcoords (1) := 100000000 + (rmousex + 24999) * 10000 + (rmousey + 4999)
+	if #block (tempcoords (1)) = boolUnInit then
+	    block (tempcoords (1)) := false
+	end if
+	x := floor (tempcoords (1) / 10000) - 24999 - 10000
+	y := tempcoords (1) - (floor (tempcoords (1) / 10000)) * 10000 - 4999
+	tempcoords (2) := 100000000 + ((x + blocksize) + 24999) * 10000 + ((y) + 4999)
+	tempcoords (3) := 100000000 + ((x - blocksize) + 24999) * 10000 + ((y) + 4999)
+	tempcoords (4) := 100000000 + ((x) + 24999) * 10000 + ((y + blocksize) + 4999)
+	tempcoords (5) := 100000000 + ((x) + 24999) * 10000 + ((y - blocksize) + 4999)
+	if #block (tempcoords (2)) = boolUnInit then
+	    block (tempcoords (2)) := false
+	end if
+	if #block (tempcoords (3)) = boolUnInit then
+	    block (tempcoords (3)) := false
+	end if
+	if #block (tempcoords (4)) = boolUnInit then
+	    block (tempcoords (4)) := false
+	end if
+	if #block (tempcoords (5)) = boolUnInit then
+	    block (tempcoords (5)) := false
+	end if
+	if block (tempcoords (2)) or block (tempcoords (3)) or block (tempcoords (4)) or block (tempcoords (5)) then
+	    if block (tempcoords (1)) = false then
+		Draw.FillBox (rmousex, rmousey, rmousex + (blocksize - 1), rmousey + (blocksize - 1), blockcolour)
+		block (tempcoords (1)) := true
+		View.UpdateArea (rmousex, rmousey, rmousex + (blocksize - 1), rmousey + (blocksize - 1))
+		blkount += 1
+		put : autosave, tempcoords (1)
+	    end if
+	    x := 0
+	    y := 0
+	end if
+    end if
+
+    %If player left-clicks
+    if cm = 1 then
+	tempcoords (1) := 100000000 + (rmousex + 24999) * 10000 + (rmousey + 4999)
+	if #block (tempcoords (1)) = boolUnInit then
+	    block (tempcoords (1)) := false
+	end if
+	if block (tempcoords (1)) = true then
+	    Draw.FillBox (rmousex, rmousey, rmousex + (blocksize - 1), rmousey + (blocksize - 1), bgcolour)
+	    block (tempcoords (1)) := false
+	    View.UpdateArea (rmousex, rmousey, rmousex + (blocksize - 1), rmousey + (blocksize - 1))
+	    blkount -= 1
+	end if
+    end if
+
+    %If 'p' key is pressed
+    if arrow ('p') then
+	View.Set ("nooffscreenonly")
+	oldbackcolour := bgcolour
+	oldblockcolour := blockcolour
+	fork pauseguis
+	Pic.Free (screenpic)
+	screenpic := Pic.New (0, 0, maxx, maxy)
+	Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+	GUI.ResetQuit
+	GUI.ShowMenuBar
+	colourstringify (headcolour)
+	Draw.FillBox (32, maxy - 67, 62, maxy - 37, headcolour)
+	Draw.Box (32, maxy - 67, 62, maxy - 37, black)
+	Draw.Text (tempcolourstr + " head", 1, maxy - 90, font2, black)
+	colourstringify (bgcolour)
+	Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
+	Draw.Box (145, maxy - 67, 175, maxy - 37, black)
+	Draw.Text (tempcolourstr + " background", 100, maxy - 90, font2, black)
+	colourstringify (blockcolour)
+	Draw.FillBox (265, maxy - 67, 295, maxy - 37, blockcolour)
+	Draw.Box (265, maxy - 67, 295, maxy - 37, black)
+	Draw.Text (tempcolourstr + " blocks", 238, maxy - 90, font2, black)
+	loop
+	    exit when startgame = true
+	end loop
+
+	%If the quit button has been clicked
+	if quitthegame then
+	    GUI.Quit
+	    exit
+	end if
+
+	%Temporarily disable and hide all GUIs
+	GUI.Quit
+	GUI.Hide (quitButton)
+	GUI.Hide (nameTextField)
+	GUI.Hide (nameLabel)
+	GUI.Hide (btncont)
+	GUI.Hide (btnend)
+	GUI.HideMenuBar
+
+	startgame := false
+	View.Set ("offscreenonly")
+
+	%Loading screen
+	loading (bgcolour)
+
+	%Updates block and background colours
+	if oldblockcolour not= blockcolour or oldbackcolour not= bgcolour then
+	    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+	    seek : autosave, 0
+	    if eof (autosave) = false then
+		loop
+		    get : autosave, autocoords
+		    if block (strint (autocoords)) then
+			x := floor (strint (autocoords) / 10000) - 24999 - 10000
+			y := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
+			Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+		    end if
+		    exit when eof (autosave)
+		end loop
+	    end if
+	    x := 0
+	    y := 0
+	    seek : autosave, *
+	else
+	    Pic.Draw (screenpic, 0, 0, picCopy)
+	end if
+	View.Update
+    end if
 
     %If 'd' key is pressed
     if arrow ('d') then
@@ -547,6 +1173,7 @@ loop
 	action := "falling"
     end if
 
+    %Character image used if forced crawling
     if mustcrawl then
 	if action = "walking left" then
 	    action := "crawling left"
@@ -643,6 +1270,7 @@ loop
 	    character := walkrc (2)
 	end if
     end if
+
     %Get character dimensions
     charwidth := Pic.Width (character)
     charheight := Pic.Height (character)
@@ -650,8 +1278,6 @@ loop
     %Save Background behind character
     Pic.Free (backpic)
     backpic := Pic.New (charx - 15, chary - 15, charx + 15, chary + 40)
-    %backpic := Pic.New (charx - 25, chary - 25, charx + 25, chary + 50)
-
 
     %Draw character's head colour
     if action = "crawling left" or action = "crawlingstop left" then
@@ -662,16 +1288,49 @@ loop
 	Draw.FillOval (charx, chary + 21, 3, 3, headcolour)
     end if
 
+
+
+    tempcoords (1) := 100000000 + (rcharx + blocksize + 24999) * 10000 + (rcharyhorizontal + 4999)
+    tempcoords (2) := 100000000 + (rcharx + blocksize + 24999) * 10000 + (rcharyhorizontal + blocksize + 4999)
+
+    Draw.FillOval (rcharx + blocksize, rcharyhorizontal, 2, 2, red)
+    Draw.FillOval (rcharx + blocksize, rcharyhorizontal + blocksize, 1, 1, blue)
+
+
+
+
+
+
+
     %Draw character
-    %Draw.FillOval (rcharx, rheady - blocksize, 2, 2, red)
-    %Draw.FillOval (rcharx + blocksize, rheady - blocksize, 1, 1, blue)
     Pic.Draw (character, charx - charwidth div 2, chary, picMerge)
     View.UpdateArea (charx - 20, chary - 20, charx + 20, chary + 45)
-    %View.Update %Area (charx - 25, chary - 25, charx + 25, chary + 50)
+
+    tempcoords (1) := 100000000 + (rmousex + 24999) * 10000 + (rmousey + 4999)
+    if #block (tempcoords (1)) = boolUnInit then
+	block (tempcoords (1)) := false
+    end if
+
+    %Draw crosshairs
+    if block (tempcoords (1)) and blockcolour = black or block (tempcoords (1)) = false and bgcolour = black then
+	Pic.Draw (crosshairs2, rmousex, rmousey, picCopy)
+    else
+	Pic.Draw (crosshairs, rmousex, rmousey, picMerge)
+    end if
+    View.UpdateArea (rmousexold, rmouseyold, rmousexold + blocksize, rmouseyold + blocksize)
+    View.Update %Area (rmousex, rmousey, rmousex + blocksize, rmousey + blocksize)
+
+    %Draw old unaltered block over crosshairs
+    if block (tempcoords (1)) then
+	Draw.FillBox (rmousex, rmousey, rmousex + (blocksize - 1), rmousey + (blocksize - 1), blockcolour)
+    else
+	Draw.FillBox (rmousex, rmousey, rmousex + (blocksize - 1), rmousey + (blocksize - 1), bgcolour)
+    end if
+    rmousexold := rmousex
+    rmouseyold := rmousey
 
     %Draw old unaltered background over character
     Pic.Draw (backpic, charx - 15, chary - 15, picCopy)
-    %Pic.Draw (backpic, charx - 25, chary - 25, picCopy)
 
     %Movement timer
     movegap += 1
@@ -683,5 +1342,20 @@ loop
 	end if
     end if
 
-    delay (0)     % This delay to be adjusted with screen size and computer performance speed.
+    delay (2)     % This delay to be adjusted with screen size and computer performance speed.
 end loop
+
+%Disable all active program functions
+close : autosave
+GUI.Disable (menuhead)
+GUI.Disable (menubg)
+GUI.Disable (menublk)
+GUI.Disable (btncont)
+GUI.Disable (btnend)
+GUI.Hide (btncont)
+GUI.Hide (btnend)
+GUI.HideMenuBar
+View.Set ("nooffscreenonly")
+colorback (white)
+cls
+put "TGIO (Thank Goodness It's Over!)"
