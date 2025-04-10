@@ -2,7 +2,6 @@
 ByanSaves/
 OldVersions/
 /*.bmp
-/*.rtf
 
 # ignore all .T files
 *.T
