@@ -11,20 +11,19 @@ var MainWinID : int := Window.Open ("position:top;right,graphics:640;400") %Smal
 buttonchoose ("multibutton")
 setscreen ("noecho")
 
-%Fix weird blocks-off-in-the-y-coordinate thing // Caused by hitting ceiling maybe!? :DDD
+%Fix old world not unloading - mostly done?
+%Fix jitter when screen scrolling
 %Fix looking straight down and jumping with your cursor on the block below you moving the block creating reticle (square) into that block
 %Fix screen bugging out when suffocating due to updating the health bar too frequently / updating health bar makes screen flicker
 
-%Add making the screen scroll by not 1 pixel all the time
-%    Run off screen come back get stuck in block.
-%    Also world generation is messed up (left/right, because rest is still moving by 1 pixel).
+%Switch from using autosave(saves duplicate blocks) to going through narrowed array of blocks (2D)
+%replace savenames with Dir.Get
 %The great variable purge
 %Add being able to click on a block if it is at all visible to the character - not just in a straight line to the mouse!
 %Prevent that little "hop" when holding space when hits ground and dies
 %Make character an instance of a class
-%Add secod player
-%Remove "groundlevel" (if unneeded)
-%Add world generation number in preferences(?) file, (plus a seed?) default to 0 if no record
+%Add second player
+%Add world generation version number in preferences(?) file, (plus a seed?) default to 0 if no record
 %   Create world-generation-version checker and handler
 %   Change world generation in old version to only save blocks differing from the flat terrain generation
 %   Change world generation in new version to only save blocks differing from the seed terrain generation
@@ -54,25 +53,42 @@ var trainx : real := 24
 var trainy : real := 3
 var trainbackpic : int := Pic.New (0, 0, 2, 2)
 %Block class
-const numBlockTypes : int := 15
+const numBlockTypes : int := 16
 type blockClass :
     record
 	id : int
 	name : string
-	solid : boolean
+	solid : int
+	clr : int
     end record
-var blockNames : array 0 .. numBlockTypes - 1 of string := init ("void", "boarder", "air", "dirt", "stone", "grass", "leaves_nat", "leaves", "wood_nat", "wood", "water", "rail", "ladder", "wire",
-    "pressure_plate")
 var blockType : array 0 .. numBlockTypes - 1 of blockClass
-for i : 0 .. numBlockTypes - 1
-    blockType (i).id := i
-    blockType (i).name := blockNames (i)
-    if i = 1 or i >= 3 and i <= 5 or i = 7 or i = 9 then
-	blockType (i).solid := true
-    else
-	blockType (i).solid := false
-    end if
-end for
+
+procedure setBlockInfo (var blockIn : int, nameIn : string, solidIn : int, clrIn : int)
+    blockType (blockIn).id := blockIn
+    blockType (blockIn).name := nameIn
+    blockType (blockIn).solid := solidIn
+    blockType (blockIn).clr := clrIn
+    blockIn += 1
+end setBlockInfo
+var iter : int := 0
+%Legend: name, isSolid, color
+setBlockInfo (iter, "void", 0, -1)
+setBlockInfo (iter, "boarder", 1, -1)
+setBlockInfo (iter, "air", 0, -1)
+setBlockInfo (iter, "dirt", 1, -1)
+setBlockInfo (iter, "stone", 1, -1)
+setBlockInfo (iter, "grass", 1, -1)
+setBlockInfo (iter, "leaves_nat", 0, -1)
+setBlockInfo (iter, "leaves", 1, -1)
+setBlockInfo (iter, "wood_nat", 0, -1)
+setBlockInfo (iter, "wood", 1, -1)
+setBlockInfo (iter, "platform", 2, -1)
+setBlockInfo (iter, "water", 0, -1)
+setBlockInfo (iter, "rail", 0, -1)
+setBlockInfo (iter, "ladder", 0, -1)
+setBlockInfo (iter, "wire", 0, -1)
+setBlockInfo (iter, "pressure_plate", 0, -1)
+
 %Variable declarations
 type vec2 :
     record
@@ -175,7 +191,7 @@ var tempcoords : array 1 .. 5 of int
 var xm, ym, cm, character, btnstrt, btncont, btnend, mainMenuButton, savenames, loadedsave,
     loadedsavepref, menuhead, menubg, menublk, menuload, saveButton, saveasguiheight, nameTextField, nameLabel, saveFile, autosave, menudelete,
     tempi, linegx, linegy, idelete, null, backpiccross, backpicbox, srx, sry, slx, sly, sux, suy, sdx, sdy, shiftspot, endspot, val,
-    autocoords, cbprev, cbfly, bigx, bigy : int
+    autocoords, cbprev, cbfly, bigx, bigy, genVersion, seed : int
 var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, blkount,
     iprevsaves, ireassign, crosshairsbb2, crosshairsbb, crosshairspb2, crosshairspb, mclickr, mclickl, guidecolour,
     mstScrnHsGnLft, mstScrnHsGnRght, mstScrnHsGnUp, mstScrnHsGnDwn, offsetprevlr, offsetprevud, healthold, groundlevel : int := 0
@@ -228,19 +244,19 @@ function blockID (blockName : string) : int
 end blockID
 
 function toScrnCdXR (val : real) : int
-    result round (val * blocksize + offsetleftright)
+    result ceil ((val + offsetleftright) * blocksize)
 end toScrnCdXR
 
 function toScrnCdYR (val : real) : int
-    result round (val * blocksize + offsetupdown)
+    result ceil ((val + offsetupdown) * blocksize)
 end toScrnCdYR
 
 function toGameCdX (val : real) : real
-    result (val - offsetleftright) / blocksize
+    result val / blocksize - offsetleftright
 end toGameCdX
 
 function toGameCdY (val : real) : real
-    result (val - offsetupdown) / blocksize
+    result val / blocksize - offsetupdown
 end toGameCdY
 
 %Floors this coordinate to the nearest block
@@ -269,20 +285,12 @@ function encodeVec (inVec : vec2i) : int
     result encode (inVec.x, inVec.y)
 end encodeVec
 
-function decodeX (coordcode : int, toPixels : boolean) : int
-    if toPixels then
-	result toScrnCdXR (coordcode - (floor (coordcode / 10000) * 10000) - 4999)
-    else
-	result coordcode - (floor (coordcode / 10000) * 10000) - 4999
-    end if
+function decodeX (coordcode : int) : int
+    result coordcode - (floor (coordcode / 10000) * 10000) - 4999
 end decodeX
 
-function decodeY (coordcode : int, toPixels : boolean) : int
-    if toPixels then
-	result toScrnCdYR (floor (coordcode / 10000) - 2499)
-    else
-	result floor (coordcode / 10000) - 2499
-    end if
+function decodeY (coordcode : int) : int
+    result floor (coordcode / 10000) - 2499
 end decodeY
 
 function isWholeNumber (input : real) : boolean
@@ -676,7 +684,9 @@ function isBlock (xin : real, yin : real, blockIn : string) : boolean
     if blockIn = "any" then
 	result #block (coordcode) not= boolUnInit and block (coordcode) not= false %blockType(block (coordcode)) != "air"
     elsif blockIn = "solid" then
-	result #block (coordcode) not= boolUnInit and block (coordcode) = true %blockType(block (coordcode)).solid
+	result #block (coordcode) not= boolUnInit and block (coordcode) = true %blockType(block (coordcode)).solid = 1
+    elsif blockIn = "void" then
+	result #block (coordcode) = boolUnInit %blockType(block (coordcode)) = "void"
     else
 	result #block (coordcode) not= boolUnInit and block (coordcode) %blockType(block (coordcode)) = blockIn
     end if
@@ -727,14 +737,14 @@ procedure saveWorld
 	close : savenames
 
 	open : loadedsavepref, ("Saves\\Preferences\\" + textfound + ".txt"), get, put, seek
+
+	put : loadedsavepref, "Gen_Ver_", 1
 	put : loadedsavepref, pos.x
 	put : loadedsavepref, pos.y
 	put : loadedsavepref, headcolour
 	put : loadedsavepref, bgcolour
 	put : loadedsavepref, blockcolour
 	put : loadedsavepref, blocksize
-	put : loadedsavepref, -1234
-	put : loadedsavepref, -1234
 	put : loadedsavepref, groundlevel
 	put : loadedsavepref, mstScrnHsGnUp
 	put : loadedsavepref, mstScrnHsGnDwn
@@ -750,7 +760,7 @@ procedure saveWorld
 	seek : autosave, 0
 	loop
 	    get : autosave, autocoords
-	    if block (autocoords) then
+	    if isBlock (decodeX (autocoords), decodeY (autocoords), "any") then %later, "not void"
 		put : saveFile, autocoords
 	    end if
 	    exit when eof (autosave)
@@ -795,28 +805,31 @@ procedure showWorld ()
     end loop
 end showWorld
 
-%Screen scroll
-procedure screenscroll (scrdirx : real, scrdiry : real)
-    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-    offsetleftright += scrdirx
-    offsetupdown += scrdiry
+procedure UpdateMostTravelled
     if offsetupdown + toGameCdMeasure (maxy div 2) > mstScrnHsGnUp then
 	mstScrnHsGnUp := ceil (offsetupdown + toGameCdMeasure (maxy div 2))
     end if
     if offsetupdown - toGameCdMeasure (maxy div 2) < mstScrnHsGnDwn then
 	mstScrnHsGnDwn := floor (offsetupdown - toGameCdMeasure (maxy div 2))
     end if
-    if offsetleftright + toGameCdMeasure (maxx div 2) > mstScrnHsGnRght then
-	mstScrnHsGnRght := ceil (offsetleftright + toGameCdMeasure (maxx div 2))
+    if offsetleftright > mstScrnHsGnRght then
+	mstScrnHsGnRght := ceil (offsetleftright)
     end if
-    if offsetleftright - toGameCdMeasure (maxx div 2) < mstScrnHsGnLft then
-	mstScrnHsGnLft := floor (offsetleftright - toGameCdMeasure (maxx div 2))
+    if offsetleftright - toGameCdMeasure (maxx) < mstScrnHsGnLft then
+	mstScrnHsGnLft := floor (offsetleftright - toGameCdMeasure (maxx))
     end if
-    seek : autosave, *
+end UpdateMostTravelled
+
+%Screen scroll
+procedure screenscroll (scrdirx : real, scrdiry : real)
+    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+    offsetleftright += scrdirx
+    offsetupdown += scrdiry
+    UpdateMostTravelled
 
     %Generate new ground
 	var x, y : int
-    if scrdirx = 0 and scrdiry > 0 and toGameCdYR (0) - 1 < 0 then %Screen up, make ground below
+    if scrdirx = 0 and scrdiry > 0 and toGameCdYR (0) - 1 < 0 then  %Screen up, make ground below
 	x := toGameCdXR (0) - 1
 	y := toGameCdYR (0) - 1
 	loop
@@ -828,7 +841,7 @@ procedure screenscroll (scrdirx : real, scrdiry : real)
 	    x += 1
 	    exit when x > toGameCdX (maxx)
 	end loop
-    elsif scrdirx < 0 and scrdiry = 0 and toGameCdYR (0) - 1 < 0 then %Screen left, make ground right
+    elsif scrdirx < 0 and scrdiry = 0 and toGameCdYR (0) - 1 < 0 then  %Screen left, make ground right
 	x := toGameCdXR (maxx)
 	y := toGameCdYR (0) - 1
 	loop
@@ -840,7 +853,7 @@ procedure screenscroll (scrdirx : real, scrdiry : real)
 	    y += 1
 	    exit when y >= 0
 	end loop
-    elsif scrdirx > 0 and scrdiry = 0 and toGameCdYR (0) - 1 < 0 then %Screen right, make ground left
+    elsif scrdirx > 0 and scrdiry = 0 and toGameCdYR (0) - 1 < 0 then  %Screen right, make ground left
 	x := toGameCdXR (0) - 1
 	y := toGameCdYR (0) - 1
 	loop
@@ -905,49 +918,114 @@ procedure DisableAndHideGUIs
     GUI.Quit
 end DisableAndHideGUIs
 
+procedure CenterCamera
+    offsetleftright := -pos.x + toGameCdMeasure (maxx div 2)
+    offsetupdown := -pos.y + toGameCdMeasure (pxscrollclearance) %maxy div 2) - charheight
+    UpdateMostTravelled
+end CenterCamera
+
+procedure ClampOffsetToScreen
+    if toScrnCdXR (leftSide ()) < pxscrollclearance then
+	offsetleftright += toGameCdMeasure (pxscrollclearance - toScrnCdXR (leftSide ()))
+    elsif toScrnCdXR (rightSide ()) > maxx - pxscrollclearance then
+	offsetleftright -= toGameCdMeasure (toScrnCdXR (rightSide ()) - (maxx - pxscrollclearance))
+    end if
+    if toScrnCdYR (pos.y) < pxscrollclearance then
+	offsetupdown += toGameCdMeasure (pxscrollclearance - toScrnCdYR (pos.y))
+    elsif toScrnCdYR (topSide ()) > maxy - pxscrollclearance then
+	offsetupdown -= toGameCdMeasure (toScrnCdYR (topSide ()) - (maxy - pxscrollclearance))
+    end if
+    UpdateMostTravelled
+end ClampOffsetToScreen
+
 %Get preferences
 procedure GetPreferences
     if loaded then
 	open : loadedsave, ("Saves\\" + loadfile + ".txt"), get, put, seek, mod
 	open : loadedsavepref, ("Saves\\Preferences\\" + loadfile + ".txt"), get, put, seek, mod
 	seek : loadedsavepref, 0
-	get : loadedsavepref, pos.x
-	get : loadedsavepref, pos.y
-	if headcolour = 983 then
-	    get : loadedsavepref, headcolour
+
+	var instring : string
+	get : loadedsavepref, instring
+	if strrealok (instring) then
+	    genVersion := 0
 	else
-	    get : loadedsavepref, nullreal
+	    genVersion := strint (instring (9 .. *))
 	end if
-	if bgcolour = 983 then
-	    get : loadedsavepref, bgcolour
-	else
+
+	if genVersion = 0 then
+	    pos.x := strreal (instring)
+	    get : loadedsavepref, pos.y
+	    if headcolour = 983 then
+		get : loadedsavepref, headcolour
+	    else
+		get : loadedsavepref, nullreal
+	    end if
+	    if bgcolour = 983 then
+		get : loadedsavepref, bgcolour
+	    else
+		get : loadedsavepref, nullreal
+	    end if
+	    if blockcolour = 983 then
+		get : loadedsavepref, blockcolour
+	    else
+		get : loadedsavepref, nullreal
+	    end if
+	    if keepmapblocksize then
+		get : loadedsavepref, blocksize
+	    else
+		get : loadedsavepref, nullreal
+	    end if
 	    get : loadedsavepref, nullreal
-	end if
-	if blockcolour = 983 then
-	    get : loadedsavepref, blockcolour
-	else
 	    get : loadedsavepref, nullreal
-	end if
-	if keepmapblocksize then
-	    get : loadedsavepref, blocksize
-	else
+	    get : loadedsavepref, groundlevel
 	    get : loadedsavepref, nullreal
+	    mstScrnHsGnUp := round (nullreal + toGameCdMeasure (maxy div 2))
+	    get : loadedsavepref, nullreal
+	    mstScrnHsGnDwn := round (nullreal - toGameCdMeasure (maxy div 2))
+	    get : loadedsavepref, nullreal
+	    mstScrnHsGnLft := round (nullreal - toGameCdMeasure (maxx div 2))
+	    get : loadedsavepref, nullreal
+	    mstScrnHsGnRght := round (nullreal + toGameCdMeasure (maxx div 2))
+	    get : loadedsavepref, offsetupdown
+	    offsetupdown /= blocksize
+	    get : loadedsavepref, offsetleftright
+	    offsetleftright /= blocksize
+	    get : loadedsavepref, health
+	    get : loadedsavepref, survival
+	elsif genVersion = 1 then
+	    get : loadedsavepref, pos.x
+	    get : loadedsavepref, pos.y
+	    if headcolour = 983 then
+		get : loadedsavepref, headcolour
+	    else
+		get : loadedsavepref, nullreal
+	    end if
+	    if bgcolour = 983 then
+		get : loadedsavepref, bgcolour
+	    else
+		get : loadedsavepref, nullreal
+	    end if
+	    if blockcolour = 983 then
+		get : loadedsavepref, blockcolour
+	    else
+		get : loadedsavepref, nullreal
+	    end if
+	    if keepmapblocksize then
+		get : loadedsavepref, blocksize
+	    else
+		get : loadedsavepref, nullreal
+	    end if
+	    get : loadedsavepref, groundlevel
+	    get : loadedsavepref, mstScrnHsGnUp
+	    get : loadedsavepref, mstScrnHsGnDwn
+	    get : loadedsavepref, mstScrnHsGnLft
+	    get : loadedsavepref, mstScrnHsGnRght
+	    get : loadedsavepref, offsetupdown
+	    get : loadedsavepref, offsetleftright
+	    get : loadedsavepref, health
+	    get : loadedsavepref, survival
 	end if
-	get : loadedsavepref, nullreal %Garbage, to delete after fileconverter is done.
-	get : loadedsavepref, nullreal %Garbage, to delete after fileconverter is done.
-	get : loadedsavepref, groundlevel
-	get : loadedsavepref, nullreal
-	mstScrnHsGnUp := round (nullreal)
-	get : loadedsavepref, nullreal
-	mstScrnHsGnDwn := round (nullreal)
-	get : loadedsavepref, nullreal
-	mstScrnHsGnLft := round (nullreal)
-	get : loadedsavepref, nullreal
-	mstScrnHsGnRght := round (nullreal)
-	get : loadedsavepref, offsetupdown
-	get : loadedsavepref, offsetleftright
-	get : loadedsavepref, health
-	get : loadedsavepref, survival
 	close : loadedsavepref
     else
 	if headcolour = 983 then
@@ -959,7 +1037,11 @@ procedure GetPreferences
 	if blockcolour = 983 then
 	    blockcolour := black
 	end if
+	CenterCamera
     end if
+
+    ClampOffsetToScreen
+
 end GetPreferences
 
 %Assign values to variables that are calculated using "blocksize"
@@ -970,8 +1052,6 @@ procedure AssignStartingVariables
     crosshairspb2 := Pic.Scale (crosshairspbpre2, blocksize, blocksize)
     Pic.SetTransparentColor (crosshairsbb2, 7)
     Pic.SetTransparentColor (crosshairspb2, 7)
-    offsetleftright := round (pos.x + toGameCdMeasure (maxx div 2)) %REMOVE THESE ROUNDS WHEN CODE IS WORKING
-    offsetupdown := (pos.y + toBlock(toGameCdMeasure (pxscrollclearance)))
 end AssignStartingVariables
 
 %Generate world
@@ -985,10 +1065,10 @@ procedure GenerateWorld
 	if eof (loadedsave) = false then
 	    loop
 		get : loadedsave, textfound
-		block (strint (textfound)) := true
+		setBlock (decodeX (strint (textfound)), decodeY (strint (textfound)), "dirt")
 		put : autosave, textfound
-		var xInd : int := decodeX (strint (textfound), false)
-		var yInd : int := decodeY (strint (textfound), false)
+		var xInd : int := decodeX (strint (textfound))
+		var yInd : int := decodeY (strint (textfound))
 		if firstblock then
 		    firstblock := false
 		    rightest := xInd
@@ -1058,14 +1138,19 @@ procedure WorldPreview
 	    if eof (autosave) = false then
 		loop
 		    get : autosave, autocoords
-		    if block (autocoords) then
-			var x : int := decodeX (autocoords, false) + offsetprevlr + (midx - midx div 16)
-			var y : int := decodeY (autocoords, false) + offsetprevud + (midy - midy div 16)
+		    if isBlock (decodeX (autocoords), decodeY (autocoords), "any") then
+			var x : int := decodeX (autocoords) + offsetprevlr + (midx - midx div 16)
+			var y : int := decodeY (autocoords) + offsetprevud + (midy - midy div 16)
 			Draw.Dot (x, y, blockcolour)
 		    end if
 		    exit when eof (autosave)
 		end loop
 	    end if
+	    var x1 : int := mstScrnHsGnLft + offsetprevlr + (midx - midx div 16)
+	    var y1 : int := mstScrnHsGnDwn + offsetprevud + (midy - midy div 16)
+	    var x2 : int := mstScrnHsGnRght + offsetprevlr + (midx - midx div 16)
+	    var y2 : int := mstScrnHsGnUp + offsetprevud + (midy - midy div 16)
+	    Draw.Box (x1, y1, x2, y2, brightred)
 	    View.Update
 	    if arrow ('a') or arrow (KEY_LEFT_ARROW) then
 		offsetprevlr -= 10
@@ -1158,13 +1243,7 @@ procedure KeyAndParallelInput
 	setBlock (pos.x, pos.y, "air")
     end if
     if arrow ('o') then
-	locate (1, 1)
-	put encode (pos.x, pos.y)
-	View.Update
-	delay (5000)
-
-	pos.y -= 0.5
-	oldPos.y -= 0.5
+	screenscroll (0, 0.01)
     end if
 
     %If parallel port input is enabled
@@ -1194,17 +1273,17 @@ end KeyAndParallelInput
 %Screen sliding
 procedure ScreenSlide
     seek : autosave, 0
-    if eof (autosave) = false and (toScrnCdXR (leftSide ()) <= pxscrollclearance or toScrnCdXR (rightSide ()) >= maxx - pxscrollclearance
-	    or toScrnCdYR (pos.y) <= pxscrollclearance or toScrnCdYR (topSide ()) >= maxy - pxscrollclearance) then
-	if toScrnCdXR (leftSide ()) <= pxscrollclearance then
-	    screenscroll (pxscrollclearance - toScrnCdXR (leftSide ()), 0)
-	elsif toScrnCdXR (rightSide ()) >= maxx - pxscrollclearance then
-	    screenscroll (- (toScrnCdXR (rightSide ()) - (maxx - pxscrollclearance)), 0)
+    if eof (autosave) = false and (toScrnCdXR (leftSide ()) < pxscrollclearance or toScrnCdXR (rightSide ()) > maxx - pxscrollclearance
+	    or toScrnCdYR (pos.y) < pxscrollclearance or toScrnCdYR (topSide ()) > maxy - pxscrollclearance) then
+	if toScrnCdXR (leftSide ()) < pxscrollclearance then
+	    screenscroll (toGameCdMeasure (pxscrollclearance - toScrnCdXR (leftSide ())), 0)
+	elsif toScrnCdXR (rightSide ()) > maxx - pxscrollclearance then
+	    screenscroll (-toGameCdMeasure (toScrnCdXR (rightSide ()) - (maxx - pxscrollclearance)), 0)
 	end if
-	if toScrnCdYR (pos.y) <= pxscrollclearance then
-	    screenscroll (0, pxscrollclearance - toScrnCdYR (pos.y))
-	elsif toScrnCdYR (topSide ()) >= maxy - pxscrollclearance then
-	    screenscroll (0, - (toScrnCdYR (topSide ()) - (maxy - pxscrollclearance)))
+	if toScrnCdYR (pos.y) < pxscrollclearance then
+	    screenscroll (0, toGameCdMeasure (pxscrollclearance - toScrnCdYR (pos.y)))
+	elsif toScrnCdYR (topSide ()) > maxy - pxscrollclearance then
+	    screenscroll (0, -toGameCdMeasure (toScrnCdYR (topSide ()) - (maxy - pxscrollclearance)))
 	end if
     else
 	seek : autosave, *
@@ -2124,10 +2203,6 @@ procedure resetVariables
     mclickl := 0
     guidecolour := 0
     offsetleftright := 0
-    mstScrnHsGnLft := 0
-    mstScrnHsGnRght := 0
-    mstScrnHsGnUp := 0
-    mstScrnHsGnDwn := 0
     offsetprevlr := 0
     offsetprevud := 0
     offsetupdown := 0
@@ -2192,6 +2267,10 @@ procedure resetVariables
 	    setBlock (i, i2, "void")
 	end for
     end for
+    mstScrnHsGnLft := 0
+    mstScrnHsGnRght := 0
+    mstScrnHsGnUp := 0
+    mstScrnHsGnDwn := 0
 end resetVariables
 
 %Entire program loop
@@ -2419,12 +2498,12 @@ loop
 	IfDeadGameOver
 
 	locate (1, 1)
-	put offsetupdown
-	%put pos.x, ", ", pos.y
-	/*put offsetleftright, "   ", pos.x, " ", pos.y
-	 put encode (pos.x, pos.y)
-	 put encodeVec (asBlock (pos.x, pos.y))
-	 put isBlock (leftSide (), pos.y)*/
+	put toGameCdMeasure (maxx div 2)
+	put offsetleftright
+	put mstScrnHsGnRght, ", ", mstScrnHsGnLft
+	put toGameCdXR (xm), ", ", toGameCdYR (ym)
+	%put pos.x, " ", pos.y
+	%put pos.y, " ", toBlock (pos.y), " ", offsetupdown, " ", toGameCdYR (0)
 	%Drawing debug character inhabited boxes
 
 
