@@ -13,7 +13,7 @@ setscreen ("noecho")
 
 %Declaration Statements
 %Constant declarations
-const midx : int := maxx div 2 
+const midx : int := maxx div 2
 const midy : int := maxy div 2
 const boolUnInit := 16#FF
 const numblockscanjump : real := 2.3
@@ -106,6 +106,8 @@ var loadingScreen : int := Pic.Scale (loadingScreen1, maxx - 20, maxy - 20)
 var charwidth : int := Pic.Width (stand)
 var charheight : int := Pic.Height (stand)
 var arrow : array char of boolean
+var deltaTime : int
+var gametimeold : int := 0
 var charx : int := midx + 2
 var chary : int := 200
 var backpic : int := Pic.New (0, 0, 2, 2)
@@ -824,13 +826,33 @@ end AssignBlocksizeVariables
 %Generate world
 procedure GenerateWorld
     if loaded then %Load world
+	var rightest, leftest, downest : int
+	var firstblock : boolean := true
 	seek : loadedsave, 0
 	if eof (loadedsave) = false then
 	    loop
 		get : loadedsave, textfound
 		block (strint (textfound)) := true
-		x := (strint (textfound) - (floor (strint (textfound) / 10000) * 10000) - 4999) * blocksize + offsetleftright
-		y := (floor (strint (textfound) / 10000) - 2499) * blocksize + offsetupdown
+		var xInd : int := strint (textfound) - (floor (strint (textfound) / 10000) * 10000) - 4999
+		var yInd : int := floor (strint (textfound) / 10000) - 2499
+		if firstblock then
+		    firstblock := false
+		    rightest := xInd
+		    leftest := xInd
+		    downest := yInd
+		else
+		    if xInd < leftest then
+			leftest := xInd
+		    end if
+		    if xInd > rightest then
+			rightest := xInd
+		    end if
+		    if yInd < downest then
+			downest := yInd
+		    end if
+		end if
+		x := xInd * blocksize + offsetleftright
+		y := yInd * blocksize + offsetupdown
 		Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
 		put : autosave, textfound
 		exit when eof (loadedsave)
@@ -838,6 +860,20 @@ procedure GenerateWorld
 	    textfound := loadfile
 	end if
 	close : loadedsave
+
+	%Turn the "void"s in the loaded world into proper "0"s.
+	for i : leftest .. rightest
+	    var startFilling : boolean := false
+	    for i2 : downest .. groundlevel
+		tempcoords (1) := ((i2 + 2499) * 10000) + (i + 4999)
+		if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) = true then
+		    startFilling := true
+		end if
+		if startFilling and #block (tempcoords (1)) = boolUnInit then
+		    block (tempcoords (1)) := false
+		end if
+	    end for
+	end for
     else %Generate ground
 	x := 0
 	y := 0
@@ -1216,7 +1252,6 @@ procedure AimGuideMovement
     end if
 
     norcursorinput := false
-    %Draw.Line (charx, handheight, round(charx + xinc * tempi), round(handheight + yinc * tempi), brightgreen)
     if Math.Distance (charx, handheight, xm, ym) < Math.Distance (charx, handheight, charx + xinc * tempi, handheight + yinc * tempi) then
 	rcursorxbb := (floor ((xm - offsetx) / blocksize)) * blocksize + offsetx
 	rcursorybb := (floor ((ym - offsety) / blocksize)) * blocksize + offsety
@@ -1374,31 +1409,31 @@ procedure PressDKey
 	if keys and onground or mustcrawl then
 	    if flying then
 		if movegap / 2 = movegap div 2 and not onrightwall then
-		    charx += 1
+		    charx += 1 * deltaTime
 		end if
 	    else
 		if movegap = 0 and not onrightwall then
-		    charx += 1
+		    charx += 1 * deltaTime
 		end if
 	    end if
 	elsif sprintd then
 	    if flying then
 		if not onrightwall then
-		    charx += 1
+		    charx += 1 * deltaTime
 		end if
 	    else
 		if (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and not onrightwall then
-		    charx += 1
+		    charx += 1 * deltaTime
 		end if
 	    end if
 	else
 	    if flying then
 		if movegap / 2 = movegap div 2 and not onrightwall then
-		    charx += 1
+		    charx += 1 * deltaTime
 		end if
 	    else
 		if (movegap = 0 or movegap = 8) and not onrightwall then
-		    charx += 1
+		    charx += 1 * deltaTime
 		end if
 	    end if
 	end if
@@ -1439,32 +1474,32 @@ procedure PressAKey
 	if keys and onground or mustcrawl then
 	    if flying then
 		if movegap / 2 = movegap div 2 and not onleftwall then
-		    charx -= 1
+		    charx -= 1 * deltaTime
 		end if
 	    else
 		if movegap = 0 and not onleftwall then
-		    charx -= 1
+		    charx -= 1 * deltaTime
 		end if
 	    end if
 	else
 	    if sprinta then
 		if flying then
 		    if not onleftwall then
-			charx -= 1
+			charx -= 1 * deltaTime
 		    end if
 		else
 		    if (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and not onleftwall then
-			charx -= 1
+			charx -= 1 * deltaTime
 		    end if
 		end if
 	    else
 		if flying then
 		    if movegap / 2 = movegap div 2 and not onleftwall then
-			charx -= 1
+			charx -= 1 * deltaTime
 		    end if
 		else
 		    if (movegap = 0 or movegap = 8) and not onleftwall then
-			charx -= 1
+			charx -= 1 * deltaTime
 		    end if
 		end if
 	    end if
@@ -1493,13 +1528,12 @@ end PressAKey
 procedure PressSpaceKey
     if keyspc and health > 0 and (onground or flying) and mustcrawl = false and hitceiling = false then
 	if flying then
-	    chary += 1
+	    chary += 1 * deltaTime
 	else
 	    jumpcount := jumpheight
 	end if
     end if
 end PressSpaceKey
-
 
 %If 's' key is pressed
 procedure PressSKey
@@ -1511,7 +1545,7 @@ procedure PressSKey
 		action := "crawlingstop"
 	    end if
 	elsif flying then
-	    chary -= 1
+	    chary -= 1 * deltaTime
 	end if
     end if
 end PressSKey
@@ -1522,22 +1556,24 @@ procedure CharJump
 	if jumpcount = jumpheight then
 	    facing := ""
 	end if
-	if jumpcount not= 0 then
+	if jumpcount > 0 then
 	    action := "jumping"
 	    if hitceiling then
 		jumpcount := 0
 	    else
 		if (movegap = 0 or movegap = 3 or movegap = 5 or movegap = 8 or movegap = 10 or movegap = 13) and jumpcount >= 18 then
-		    chary += 1
-		    jumpcount -= 1
+		    chary += 1 * deltaTime
+		    jumpcount -= 1 * deltaTime
 		elsif (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and jumpcount >= 9 and jumpcount < 18 then
-		    chary += 1
-		    jumpcount -= 1
+		    chary += 1 * deltaTime
+		    jumpcount -= 1 * deltaTime
 		elsif (movegap = 0 or movegap = 8) and jumpcount < 9 then
-		    chary += 1
-		    jumpcount -= 1
+		    chary += 1 * deltaTime
+		    jumpcount -= 1 * deltaTime
 		end if
 	    end if
+	elsif jumpcount < 0 then
+	    jumpcount := 0
 	end if
     end if
 end CharJump
@@ -1547,20 +1583,20 @@ procedure Gravity
     if onground = false and jumpcount = 0 and flying = false then
 	action := "falling"
 	if (movegap = 0 or movegap = 8) and gravcount < 9 then
-	    chary -= 1
-	    gravcount += 1
+	    chary -= 1 * deltaTime
+	    gravcount += 1 * deltaTime
 	elsif (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and gravcount >= 9 and gravcount < 18 then
-	    chary -= 1
-	    gravcount += 1
+	    chary -= 1 * deltaTime
+	    gravcount += 1 * deltaTime
 	elsif (movegap = 0 or movegap = 3 or movegap = 5 or movegap = 8 or movegap = 10 or movegap = 13) and gravcount >= 18 and gravcount < 30 then
-	    chary -= 1
-	    gravcount += 1
+	    chary -= 1 * deltaTime
+	    gravcount += 1 * deltaTime
 	elsif (movegap = 0 or movegap = 2 or movegap = 4 or movegap = 6 or movegap = 8 or movegap = 10 or movegap = 12 or movegap = 14) and gravcount >= 30 and gravcount < 70 then
-	    chary -= 1
-	    gravcount += 1
+	    chary -= 1 * deltaTime
+	    gravcount += 1 * deltaTime
 	elsif gravcount >= 70 then
-	    chary -= 1
-	    gravcount += 1
+	    chary -= 1 * deltaTime
+	    gravcount += 1 * deltaTime
 	end if
     end if
 
@@ -2140,6 +2176,12 @@ loop
 
     %Game program loop
     loop
+	deltaTime := Time.Elapsed - gametimeold
+	gametimeold := Time.Elapsed
+	if deltaTime > 100 or deltaTime < 1 then
+	    deltaTime := 1
+	end if
+deltaTime := 1
 
 	CharPointCoords
 
@@ -2244,7 +2286,7 @@ loop
 		movegaptens := 1
 	    end if
 	end if
-	delay (0) %This delay to be adjusted with screen size and computer performance speed.
+
     end loop
     if quitthegame then
 	exit
