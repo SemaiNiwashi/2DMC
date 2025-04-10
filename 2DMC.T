@@ -707,6 +707,72 @@ else %Generate ground
     textfound := ""
 end if
 
+%Generate one row of below-screen ground if screen is at it's lowest.
+if mstScrnHsGnUp = groundlevel then
+    x := -blocksize + offsetx
+    y := -blocksize + offsety
+    loop
+	tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	if #block (tempcoords (1)) = boolUnInit then
+	    block (tempcoords (1)) := false
+	end if
+	if block (tempcoords (1)) not= true then %If it has never gone down this far before
+	    blkount += 1
+	    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+	    block (tempcoords (1)) := true
+	    put : autosave, tempcoords (1)
+	end if
+	x += blocksize
+	exit when x >= maxx
+    end loop
+    x := 0
+    y := 0
+end if
+
+%Generate one row of to-the-right-of-screen ground if screen is at the furthest it has gone right.
+if mstScrnHsGnLft = offsetleftright then
+    x := ((floor ((maxx - offsetx) / blocksize)) * blocksize + offsetx)
+    y := -blocksize + offsety
+    loop
+	tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	if #block (tempcoords (1)) = boolUnInit then
+	    block (tempcoords (1)) := false
+	end if
+	if block (tempcoords (1)) not= true then %If it has never gone right this far before
+	    blkount += 1
+	    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+	    block (tempcoords (1)) := true
+	    put : autosave, tempcoords (1)
+	end if
+	y += blocksize
+	exit when y >= groundlevel
+    end loop
+    x := 0
+    y := 0
+end if
+
+%Generate one row of to-the-left-of-screen ground if screen is at the furthest it has gone left.
+if mstScrnHsGnRght = offsetleftright then
+    x := -blocksize + offsetx
+    y := -blocksize + offsety
+    loop
+	tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	if #block (tempcoords (1)) = boolUnInit then
+	    block (tempcoords (1)) := false
+	end if
+	if block (tempcoords (1)) not= true then %If it has never gone left this far before
+	    blkount += 1
+	    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), Rand.Int (33, 55))     %blockcolour)
+	    block (tempcoords (1)) := true
+	    put : autosave, tempcoords (1)
+	end if
+	y += blocksize
+	exit when y >= groundlevel
+    end loop
+    x := 0
+    y := 0
+end if
+
 %Screen scroll
 procedure screenscroll (scrdirx : int, scrdiry : int)
     Draw.FillBox (0, 0, maxx, maxy, bgcolour)
@@ -743,9 +809,8 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 
     %Generate new ground
     if scrdirx = 0 and scrdiry = 1 and groundlevel > 0 then  %Screen up, make ground below
-	%Error where a block the user breaks near the bottom is re-generated
-	x := -blocksize + offsetx
-	y := -blocksize + offsety %-blocksize - blocksize + offsety
+	x := -blocksize - blocksize + offsetx
+	y := -blocksize - blocksize + offsety
 	loop
 	    tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
 	    if #block (tempcoords (1)) = boolUnInit then
@@ -758,12 +823,11 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 		put : autosave2, tempcoords (1)
 	    end if
 	    x += blocksize
-	    exit when x >= maxx
+	    exit when x >= maxx + blocksize
 	end loop
 	x := 0
 	y := 0
     elsif scrdirx = -1 and scrdiry = 0 and groundlevel > 0 then  %Screen left, make ground right
-	%Once observed an error caused by the following line where a block did not generate
 	x := ((floor ((maxx - offsetx) / blocksize)) * blocksize + offsetx) + blocksize
 	y := -blocksize + offsety
 	loop
@@ -772,6 +836,25 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 		block (tempcoords (1)) := false
 	    end if
 	    if mstScrnHsGnLft = offsetleftright and block (tempcoords (1)) not= true then %If it has never gone right this far before
+		blkount += 1
+		Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+		block (tempcoords (1)) := true
+		put : autosave2, tempcoords (1)
+	    end if
+	    y += blocksize
+	    exit when y >= groundlevel
+	end loop
+	x := 0
+	y := 0
+    elsif scrdirx = 1 and scrdiry = 0 and groundlevel > 0 then  %Screen right, make ground left
+	x := -blocksize - blocksize + offsetx
+	y := -blocksize + offsety
+	loop
+	    tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	    if #block (tempcoords (1)) = boolUnInit then
+		block (tempcoords (1)) := false
+	    end if
+	    if mstScrnHsGnRght = offsetleftright and block (tempcoords (1)) not= true then %If it has never gone left this far before
 		blkount += 1
 		Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), Rand.Int (33, 55)) %blockcolour)
 		block (tempcoords (1)) := true
@@ -782,8 +865,6 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
 	end loop
 	x := 0
 	y := 0
-    elsif scrdirx = 1 and scrdiry = 0 and groundlevel > 0 then  %Screen right, make ground left
-
     end if
 end screenscroll
 
@@ -815,6 +896,7 @@ loop
     rcharxr := (floor ((charx + charwidth div 2 - offsetx) / blocksize)) * blocksize + offsetx
     rcharyu := (floor ((chary + charheight + 1 - offsety) / blocksize)) * blocksize + offsety
     rcharyuceil := (ceil ((chary + charheight + 1 - offsety) / blocksize)) * blocksize + offsety
+
     rcharydfloor := (floor ((chary - offsety) / blocksize)) * blocksize + offsety
 
     %If character must crawl
