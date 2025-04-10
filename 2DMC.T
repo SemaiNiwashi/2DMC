@@ -702,165 +702,107 @@ end if
 %Screen scroll up
 procedure screenup
     Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-    seek : autosave, *
-    tell : autosave, endspot
     seek : autosave, 0
-
-    locate (1, 1)
-    put "hi1"
-    View.UpdateArea (0, maxy - 20, 30, maxy)
-    delay (4000)
+    open : autosave2, ("Autosave2.txt"), get, put, seek
+    seek : autosave2, 0
     loop
 	get : autosave, autocoords
 	if block (strint (autocoords)) then
 	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
 	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
-	    /*locate (4, 1)
-	     put srx
-	     put sry
-	     View.Update*/
 	    tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry + 1 + 4999)
 	    block (strint (autocoords)) := false
 	    block (tempcoords (1)) := true
-	    tell : autosave, shiftspot
-	    seek : autosave, *
-	    put : autosave, tempcoords (1)
-	    seek : autosave, shiftspot
+	    put : autosave2, tempcoords (1)
 	    Draw.FillBox (srx, sry + 1, srx + (blocksize - 1), (sry + 1) + (blocksize - 1), blockcolour)
-	    %View.Update
-	    %delay (10)
 	end if
-	if shiftspot >= endspot then
-	    exit
-	end if
+	exit when eof (autosave)
     end loop
     srx := 0
     sry := 0
     seek : autosave, *
 	offsety += 1
     groundlevel += 1
+    close : autosave2
 end screenup
 
 %Screen scroll down
 procedure screendown
     Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-    seek : autosave, *
-    tell : autosave, endspot
     seek : autosave, 0
+    open : autosave2, ("Autosave2.txt"), get, put, seek
+    seek : autosave2, 0
     loop
 	get : autosave, autocoords
 	if block (strint (autocoords)) then
 	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
 	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
-	end if
-	tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry + 4999)
-	tempcoords (2) := 100000000 + (srx + 24999) * 10000 + (sry - 1 + 4999)
-	if #block (tempcoords (1)) = boolUnInit then
-	    block (tempcoords (1)) := false
-	end if
-	if block (tempcoords (1)) then
-	    block (tempcoords (1)) := false
-	    block (tempcoords (2)) := true
-	    tell : autosave, shiftspot
-	    seek : autosave, *
-	    put : autosave, tempcoords (2)
-	    seek : autosave, shiftspot
+	    tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry - 1 + 4999)
+	    block (strint (autocoords)) := false
+	    block (tempcoords (1)) := true
+	    put : autosave2, tempcoords (1)
 	    Draw.FillBox (srx, sry - 1, srx + (blocksize - 1), (sry - 1) + (blocksize - 1), blockcolour)
 	end if
-	if shiftspot >= endspot then
-	    exit
-	end if
+	exit when eof (autosave)
     end loop
     srx := 0
     sry := 0
     seek : autosave, *
 	offsety -= 1
     groundlevel -= 1
+    close : autosave2
 end screendown
 
 %Screen scroll right
 procedure screenright
     Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-    seek : autosave, *
-    tell : autosave, endspot
     seek : autosave, 0
+    open : autosave2, ("Autosave2.txt"), get, put, seek
+    seek : autosave2, 0
     loop
 	get : autosave, autocoords
 	if block (strint (autocoords)) then
 	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
 	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
-	end if
-	tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry + 4999)
-	tempcoords (2) := 100000000 + (srx + 1 + 24999) * 10000 + (sry + 4999)
-	if #block (tempcoords (1)) = boolUnInit then
-	    block (tempcoords (1)) := false
-	end if
-	if block (tempcoords (1)) then
-	    block (tempcoords (1)) := false
-	    block (tempcoords (2)) := true
-	    tell : autosave, shiftspot
-	    seek : autosave, *
-	    put : autosave, tempcoords (2)
-	    seek : autosave, shiftspot
+	    tempcoords (1) := 100000000 + (srx + 1 + 24999) * 10000 + (sry + 4999)
+	    block (strint (autocoords)) := false
+	    block (tempcoords (1)) := true
+	    put : autosave2, tempcoords (1)
 	    Draw.FillBox (srx + 1, sry, (srx + 1) + (blocksize - 1), sry + (blocksize - 1), blockcolour)
 	end if
-	if shiftspot >= endspot then
-	    exit
-	end if
+	exit when eof (autosave)
     end loop
     srx := 0
     sry := 0
     seek : autosave, *
 	offsetx += 1
-
-
-
-    if groundlevel >= 0 then
-
-
-
-
-
-
-    end if
-
-
+    close : autosave2
 end screenright
 
 %Screen scroll left
 procedure screenleft
     Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-    seek : autosave, *
-    tell : autosave, endspot
     seek : autosave, 0
+    open : autosave2, ("Autosave2.txt"), get, put, seek
+    seek : autosave2, 0
     loop
 	get : autosave, autocoords
 	if block (strint (autocoords)) then
 	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
 	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
-	end if
-	tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry + 4999)
-	tempcoords (2) := 100000000 + (srx - 1 + 24999) * 10000 + (sry + 4999)
-	if #block (tempcoords (1)) = boolUnInit then
-	    block (tempcoords (1)) := false
-	end if
-	if block (tempcoords (1)) then
-	    block (tempcoords (1)) := false
-	    block (tempcoords (2)) := true
-	    tell : autosave, shiftspot
-	    seek : autosave, *
-	    put : autosave, tempcoords (2)
-	    seek : autosave, shiftspot
+	    tempcoords (1) := 100000000 + (srx - 1 + 24999) * 10000 + (sry + 4999)
+	    block (strint (autocoords)) := false
+	    block (tempcoords (1)) := true
+	    put : autosave2, tempcoords (1)
 	    Draw.FillBox (srx - 1, sry, (srx - 1) + (blocksize - 1), sry + (blocksize - 1), blockcolour)
 	end if
-	if shiftspot >= endspot then
-	    exit
-	end if
+	exit when eof (autosave)
     end loop
     srx := 0
     sry := 0
     seek : autosave, *
 	offsetx -= 1
+    close : autosave2
 end screenleft
 
 %Show world
@@ -1543,15 +1485,8 @@ loop
 	end if
 
 	%Update autosave file with new moved coordinates
-	open : autosave2, ("Autosave2.txt"), get, put, seek
+	open : autosave2, ("Autosave2.txt"), get, put, seek, mod
 	seek : autosave, 0
-	loop
-	    get : autosave, autocoords
-	    if block (strint (autocoords)) then
-		put : autosave2, autocoords
-	    end if
-	    exit when eof (autosave)
-	end loop
 	close : autosave
 	open : autosave, ("Autosave.txt"), get, put, seek
 	seek : autosave2, 0
