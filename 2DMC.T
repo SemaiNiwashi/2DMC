@@ -114,15 +114,18 @@ var facing, oldfacing : string := ""
 var headcolour, bgcolour, blockcolour : int := 983
 var ponwlk, poncrl, movegaptens, isaves : int := 1
 var item1, item2, item3 : array 1 .. 16 of int
-var item4, item5 : array 1 .. 99 of int
+var item4 : array 0 .. 99 of int
+var item5 : array 1 .. 99 of int
 var oktosavenew, inmainmenu, forcedelete : boolean := true
 var previoussaves : array 1 .. 99 of string (30)
 var xinc, yinc, reach : real
 var groundlevel : int := 50
 var menuitemcolours : array 1 .. 16 of string (20) :=
     init ("Default", "White", "Light Grey", "Dark Grey", "Black", "Brown", "Red", "Orange", "Yellow", "Green", "Dark Green", "Turquoise", "Blue", "Dark Blue", "Purple", "Pink")
-var menuitemsaves, menuitemdelete : array 1 .. 99 of string (50)
+var menuitemsaves : array 0 .. 99 of string (50)
+var menuitemdelete : array 1 .. 99 of string (50)
 menuitemsaves (1) := "New"
+menuitemsaves (0) := "---"
 menuitemdelete (99) := ""
 
 %Turn the integer value of a colour into a string
@@ -425,7 +428,9 @@ process guis
 	item5 (i) := GUI.CreateMenuItem (menuitemdelete (i), DeleteSelected)
     end for
     menuload := GUI.CreateMenu ("Load")
-    for i : 1 .. isaves
+    item4 (1) := GUI.CreateMenuItem (menuitemsaves (1), LoadSelected)
+    item4 (0) := GUI.CreateMenuItem (menuitemsaves (0), LoadSelected)
+    for i : 2 .. isaves
 	item4 (i) := GUI.CreateMenuItem (menuitemsaves (i), LoadSelected)
     end for
     loop
