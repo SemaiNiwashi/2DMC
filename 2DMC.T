@@ -108,7 +108,7 @@ var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, bloc
     iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2,
     crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety, offsetleftright, mstScrnHsGnLft, mstScrnHsGnRght : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
-    mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput, keyspc, keya, keys, keyd, keyp, preview : boolean := false
+    mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput, keyspc, keya, keys, keyd, keyp, preview, inmainmenu : boolean := false
 var action : string := "standing"
 var loadfile, textfound, autocoords, deletesaveread, nullget, headcolourstr, bgcolourstr, blockcolourstr, tempcolourstr : string
 var facing, oldfacing : string := ""
@@ -117,7 +117,7 @@ var ponwlk, poncrl, movegaptens, isaves : int := 1
 var item1, item2, item3 : array 1 .. 16 of int
 var item4 : array 0 .. 99 of int
 var item5 : array 1 .. 99 of int
-var oktosavenew, inmainmenu, forcedelete : boolean := true
+var oktosavenew, frstmthrgh, forcedelete : boolean := true
 var previoussaves : array 1 .. 99 of string (30)
 var xinc, yinc, reach : real
 var groundlevel : int := 50
@@ -415,30 +415,32 @@ end LoadSelected
 
 %The GUIs that are used for main and pause menus
 process guis
-    btnstrt := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Start Game", start, 30, chr (13), false)
+    if frstmthrgh then
+	btnstrt := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Start Game", start, 30, chr (13), false)
 
-    menuhead := GUI.CreateMenu ("Head Colour")
-    for i : 1 .. 16
-	item1 (i) := GUI.CreateMenuItem (menuitemcolours (i), HeadSelected)
-    end for
-    menubg := GUI.CreateMenu ("Background Colour")
-    for i : 1 .. 16
-	item2 (i) := GUI.CreateMenuItem (menuitemcolours (i), BackgroundSelected)
-    end for
-    menublk := GUI.CreateMenu ("Block Colour")
-    for i : 1 .. 16
-	item3 (i) := GUI.CreateMenuItem (menuitemcolours (i), BlocksSelected)
-    end for
-    menudelete := GUI.CreateMenu ("Delete")
-    for i : 1 .. isaves - 1
-	item5 (i) := GUI.CreateMenuItem (menuitemdelete (i), DeleteSelected)
-    end for
-    menuload := GUI.CreateMenu ("Load")
-    item4 (1) := GUI.CreateMenuItem (menuitemsaves (1), LoadSelected)
-    item4 (0) := GUI.CreateMenuItem (menuitemsaves (0), LoadSelected)
-    for i : 2 .. isaves
-	item4 (i) := GUI.CreateMenuItem (menuitemsaves (i), LoadSelected)
-    end for
+	menuhead := GUI.CreateMenu ("Head Colour")
+	for i : 1 .. 16
+	    item1 (i) := GUI.CreateMenuItem (menuitemcolours (i), HeadSelected)
+	end for
+	menubg := GUI.CreateMenu ("Background Colour")
+	for i : 1 .. 16
+	    item2 (i) := GUI.CreateMenuItem (menuitemcolours (i), BackgroundSelected)
+	end for
+	menublk := GUI.CreateMenu ("Block Colour")
+	for i : 1 .. 16
+	    item3 (i) := GUI.CreateMenuItem (menuitemcolours (i), BlocksSelected)
+	end for
+	menudelete := GUI.CreateMenu ("Delete")
+	for i : 1 .. isaves - 1
+	    item5 (i) := GUI.CreateMenuItem (menuitemdelete (i), DeleteSelected)
+	end for
+	menuload := GUI.CreateMenu ("Load")
+	item4 (1) := GUI.CreateMenuItem (menuitemsaves (1), LoadSelected)
+	item4 (0) := GUI.CreateMenuItem (menuitemsaves (0), LoadSelected)
+	for i : 2 .. isaves
+	    item4 (i) := GUI.CreateMenuItem (menuitemsaves (i), LoadSelected)
+	end for
+    end if
     loop
 	if startgame = true then
 	    exit
@@ -446,12 +448,6 @@ process guis
 	exit when GUI.ProcessEvent
     end loop
 end guis
-
-
-
-
-
-
 
 %Welcome screen
 Draw.Text ("Welcome to 2DMC!", midx - Font.Width ("Welcome to 2DMC!", font1) div 2, midy - 20, font1, black)
@@ -480,72 +476,8 @@ cls
 
 forcedelete := false
 
-%Set colour-change-detecting variables
-if bgcolour = 983 then
-    oldbackcolour := white
-else
-    oldbackcolour := bgcolour
-end if
-if blockcolour = 983 then
-    oldblockcolour := black
-else
-    oldblockcolour := blockcolour
-end if
-
-%Clear and open autosave file
-open : autosave, ("Autosave.txt"), get, put, seek
-
-%open text file of all saved files' names
-open : savenames, ("Savenames.txt"), get, put, seek, mod
-
-%Create a list of all saved files' names
-loop
-    isaves += 1
-    get : savenames, menuitemsaves (isaves) : *
-    menuitemdelete (isaves - 1) := (menuitemsaves (isaves))
-    exit when eof (savenames)
-end loop
-
-%Run the GUIs to be used in main and pause menus
-fork guis
-
-%Show colour preview as default
-Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
-Draw.Text ("Default head", 1, maxy - 90, font2, black)
-Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
-Draw.Text ("Default background", 100, maxy - 90, font2, black)
-Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
-Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
-
-%Wait until user clicks "start" button
-loop
-    exit when startgame = true
-end loop
-
-%close text file of all saved files' names
-close : savenames
-
-%Set program variables and disable and hide all GUIs
-inmainmenu := false
-startgame := false
-GUI.Disable (menuload)
-GUI.Disable (item1 (1))
-GUI.Disable (item2 (1))
-GUI.Disable (item3 (1))
-GUI.Hide (btnstrt)
-GUI.HideMenuBar
-GUI.Quit
-cls
-
-%Allows for smooth animation
-View.Set ("offscreenonly")
-
 %Beginning loading screen
-if bgcolour = 983 then
-    loading (white)
-else
-    loading (bgcolour)
-end if
+loading (white)
 
 %Declaration statement for the array of blocks: down here because it takes a really long time
 var block : array 100000000 .. 499999999 of boolean
@@ -730,193 +662,284 @@ procedure updateAutosave
     end loop
 end updateAutosave
 
-%Get preferences
-if loaded then
-    open : loadedsave, ("Saves\\" + loadfile + ".txt"), get, put, seek, mod
-    open : loadedsavepref, ("Preferences\\" + loadfile + ".txt"), get, put, seek, mod
-    seek : loadedsavepref, 0
-    get : loadedsavepref, charx
-    get : loadedsavepref, chary
-    if headcolour = 983 then
-	get : loadedsavepref, headcolour
-    else
-	get : loadedsavepref, nullget
-    end if
-    if bgcolour = 983 then
-	get : loadedsavepref, bgcolour
-    else
-	get : loadedsavepref, nullget
-    end if
-    if blockcolour = 983 then
-	get : loadedsavepref, blockcolour
-    else
-	get : loadedsavepref, nullget
-    end if
-    get : loadedsavepref, blocksize
-    get : loadedsavepref, offsetx
-    get : loadedsavepref, offsety
-    get : loadedsavepref, groundlevel
-    get : loadedsavepref, mstScrnHsGnUp
-    get : loadedsavepref, mstScrnHsGnLft
-    get : loadedsavepref, mstScrnHsGnRght
-    close : loadedsavepref
+%Set colour-change-detecting variables
+if bgcolour = 983 then
+    oldbackcolour := white
 else
-    if headcolour = 983 then
-	headcolour := white
-    end if
-    if bgcolour = 983 then
-	bgcolour := white
-    end if
-    if blockcolour = 983 then
-	blockcolour := black
-    end if
-    groundlevel := ((floor ((groundlevel - offsetx) / blocksize)) * blocksize + offsetx)
-    mstScrnHsGnUp := groundlevel
+    oldbackcolour := bgcolour
+end if
+if blockcolour = 983 then
+    oldblockcolour := black
+else
+    oldblockcolour := blockcolour
 end if
 
-%Assign values to variables that are calculated using "blocksize"
-crosshairsbb := Pic.Scale (crosshairsbbpre, blocksize, blocksize)
-crosshairsbb2 := Pic.Scale (crosshairsbbpre2, blocksize, blocksize)
-crosshairspb := Pic.Scale (crosshairspbpre, blocksize, blocksize)
-crosshairspb2 := Pic.Scale (crosshairspbpre2, blocksize, blocksize)
-Pic.SetTransparentColor (crosshairsbb2, 7)
-Pic.SetTransparentColor (crosshairspb2, 7)
-jumpheight := round (numblockscanjump * blocksize)
-reach := numblockscanreach * blocksize
-%Update background colour
-Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+%Clear and open autosave file
+open : autosave, ("Autosave.txt"), get, put, seek
 
-if loaded then %Load world
-    if eof (loadedsave) = false then
-	seek : loadedsave, 0
-	loop
-	    get : loadedsave, textfound
-	    block (strint (textfound)) := true
-	    x := floor (strint (textfound) / 10000) - 19999 - 10000
-	    y := strint (textfound) - (floor (strint (textfound) / 10000)) * 10000 - 4999
-	    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
-	    put : autosave, textfound
-	    exit when eof (loadedsave)
-	end loop
-	textfound := loadfile
+loop
+
+    close : autosave
+    %Clear and open autosave file
+    open : autosave, ("Autosave.txt"), get, put, seek
+    cls
+
+    %Disables buffer drawing
+    View.Set ("nooffscreenonly")
+
+    %Re-enables start GUIs
+    if frstmthrgh = false then
+	GUI.Enable (menuload)
+	GUI.Enable (item1 (1))
+	GUI.Enable (item2 (1))
+	GUI.Enable (item3 (1))
+	GUI.Show (btnstrt)
+	GUI.ShowMenuBar
+	GUI.ResetQuit
+	GUI.Refresh
     end if
-    x := 0
-    y := 0
-    loaded := false
-    close : loadedsave
-else %Generate ground
+
+    inmainmenu := true
+    isaves := 1
+
+    %open text file of all saved files' names
+    open : savenames, ("Savenames.txt"), get, put, seek, mod
+
+    %Create a list of all saved files' names
     loop
-	blkount += 1
-	Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
-	tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
-	block (tempcoords (1)) := true
-	put : autosave, tempcoords (1)
-	x += blocksize
-	if x >= maxx then
-	    x := 0
-	    y += blocksize
-	end if
-	exit when y >= blocksize * 3
+	isaves += 1
+	get : savenames, menuitemsaves (isaves) : *
+	menuitemdelete (isaves - 1) := (menuitemsaves (isaves))
+	exit when eof (savenames)
     end loop
-    x := 0
-    y := 0
-    textfound := ""
-end if
 
-if preview = false then
-    %Generate one row of below-screen ground if screen is at it's lowest.
-    if mstScrnHsGnUp = groundlevel then
-	x := -blocksize + offsetx
-	y := -blocksize + offsety
-	loop
-	    tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
-	    if #block (tempcoords (1)) = boolUnInit then
-		block (tempcoords (1)) := false
-	    end if
-	    if block (tempcoords (1)) not= true then %If it has never gone down this far before
-		blkount += 1
+    %Run the GUIs to be used in main and pause menus
+    fork guis
+
+    %Show colour preview as default
+    Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
+    Draw.Text ("Default head", 1, maxy - 90, font2, black)
+    Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
+    Draw.Text ("Default background", 100, maxy - 90, font2, black)
+    Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
+    Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
+
+    preview := false
+
+    %Wait until user clicks "start" button
+    loop
+	exit when startgame = true
+    end loop
+
+    %close text file of all saved files' names
+    close : savenames
+
+    %Set program variables and disable and hide all GUIs
+    inmainmenu := false
+    startgame := false
+    GUI.Disable (menuload)
+    GUI.Disable (item1 (1))
+    GUI.Disable (item2 (1))
+    GUI.Disable (item3 (1))
+    GUI.Hide (btnstrt)
+    GUI.HideMenuBar
+    GUI.Quit
+    cls
+
+    %Allows for smooth animation
+    View.Set ("offscreenonly")
+
+    %Second loading screen
+    loading (white)
+
+    %Get preferences
+    if loaded then
+	open : loadedsave, ("Saves\\" + loadfile + ".txt"), get, put, seek, mod
+	open : loadedsavepref, ("Preferences\\" + loadfile + ".txt"), get, put, seek, mod
+	seek : loadedsavepref, 0
+	get : loadedsavepref, charx
+	get : loadedsavepref, chary
+	if headcolour = 983 then
+	    get : loadedsavepref, headcolour
+	else
+	    get : loadedsavepref, nullget
+	end if
+	if bgcolour = 983 then
+	    get : loadedsavepref, bgcolour
+	else
+	    get : loadedsavepref, nullget
+	end if
+	if blockcolour = 983 then
+	    get : loadedsavepref, blockcolour
+	else
+	    get : loadedsavepref, nullget
+	end if
+	get : loadedsavepref, blocksize
+	get : loadedsavepref, offsetx
+	get : loadedsavepref, offsety
+	get : loadedsavepref, groundlevel
+	get : loadedsavepref, mstScrnHsGnUp
+	get : loadedsavepref, mstScrnHsGnLft
+	get : loadedsavepref, mstScrnHsGnRght
+	close : loadedsavepref
+    else
+	if headcolour = 983 then
+	    headcolour := white
+	end if
+	if bgcolour = 983 then
+	    bgcolour := white
+	end if
+	if blockcolour = 983 then
+	    blockcolour := black
+	end if
+	groundlevel := ((floor ((groundlevel - offsetx) / blocksize)) * blocksize + offsetx)
+	mstScrnHsGnUp := groundlevel
+    end if
+
+    %Assign values to variables that are calculated using "blocksize"
+    crosshairsbb := Pic.Scale (crosshairsbbpre, blocksize, blocksize)
+    crosshairsbb2 := Pic.Scale (crosshairsbbpre2, blocksize, blocksize)
+    crosshairspb := Pic.Scale (crosshairspbpre, blocksize, blocksize)
+    crosshairspb2 := Pic.Scale (crosshairspbpre2, blocksize, blocksize)
+    Pic.SetTransparentColor (crosshairsbb2, 7)
+    Pic.SetTransparentColor (crosshairspb2, 7)
+    jumpheight := round (numblockscanjump * blocksize)
+    reach := numblockscanreach * blocksize
+    %Update background colour
+    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+
+    if loaded then %Load world
+	if eof (loadedsave) = false then
+	    seek : loadedsave, 0
+	    loop
+		get : loadedsave, textfound
+		block (strint (textfound)) := true
+		x := floor (strint (textfound) / 10000) - 19999 - 10000
+		y := strint (textfound) - (floor (strint (textfound) / 10000)) * 10000 - 4999
 		Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
-		block (tempcoords (1)) := true
-		put : autosave, tempcoords (1)
-	    end if
+		put : autosave, textfound
+		exit when eof (loadedsave)
+	    end loop
+	    textfound := loadfile
+	end if
+	x := 0
+	y := 0
+	loaded := false
+	close : loadedsave
+    else %Generate ground
+	loop
+	    blkount += 1
+	    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+	    tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
+	    block (tempcoords (1)) := true
+	    put : autosave, tempcoords (1)
 	    x += blocksize
-	    exit when x >= maxx
+	    if x >= maxx then
+		x := 0
+		y += blocksize
+	    end if
+	    exit when y >= blocksize * 3
 	end loop
 	x := 0
 	y := 0
+	textfound := ""
     end if
 
-    %Generate one row of to-the-right-of-screen ground if screen is at the furthest it has gone right.
-    if mstScrnHsGnLft = offsetleftright then
-	x := ((floor ((maxx - offsetx) / blocksize)) * blocksize + offsetx)
-	y := -blocksize + offsety
-	loop
-	    tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
-	    if #block (tempcoords (1)) = boolUnInit then
-		block (tempcoords (1)) := false
-	    end if
-	    if block (tempcoords (1)) not= true then %If it has never gone right this far before
-		blkount += 1
-		Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
-		block (tempcoords (1)) := true
-		put : autosave, tempcoords (1)
-	    end if
-	    y += blocksize
-	    exit when y >= groundlevel
-	end loop
-	x := 0
-	y := 0
+    if preview = false then
+	%Generate one row of below-screen ground if screen is at it's lowest.
+	if mstScrnHsGnUp = groundlevel then
+	    x := -blocksize + offsetx
+	    y := -blocksize + offsety
+	    loop
+		tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
+		if #block (tempcoords (1)) = boolUnInit then
+		    block (tempcoords (1)) := false
+		end if
+		if block (tempcoords (1)) not= true then %If it has never gone down this far before
+		    blkount += 1
+		    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+		    block (tempcoords (1)) := true
+		    put : autosave, tempcoords (1)
+		end if
+		x += blocksize
+		exit when x >= maxx
+	    end loop
+	    x := 0
+	    y := 0
+	end if
+
+	%Generate one row of to-the-right-of-screen ground if screen is at the furthest it has gone right.
+	if mstScrnHsGnLft = offsetleftright then
+	    x := ((floor ((maxx - offsetx) / blocksize)) * blocksize + offsetx)
+	    y := -blocksize + offsety
+	    loop
+		tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
+		if #block (tempcoords (1)) = boolUnInit then
+		    block (tempcoords (1)) := false
+		end if
+		if block (tempcoords (1)) not= true then %If it has never gone right this far before
+		    blkount += 1
+		    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+		    block (tempcoords (1)) := true
+		    put : autosave, tempcoords (1)
+		end if
+		y += blocksize
+		exit when y >= groundlevel
+	    end loop
+	    x := 0
+	    y := 0
+	end if
+
+	%Generate one row of to-the-left-of-screen ground if screen is at the furthest it has gone left.
+	if mstScrnHsGnRght = offsetleftright then
+	    x := -blocksize + offsetx
+	    y := -blocksize + offsety
+	    loop
+		tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
+		if #block (tempcoords (1)) = boolUnInit then
+		    block (tempcoords (1)) := false
+		end if
+		if block (tempcoords (1)) not= true then %If it has never gone left this far before
+		    blkount += 1
+		    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), Rand.Int (33, 55)) %blockcolour)
+		    block (tempcoords (1)) := true
+		    put : autosave, tempcoords (1)
+		end if
+		y += blocksize
+		exit when y >= groundlevel
+	    end loop
+	    x := 0
+	    y := 0
+	end if
     end if
 
-    %Generate one row of to-the-left-of-screen ground if screen is at the furthest it has gone left.
-    if mstScrnHsGnRght = offsetleftright then
-	x := -blocksize + offsetx
-	y := -blocksize + offsety
-	loop
-	    tempcoords (1) := 100000000 + (x + 19999) * 10000 + (y + 4999)
-	    if #block (tempcoords (1)) = boolUnInit then
-		block (tempcoords (1)) := false
-	    end if
-	    if block (tempcoords (1)) not= true then %If it has never gone left this far before
-		blkount += 1
-		Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), Rand.Int (33, 55)) %blockcolour)
-		block (tempcoords (1)) := true
-		put : autosave, tempcoords (1)
-	    end if
-	    y += blocksize
-	    exit when y >= groundlevel
-	end loop
-	x := 0
-	y := 0
+    %World preview feature
+    if preview then
+	cls
+	seek : autosave, 0
+	if eof (autosave) = false then
+	    loop
+		get : autosave, autocoords
+		if block (strint (autocoords)) then
+		    x := (floor (strint (autocoords) / 10000) - 19999 - 10000) div blocksize + (midx - midx div 16)
+		    y := (strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999) div blocksize + (midy - midy div 16)
+		    Draw.Dot (x, y, blockcolour)
+		end if
+		exit when eof (autosave)
+	    end loop
+	end if
+	View.Update
+	delay (5000)
     end if
-end if
+
+    frstmthrgh := false
+    if preview = false then
+	exit
+    end if
+end loop
 
 %Show world
 View.Update
-
-
-
-
-%World preview feature
-if preview then
-    seek : autosave, 0
-    if eof (autosave) = false then
-	loop
-	    get : autosave, autocoords
-	    if block (strint (autocoords)) then
-		x := (floor (strint (autocoords) / 10000) - 19999 - 10000) div 16
-		y := (strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999) div 16
-		Draw.Dot (x, y, blockcolour)
-	    end if
-	    exit when eof (autosave)
-	    View.Update
-	end loop
-    end if
-    quit
-end if
-
-
-
 
 %Main program
 loop
