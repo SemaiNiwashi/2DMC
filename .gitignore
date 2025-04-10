@@ -1,0 +1,10 @@
+# Ignore extraneous stuff
+ByanSaves/
+OldVersions/
+/*.bmp
+/*.rtf
+
+# ignore all .T files
+*.T
+# but do track 2DMC.T
+!2DMC.T
