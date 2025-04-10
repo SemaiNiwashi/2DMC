@@ -697,10 +697,8 @@ else %Generate ground
     textfound := ""
 end if
 
-%Error: Offsets the first block in the autosave file (that has not been glitch-offset) up one when the character is actively falling and then places a block over their head and then breaks it.
-
-%Screen scroll up
-procedure screenup
+%Screen scroll
+procedure screenscroll (scrdirx : int, scrdiry : int)
     Draw.FillBox (0, 0, maxx, maxy, bgcolour)
     seek : autosave, 0
     open : autosave2, ("Autosave2.txt"), get, put, seek
@@ -710,100 +708,21 @@ procedure screenup
 	if block (strint (autocoords)) then
 	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
 	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
-	    tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry + 1 + 4999)
+	    tempcoords (1) := 100000000 + (srx + scrdirx + 24999) * 10000 + (sry + scrdiry + 4999)
 	    block (strint (autocoords)) := false
 	    block (tempcoords (1)) := true
 	    put : autosave2, tempcoords (1)
-	    Draw.FillBox (srx, sry + 1, srx + (blocksize - 1), (sry + 1) + (blocksize - 1), blockcolour)
+	    Draw.FillBox (srx + scrdirx, sry + scrdiry, srx + scrdirx + (blocksize - 1), sry + scrdiry + (blocksize - 1), blockcolour)
 	end if
 	exit when eof (autosave)
     end loop
     srx := 0
     sry := 0
     seek : autosave, *
-	offsety += 1
-    groundlevel += 1
-    close : autosave2
-end screenup
-
-%Screen scroll down
-procedure screendown
-    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-    seek : autosave, 0
-    open : autosave2, ("Autosave2.txt"), get, put, seek
-    seek : autosave2, 0
-    loop
-	get : autosave, autocoords
-	if block (strint (autocoords)) then
-	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
-	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
-	    tempcoords (1) := 100000000 + (srx + 24999) * 10000 + (sry - 1 + 4999)
-	    block (strint (autocoords)) := false
-	    block (tempcoords (1)) := true
-	    put : autosave2, tempcoords (1)
-	    Draw.FillBox (srx, sry - 1, srx + (blocksize - 1), (sry - 1) + (blocksize - 1), blockcolour)
-	end if
-	exit when eof (autosave)
-    end loop
-    srx := 0
-    sry := 0
-    seek : autosave, *
-	offsety -= 1
-    groundlevel -= 1
-    close : autosave2
-end screendown
-
-%Screen scroll right
-procedure screenright
-    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-    seek : autosave, 0
-    open : autosave2, ("Autosave2.txt"), get, put, seek
-    seek : autosave2, 0
-    loop
-	get : autosave, autocoords
-	if block (strint (autocoords)) then
-	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
-	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
-	    tempcoords (1) := 100000000 + (srx + 1 + 24999) * 10000 + (sry + 4999)
-	    block (strint (autocoords)) := false
-	    block (tempcoords (1)) := true
-	    put : autosave2, tempcoords (1)
-	    Draw.FillBox (srx + 1, sry, (srx + 1) + (blocksize - 1), sry + (blocksize - 1), blockcolour)
-	end if
-	exit when eof (autosave)
-    end loop
-    srx := 0
-    sry := 0
-    seek : autosave, *
-	offsetx += 1
-    close : autosave2
-end screenright
-
-%Screen scroll left
-procedure screenleft
-    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-    seek : autosave, 0
-    open : autosave2, ("Autosave2.txt"), get, put, seek
-    seek : autosave2, 0
-    loop
-	get : autosave, autocoords
-	if block (strint (autocoords)) then
-	    srx := floor (strint (autocoords) / 10000) - 24999 - 10000
-	    sry := strint (autocoords) - (floor (strint (autocoords) / 10000)) * 10000 - 4999
-	    tempcoords (1) := 100000000 + (srx - 1 + 24999) * 10000 + (sry + 4999)
-	    block (strint (autocoords)) := false
-	    block (tempcoords (1)) := true
-	    put : autosave2, tempcoords (1)
-	    Draw.FillBox (srx - 1, sry, (srx - 1) + (blocksize - 1), sry + (blocksize - 1), blockcolour)
-	end if
-	exit when eof (autosave)
-    end loop
-    srx := 0
-    sry := 0
-    seek : autosave, *
-	offsetx -= 1
-    close : autosave2
-end screenleft
+	offsetx += scrdirx
+    offsety += scrdiry
+    groundlevel += scrdiry
+end screenscroll
 
 %Show world
 View.Update
@@ -964,16 +883,22 @@ loop
 		rcursorypb := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
 		norcursorinput := true
 	    end if
-	else
-	    null := ((floor ((charx + xinc * i) / blocksize)) * blocksize)
-	    null := ((floor ((handheight + yinc * i) / blocksize)) * blocksize)
+	else %This is just to slow it down so that there is the same delay wether you are looking at a block or not. I am not convinced that it is nessecary.
+	    null := ((floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize) + offsetx
+	    null := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
+	    null := rcursorxbb
+	    null := rcursorybb
 	    null := 100000000 + (rcursorxbb + 24999) * 10000 + (rcursorybb + 4999)
+	    if #block (null) = boolUnInit then
+		null := 0
+	    end if
 	    if block (null) then
 		null := i
 		null := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
 		null := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
 		null := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
 		null := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
+		null := 1
 	    end if
 	end if
     end for
@@ -1458,18 +1383,18 @@ loop
     seek : autosave, 0
     if eof (autosave) = false and (charx <= 20 or charx >= maxx - 20 or chary <= 20 or chary + charheight >= maxy - 20) then
 	if charx <= 20 then
-	    screenright %fork?
+	    screenscroll (1, 0) %fork?
 	    charx += 1
 	elsif charx >= maxx - 20 then
-	    screenleft %fork?
+	    screenscroll (-1, 0)  %fork?
 	    charx -= 1
 	end if
 	if chary <= 20 then
-	    screenup %fork?
+	    screenscroll (0, 1)  %fork?
 	    chary += 1
 	elsif chary + charheight >= maxy - 20 then
+	    screenscroll (0, -1) %fork?
 	    chary -= 1
-	    screendown %fork?
 	end if
 
 	%reset x and y offsets
@@ -1485,11 +1410,10 @@ loop
 	end if
 
 	%Update autosave file with new moved coordinates
-	open : autosave2, ("Autosave2.txt"), get, put, seek, mod
-	seek : autosave, 0
+	seek : autosave2, 0
 	close : autosave
 	open : autosave, ("Autosave.txt"), get, put, seek
-	seek : autosave2, 0
+	seek : autosave, 0
 	loop
 	    get : autosave2, autocoords
 	    put : autosave, autocoords
