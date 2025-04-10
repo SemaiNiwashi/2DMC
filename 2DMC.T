@@ -654,43 +654,8 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
     end loop
 end screenscroll
 
-%Set colour-change-detecting variables
-if bgcolour = 983 then
-    oldbackcolour := white
-else
-    oldbackcolour := bgcolour
-end if
-if blockcolour = 983 then
-    oldblockcolour := black
-else
-    oldblockcolour := blockcolour
-end if
-
-%open text file of all saved files' names
-open : savenames, ("Savenames.txt"), get, put, seek, mod
-
-%Create a list of all saved files' names
-if eof (savenames) = false then
-    loop
-	isaves += 1
-	get : savenames, menuitemsaves (isaves) : *
-	menuitemdelete (isaves - 1) := (menuitemsaves (isaves))
-	exit when eof (savenames)
-    end loop
-end if
-
-%close text file of all saved files' names
-close : savenames
-
-loop
-    %Clear and open autosave file
-    open : autosave, ("Autosave.txt"), get, put, seek
-    cls
-
-    %Disables buffer drawing
-    View.Set ("nooffscreenonly")
-
-    %Re-enables start GUIs
+%Re-enables start GUIs
+procedure ReEnableStartGUIs
     if frstmthrgh = false then
 	Pic.Draw (backpic, 0, maxy - 210, picCopy)
 	GUI.Enable (menuload)
@@ -704,13 +669,10 @@ loop
 	GUI.ResetQuit
 	GUI.Refresh
     end if
+end ReEnableStartGUIs
 
-    inmainmenu := true
-
-    %Run the GUIs to be used in main and pause menus
-    fork guis
-
-    %Show colour preview as default
+%Show colour preview as default
+procedure ShowColourPreveiwDefault
     if frstmthrgh then
 	Draw.Text ("DEFAULT", 25, maxy - 55, font2, black)
 	Draw.Text ("Default head", 1, maxy - 90, font2, black)
@@ -721,44 +683,10 @@ loop
 	locate (13, 1)
 	put "World: New"
     end if
+end ShowColourPreveiwDefault
 
-    %Wait until user clicks "start" button
-    loop
-	exit when startgame
-    end loop
-
-    %Save main menu screen
-    Pic.Free (backpic)
-    backpic := Pic.New (0, maxy - 210, 340, maxy - 35)
-
-    %Get preview checkbox state
-    if GUI.GetCheckBox (cbprev) then
-	preview := true
-    else
-	preview := false
-    end if
-
-    %Get canfly checkbox state
-    if GUI.GetCheckBox (cbfly) then
-	canfly := true
-    else
-	canfly := false
-    end if
-
-    %Set default indicators
-    if bgcolour = 983 then
-	resetdefaultbg := true
-    end if
-    if headcolour = 983 then
-	resetdefaulthead := true
-    end if
-    if blockcolour = 983 then
-	resetdefaultblk := true
-    end if
-
-    %Set program variables and disable and hide all GUIs
-    inmainmenu := false
-    startgame := false
+%Disable and hide all GUIs
+procedure DisableAndHideGUIs
     GUI.Disable (menuload)
     GUI.Disable (item1 (1))
     GUI.Disable (item2 (1))
@@ -768,15 +696,10 @@ loop
     GUI.Hide (btnstrt)
     GUI.HideMenuBar
     GUI.Quit
-    cls
+end DisableAndHideGUIs
 
-    %Allows for smooth animation
-    View.Set ("offscreenonly")
-
-    %Second loading screen
-    loading (white)
-
-    %Get preferences
+%Get preferences
+procedure GetPreferences
     if loaded then
 	open : loadedsave, ("Saves\\" + loadfile + ".txt"), get, put, seek, mod
 	open : loadedsavepref, ("Preferences\\" + loadfile + ".txt"), get, put, seek, mod
@@ -835,8 +758,10 @@ loop
 	groundlevel := ((floor ((groundlevel) / blocksize)) * blocksize)
 	mstScrnHsGnUp := groundlevel
     end if
+end GetPreferences
 
-    %Assign values to variables that are calculated using "blocksize"
+%Assign values to variables that are calculated using "blocksize"
+procedure AssignBlocksizeVariables
     crosshairsbb := Pic.Scale (crosshairsbbpre, blocksize, blocksize)
     crosshairsbb2 := Pic.Scale (crosshairsbbpre2, blocksize, blocksize)
     crosshairspb := Pic.Scale (crosshairspbpre, blocksize, blocksize)
@@ -845,10 +770,10 @@ loop
     Pic.SetTransparentColor (crosshairspb2, 7)
     jumpheight := round (numblockscanjump * blocksize)
     reach := numblockscanreach * blocksize
+end AssignBlocksizeVariables
 
-    %Update background colour
-    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-
+%Generate world
+procedure GenerateWorld
     if loaded then %Load world
 	seek : loadedsave, 0
 	if eof (loadedsave) = false then
@@ -882,7 +807,10 @@ loop
 	end loop
 	textfound := ""
     end if
+end GenerateWorld
 
+%Generate out-of-screen blocks
+procedure GenerateOutScreenBlocks
     if preview = false then
 	%Generate one row of below-screen ground if screen is at it's lowest.
 	if mstScrnHsGnUp = offsetupdown + groundlevel then
@@ -932,8 +860,10 @@ loop
 	    end loop
 	end if
     end if
+end GenerateOutScreenBlocks
 
-    %World preview feature
+%World preview feature
+procedure WorldPreview
     if preview then
 	cls
 	loop
@@ -984,6 +914,150 @@ loop
 	end if
 	close : autosave
     end if
+end WorldPreview
+/*
+ procedure
+
+ end
+ /*
+ procedure
+
+ end
+ /*
+ procedure
+
+ end
+ /*
+ procedure
+
+ end
+ /*
+ procedure
+
+ end
+ /*
+ procedure
+
+ end
+ /*
+ procedure
+
+ end
+ /*
+ procedure
+
+ end
+ /*
+ procedure
+
+ end
+ */
+
+%Set colour-change-detecting variables
+if bgcolour = 983 then
+    oldbackcolour := white
+else
+    oldbackcolour := bgcolour
+end if
+if blockcolour = 983 then
+    oldblockcolour := black
+else
+    oldblockcolour := blockcolour
+end if
+
+%open text file of all saved files' names
+open : savenames, ("Savenames.txt"), get, put, seek, mod
+
+%Create a list of all saved files' names
+if eof (savenames) = false then
+    loop
+	isaves += 1
+	get : savenames, menuitemsaves (isaves) : *
+	menuitemdelete (isaves - 1) := (menuitemsaves (isaves))
+	exit when eof (savenames)
+    end loop
+end if
+
+%close text file of all saved files' names
+close : savenames
+
+loop
+    %Clear and open autosave file
+    open : autosave, ("Autosave.txt"), get, put, seek
+    cls
+
+    %Disables buffer drawing
+    View.Set ("nooffscreenonly")
+
+    ReEnableStartGUIs
+
+    inmainmenu := true
+
+    %Run the GUIs to be used in main and pause menus
+    fork guis
+
+    ShowColourPreveiwDefault
+
+    %Wait until user clicks "start" button
+    loop
+	exit when startgame
+    end loop
+
+    %Save main menu screen
+    Pic.Free (backpic)
+    backpic := Pic.New (0, maxy - 210, 340, maxy - 35)
+
+    %Get preview checkbox state
+    if GUI.GetCheckBox (cbprev) then
+	preview := true
+    else
+	preview := false
+    end if
+
+    %Get canfly checkbox state
+    if GUI.GetCheckBox (cbfly) then
+	canfly := true
+    else
+	canfly := false
+    end if
+
+    %Set default indicators
+    if bgcolour = 983 then
+	resetdefaultbg := true
+    end if
+    if headcolour = 983 then
+	resetdefaulthead := true
+    end if
+    if blockcolour = 983 then
+	resetdefaultblk := true
+    end if
+
+    %Set program variables
+    inmainmenu := false
+    startgame := false
+
+    DisableAndHideGUIs
+
+    cls
+
+    %Allows for smooth animation
+    View.Set ("offscreenonly")
+
+    %Second loading screen
+    loading (white)
+
+    GetPreferences
+
+    AssignBlocksizeVariables
+
+    %Update background colour
+    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+
+    GenerateWorld
+
+    GenerateOutScreenBlocks
+
+    WorldPreview
 
     frstmthrgh := false
     if preview = false then
