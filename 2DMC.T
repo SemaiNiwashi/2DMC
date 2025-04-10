@@ -22,6 +22,7 @@ const doubletapspeed : int := 100
 const blockplacespeed : int := 130
 const blockbreakspeed : int := 130
 const charudpxrange := 0
+const parallelinput : boolean := false
 %Variable declarations
 var blocksize : int := 16 %Must be > 15
 var font1 := Font.New ("sans serif:40:bold")
@@ -102,12 +103,12 @@ var tempcoords : array 1 .. 5 of int
 var xm, ym, cm, s, character, rcharxl, rcharyd, rcharxr, rcharyu, rcursorxbb, rcursorybb, rcursorxpb, rcursorypb, rcharydfloor, rcharyuceil,
     btnstrt, btncont, btnend, savenames, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload, quitButton, nameTextField, nameLabel,
     oldbackcolour, saveFile, autosave, menudelete, oldblockcolour, handheight, tempi, linegx, linegy, idelete, null, backpiccross, backpicbox,
-    srx, sry, slx, sly, sux, suy, sdx, sdy, autosave2, shiftspot, endspot, mstScrnHsGnUp : int
+    srx, sry, slx, sly, sux, suy, sdx, sdy, autosave2, shiftspot, endspot, mstScrnHsGnUp, val : int
 var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y,
     iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2,
     crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety, offsetleftright, mstScrnHsGnLft, mstScrnHsGnRght : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
-    mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput : boolean := false
+    mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput, keyspc, keya, keys, keyd, keyp : boolean := false
 var action : string := "standing"
 var loadfile, textfound, autocoords, deletesaveread, nullget, headcolourstr, bgcolourstr, blockcolourstr, tempcolourstr : string
 var facing, oldfacing : string := ""
@@ -180,7 +181,9 @@ end endgame
 %Loading screen
 procedure loading (loadscreencolour : int)
     Draw.FillBox (0, 0, maxx, maxy, loadscreencolour)
+    colourback (loadscreencolour)
     put "LOADING..."
+    colourback (white)
     View.Update
 end loading
 
@@ -572,6 +575,10 @@ procedure saveWorld
 	put : loadedsavepref, blocksize
 	put : loadedsavepref, offsetx
 	put : loadedsavepref, offsety
+	put : loadedsavepref, groundlevel
+	put : loadedsavepref, mstScrnHsGnUp
+	put : loadedsavepref, mstScrnHsGnLft
+	put : loadedsavepref, mstScrnHsGnRght
 	close : loadedsavepref
 
 	open : saveFile, ("Saves\\" + textfound + ".txt"), get, put, seek
@@ -631,6 +638,10 @@ if loaded then
     get : loadedsavepref, blocksize
     get : loadedsavepref, offsetx
     get : loadedsavepref, offsety
+    get : loadedsavepref, groundlevel
+    get : loadedsavepref, mstScrnHsGnUp
+    get : loadedsavepref, mstScrnHsGnLft
+    get : loadedsavepref, mstScrnHsGnRght
     close : loadedsavepref
 else
     if headcolour = 983 then
@@ -642,11 +653,11 @@ else
     if blockcolour = 983 then
 	blockcolour := black
     end if
+    groundlevel := ((floor ((groundlevel - offsetx) / blocksize)) * blocksize + offsetx)
+    mstScrnHsGnUp := groundlevel
 end if
 
 %Assign values to variables that are calculated using "blocksize"
-groundlevel := ((floor ((groundlevel - offsetx) / blocksize)) * blocksize + offsetx)
-mstScrnHsGnUp := groundlevel
 crosshairsbb := Pic.Scale (crosshairsbbpre, blocksize, blocksize)
 crosshairsbb2 := Pic.Scale (crosshairsbbpre2, blocksize, blocksize)
 crosshairspb := Pic.Scale (crosshairspbpre, blocksize, blocksize)
@@ -723,33 +734,71 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
     if groundlevel > mstScrnHsGnUp then
 	mstScrnHsGnUp := groundlevel
     end if
-    /*
-     %Generate new ground
-     if scrdirx = 0 and scrdiry = 1 and groundlevel > 0 then %Screen up, make ground below
-     x := -blocksize + offsetx
-     y := -blocksize + offsety
-     loop
-     tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
-     if #block (tempcoords (1)) = boolUnInit then
-     block (tempcoords (1)) := false
-     end if
-     if mstScrnHsGnUp = groundlevel and block (tempcoords (1)) not= true then  %If it has never gone down this far before
-     blkount += 1
-     Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), Rand.Int (33, 55)) %blockcolour)
-     block (tempcoords (1)) := true
-     put : autosave2, tempcoords (1)
-     end if
-     x += blocksize
-     exit when x >= maxx
-     end loop
-     x := 0
-     y := 0
-     elsif scrdirx = 1 and scrdiry = 0 and groundlevel > 0 then %Screen left, make ground right
+    if offsetleftright > mstScrnHsGnRght then
+	mstScrnHsGnRght := offsetleftright
+    end if
+    if offsetleftright < mstScrnHsGnLft then
+	mstScrnHsGnLft := offsetleftright
+    end if
 
-     elsif scrdirx = -1 and scrdiry = 0 and groundlevel > 0 then %Screen right, make ground left
+    %Generate new ground
+    if scrdirx = 0 and scrdiry = 1 and groundlevel > 0 then  %Screen up, make ground below
+	%Error where a block the user breaks near the bottom is re-generated
+	x := -blocksize + offsetx
+	y := -blocksize + offsety %-blocksize - blocksize + offsety
+	loop
+	    tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	    if #block (tempcoords (1)) = boolUnInit then
+		block (tempcoords (1)) := false
+	    end if
+	    if mstScrnHsGnUp = groundlevel and block (tempcoords (1)) not= true then %If it has never gone down this far before
+		blkount += 1
+		Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+		block (tempcoords (1)) := true
+		put : autosave2, tempcoords (1)
+	    end if
+	    x += blocksize
+	    exit when x >= maxx
+	end loop
+	x := 0
+	y := 0
+    elsif scrdirx = -1 and scrdiry = 0 and groundlevel > 0 then  %Screen left, make ground right
+	%Once observed an error caused by the following line where a block did not generate
+	x := ((floor ((maxx - offsetx) / blocksize)) * blocksize + offsetx) + blocksize
+	y := -blocksize + offsety
+	loop
+	    tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	    if #block (tempcoords (1)) = boolUnInit then
+		block (tempcoords (1)) := false
+	    end if
+	    if mstScrnHsGnLft = offsetleftright and block (tempcoords (1)) not= true then %If it has never gone right this far before
+		blkount += 1
+		Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), Rand.Int (33, 55)) %blockcolour)
+		block (tempcoords (1)) := true
+		put : autosave2, tempcoords (1)
+	    end if
+	    y += blocksize
+	    exit when y >= groundlevel
+	end loop
+	x := 0
+	y := 0
+    elsif scrdirx = 1 and scrdiry = 0 and groundlevel > 0 then  %Screen right, make ground left
 
-     end if*/
+    end if
 end screenscroll
+
+%Update autosave file with new moved coordinates
+procedure updateAutosave
+    seek : autosave2, 0
+    close : autosave
+    open : autosave, ("Autosave.txt"), get, put, seek
+    seek : autosave, 0
+    loop
+	get : autosave2, autocoords
+	put : autosave, autocoords
+	exit when eof (autosave2)
+    end loop
+end updateAutosave
 
 %Show world
 View.Update
@@ -880,6 +929,53 @@ loop
     %Get keyboard input
     Input.KeyDown (arrow)
 
+    %Reset input variables
+    keyspc := false
+    keya := false
+    keys := false
+    keyd := false
+    keyp := false
+
+    %Assign input variables for keyboard
+    if arrow (' ') then
+	keyspc := true
+    end if
+    if arrow ('a') then
+	keya := true
+    end if
+    if arrow ('s') then
+	keys := true
+    end if
+    if arrow ('d') then
+	keyd := true
+    end if
+    if arrow ('p') then
+	keyp := true
+    end if
+
+    %If parallel port input is enabled
+    if parallelinput then
+	%Get parallel port input
+	val := parallelget
+
+	%Assign input variables for parallel port
+	if val = 1 or val = 1 + 2 then %Etc., etc., ...
+	    keyspc := true
+	end if
+	if val = 2 then
+	    keya := true
+	end if
+	if val = 3 then
+	    keys := true
+	end if
+	if val = 4 then
+	    keyd := true
+	end if
+	if val = 5 then
+	    keyp := true
+	end if
+    end if
+
     %Screen sliding
     seek : autosave, 0
     if eof (autosave) = false and (charx <= 20 or charx >= maxx - 20 or chary <= 20 or chary + charheight >= maxy - 20) then
@@ -887,16 +983,20 @@ loop
 	if charx <= 20 then
 	    screenscroll (1, 0)
 	    charx += 1
+	    updateAutosave
 	elsif charx >= maxx - 20 then
 	    screenscroll (-1, 0)
 	    charx -= 1
+	    updateAutosave
 	end if
 	if chary <= 20 then
 	    screenscroll (0, 1)
 	    chary += 1
+	    updateAutosave
 	elsif chary + charheight >= maxy - 20 then
 	    screenscroll (0, -1)
 	    chary -= 1
+	    updateAutosave
 	end if
 
 	%reset x and y offsets
@@ -910,17 +1010,6 @@ loop
 	elsif offsety < 0 then
 	    offsety := blocksize - 1
 	end if
-
-	%Update autosave file with new moved coordinates
-	seek : autosave2, 0
-	close : autosave
-	open : autosave, ("Autosave.txt"), get, put, seek
-	seek : autosave, 0
-	loop
-	    get : autosave2, autocoords
-	    put : autosave, autocoords
-	    exit when eof (autosave2)
-	end loop
 	close : autosave2
     else
 	seek : autosave, *
@@ -1057,7 +1146,7 @@ loop
     end if
 
     %If 'p' key is pressed
-    if arrow ('p') then
+    if keyp then
 	View.Set ("nooffscreenonly")
 	oldbackcolour := bgcolour
 	oldblockcolour := blockcolour
@@ -1130,7 +1219,7 @@ loop
     end if
 
     %If 'd' key is pressed
-    if arrow ('d') then
+    if keyd then
 	if recentstartd then
 	    recentstartd := false
 	    if sprintpossibled2 = 0 then
@@ -1142,7 +1231,7 @@ loop
 	    sprintpossibled2 := 0
 	    sprintd := true
 	end if
-	if arrow ('s') and onground or mustcrawl then
+	if keys and onground or mustcrawl then
 	    if movegap = 0 and not onrightwall then
 		charx += 1
 	    end if
@@ -1168,7 +1257,7 @@ loop
     end if
 
     %If 'a' key is pressed
-    if arrow ('a') then
+    if keya then
 	if recentstarta then
 	    recentstarta := false
 	    if sprintpossiblea2 = 0 and onground then
@@ -1180,7 +1269,7 @@ loop
 	    sprintpossiblea2 := 0
 	    sprinta := true
 	end if
-	if arrow ('s') and onground or mustcrawl then
+	if keys and onground or mustcrawl then
 	    if movegap = 0 and not onleftwall then
 		charx -= 1
 	    end if
@@ -1208,12 +1297,12 @@ loop
     end if
 
     %If spacebar is pressed
-    if arrow (' ') and onground and mustcrawl = false then
+    if keyspc and onground and mustcrawl = false then
 	jumpcount := jumpheight
     end if
 
     %If 's' key is pressed
-    if arrow ('s') and onground then
+    if keys and onground then
 	action := "crawling"
     end if
 
@@ -1232,7 +1321,7 @@ loop
     end if
 
     %Stationary crouching
-    if arrow ('s') and onground and arrow ('a') = false and arrow ('d') = false then
+    if keys and onground and keya = false and keyd = false then
 	action := "crawlingstop"
     end if
 
@@ -1347,7 +1436,7 @@ loop
     end if
 
     %Directionless fall
-    if (action = "falling left" or action = "falling right") and arrow ('a') = false and arrow ('d') = false and onground = false then
+    if (action = "falling left" or action = "falling right") and keya = false and keyd = false and onground = false then
 	action := "falling"
     end if
 
@@ -1514,9 +1603,6 @@ loop
 	end if
     end if
 
-    locate (1, 1)
-    put mstScrnHsGnUp
-
     %Show new screen
     View.Update
 
@@ -1549,7 +1635,7 @@ loop
 	end if
     end if
 
-    delay (1)     %This delay to be adjusted with screen size and computer performance speed.
+    delay (0)     %This delay to be adjusted with screen size and computer performance speed.
 end loop
 
 %Erase contents of autosave files
