@@ -105,16 +105,16 @@ var backpic : int := Pic.New (0, 0, 2, 2)
 var screenpic : int := Pic.New (0, 0, 2, 2)
 var tempcoords : array 1 .. 5 of int
 var xm, ym, cm, s, character, rcharxl, rcharyd, rcharxr, rcharyu, rcursorxbb, rcursorybb, rcursorxpb, rcursorypb, rcharydfloor, rcharyuceil,
-    btnstrt, btncont, btnend, savenames, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload, quitButton, nameTextField, nameLabel,
+    btnstrt, btncont, btnend, mainMenuButton, savenames, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload, saveButton, nameTextField, nameLabel,
     oldbackcolour, saveFile, autosave, menudelete, oldblockcolour, handheight, tempi, linegx, linegy, idelete, null, backpiccross, backpicbox,
-    srx, sry, slx, sly, sux, suy, sdx, sdy, shiftspot, endspot, mstScrnHsGnUp, val, autocoords, cbprev, cbfly, bigx, bigy : int
+    srx, sry, slx, sly, sux, suy, sdx, sdy, shiftspot, endspot, mstScrnHsGnUp, mstScrnHsGnDwn, val, autocoords, cbprev, cbfly, bigx, bigy : int
 var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y,
     iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2,
     crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety, offsetleftright, mstScrnHsGnLft, mstScrnHsGnRght, offsetupdown, offsetprevlr,
     offsetprevud : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
     mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput, keyspc, keya, keys, keyd, keyp, preview, inmainmenu, resetdefaultbg,
-    resetdefaulthead, resetdefaultblk, canfly, flying : boolean := false
+    resetdefaulthead, resetdefaultblk, canfly, flying, menuReturn, forcedelete : boolean := false
 var action : string := "standing"
 var textfound, deletesaveread, headcolourstr, bgcolourstr, blockcolourstr, tempcolourstr : string
 var facing, oldfacing, loadfile : string := ""
@@ -123,7 +123,7 @@ var ponwlk, poncrl, movegaptens, isaves : int := 1
 var item1, item2, item3 : array 1 .. 16 of int
 var item4 : array 0 .. 99 of int
 var item5 : array 1 .. 99 of int
-var oktosavenew, frstmthrgh, forcedelete : boolean := true
+var oktosavenew, frstmthrgh, gmfrstmthrgh : boolean := true
 var previoussaves : array 1 .. 99 of string (30)
 var xinc, yinc, reach, nullreal : real
 var groundlevel : int := 50
@@ -178,7 +178,7 @@ procedure start
     delay (10)
 end start
 
-%If user clicks "quit" button
+%If user clicks "Quit" button
 procedure endgame
     startgame := true
     quitthegame := true
@@ -186,10 +186,18 @@ procedure endgame
     delay (10)
 end endgame
 
+%If user clicks "Return to Main Menu" button
+procedure returnMain
+    startgame := true
+    menuReturn := true
+    delay (10)
+end returnMain
+
 %Loading screen
 procedure loading (loadscreencolour : int)
     Draw.FillBox (0, 0, maxx, maxy, loadscreencolour)
     colourback (loadscreencolour)
+    locate (1, 1)
     put "LOADING..."
     colourback (white)
     View.Update
@@ -424,7 +432,7 @@ end LoadSelected
 
 %The GUIs that are used for main and pause menus
 process guis
-    if frstmthrgh then
+    if gmfrstmthrgh then
 	btnstrt := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Start Game", start, 30, chr (13), false)
 
 	cbprev := GUI.CreateCheckBox (maxx - 80, maxy - 70, "Preview", DoNothing)
@@ -468,7 +476,9 @@ put "Click to continue"
 Draw.Box (midx - Font.Width ("Welcome to 2DMC!", font1) div 2 - 10, maxy div 6 + 32, midx + Font.Width ("Welcome to 2DMC!", font1) div 2 + 10, maxy div 6 * 5 - 32, black)
 
 %Delete blanks from saves
+forcedelete := true
 DeleteSelected
+forcedelete := false
 
 %Wait for click
 loop
@@ -486,8 +496,6 @@ loop
     end if
 end loop
 cls
-
-forcedelete := false
 
 %Beginning loading screen
 loading (white)
@@ -534,6 +542,7 @@ procedure saveWorld
 	put : loadedsavepref, offsety / blocksize
 	put : loadedsavepref, groundlevel / blocksize
 	put : loadedsavepref, mstScrnHsGnUp / blocksize
+	put : loadedsavepref, mstScrnHsGnDwn / blocksize
 	put : loadedsavepref, mstScrnHsGnLft / blocksize
 	put : loadedsavepref, mstScrnHsGnRght / blocksize
 	put : loadedsavepref, offsetupdown / blocksize
@@ -558,11 +567,12 @@ end saveWorld
 
 %The GUIs that are only used on pause screen
 process pauseguis
-    quitButton := GUI.CreateButton (midx - 50, midy + 30, 100, "Save", saveWorld)
+    saveButton := GUI.CreateButton (midx - 50, midy + 30, 100, "Save", saveWorld)
     nameTextField := GUI.CreateTextFieldFull (midx - 100, midy + 60, 200, "", NameEntered, GUI.INDENT, 0, 0)
     nameLabel := GUI.CreateLabelFull (midx - 105, midy + 60, "Save as:", 0, 0, GUI.RIGHT, 0)
     btncont := GUI.CreateButtonFull (midx - 150, maxy div 3, 300, "Continue", start, 30, chr (13), false)
-    btnend := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Quit", endgame, 30, chr (13), false)
+    mainMenuButton := GUI.CreateButtonFull (midx - 150, maxy div 4.4, 300, "Return to Main Menu", returnMain, 30, chr (13), false)
+    btnend := GUI.CreateButtonFull (midx - 150, maxy div 9, 300, "Quit", endgame, 30, chr (13), false)
     GUI.SetText (nameTextField, textfound)
     loop
 	if startgame then
@@ -581,6 +591,9 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
     offsetupdown += scrdiry
     if offsetupdown + groundlevel > mstScrnHsGnUp then
 	mstScrnHsGnUp := offsetupdown + groundlevel
+    end if
+    if offsetupdown + groundlevel < mstScrnHsGnDwn then
+	mstScrnHsGnDwn := offsetupdown + groundlevel
     end if
     if offsetleftright > mstScrnHsGnRght then
 	mstScrnHsGnRght := offsetleftright
@@ -656,7 +669,7 @@ end screenscroll
 
 %Re-enables start GUIs
 procedure ReEnableStartGUIs
-    if frstmthrgh = false then
+    if gmfrstmthrgh = false then
 	Pic.Draw (backpic, 0, maxy - 210, picCopy)
 	GUI.Enable (menuload)
 	GUI.Enable (item1 (1))
@@ -737,6 +750,8 @@ procedure GetPreferences
 	get : loadedsavepref, nullreal
 	mstScrnHsGnUp := round (nullreal * blocksize)
 	get : loadedsavepref, nullreal
+	mstScrnHsGnDwn := round (nullreal * blocksize)
+	get : loadedsavepref, nullreal
 	mstScrnHsGnLft := round (nullreal * blocksize)
 	get : loadedsavepref, nullreal
 	mstScrnHsGnRght := round (nullreal * blocksize)
@@ -757,6 +772,7 @@ procedure GetPreferences
 	end if
 	groundlevel := ((floor ((groundlevel) / blocksize)) * blocksize)
 	mstScrnHsGnUp := groundlevel
+	mstScrnHsGnDwn := groundlevel
     end if
 end GetPreferences
 
@@ -1257,11 +1273,12 @@ procedure PressPKey
 
 	    %Temporarily disable and hide all GUIs
 	    GUI.Quit
-	    GUI.Hide (quitButton)
+	    GUI.Hide (saveButton)
 	    GUI.Hide (nameTextField)
 	    GUI.Hide (nameLabel)
 	    GUI.Hide (btncont)
 	    GUI.Hide (btnend)
+	    GUI.Hide (mainMenuButton)
 	    GUI.HideMenuBar
 
 	    %Reset game-continuing variable
@@ -1754,7 +1771,100 @@ procedure EraseAimGuide
     end if
 end EraseAimGuide
 
-%End of main loop processes
+%End of main loop procedures
+
+procedure resetVariables
+    close : autosave
+    sprintpossibled1 := 0
+    sprintpossibled2 := 0
+    sprintpossiblea1 := 0
+    sprintpossiblea2 := 0
+    blocknum := 0
+    gravcount := 0
+    jumpcount := 0
+    movegap := 0
+    wlk := 0
+    crl := 0
+    blkount := 0
+    x := 0
+    y := 0
+    iprevsaves := 0
+    ireassign := 0
+    jumpheight := 0
+    crosshairsbb2 := 0
+    crosshairsbb := 0
+    crosshairspb2 := 0
+    crosshairspb := 0
+    mclickr := 0
+    mclickl := 0
+    guidecolour := 0
+    offsetx := 0
+    offsety := 0
+    oldbackcolour := white
+    oldblockcolour := black
+    offsetleftright := 0
+    mstScrnHsGnLft := 0
+    mstScrnHsGnRght := 0
+    offsetprevlr := 0
+    offsetprevud := 0
+    offsetupdown := 0
+    gmfrstmthrgh := false
+    onground := false
+    onleftwall := false
+    onrightwall := false
+    hitceiling := false
+    walkleft := false
+    walkright := false
+    oldface := false
+    sprintd := false
+    sprinta := false
+    recentstopd := false
+    recentstartd := false
+    recentstopa := false
+    recentstarta := false
+    mustcrawl := false
+    startgame := false
+    recentclick := false
+    loaded := false
+    quitthegame := false
+    norcursorinput := false
+    keyspc := false
+    keya := false
+    keys := false
+    keyd := false
+    keyp := false
+    preview := false
+    inmainmenu := false
+    resetdefaultbg := false
+    resetdefaulthead := false
+    resetdefaultblk := false
+    canfly := false
+    flying := false
+    menuReturn := false
+    forcedelete := false
+    charwidth := Pic.Width (stand)
+    charheight := Pic.Height (stand)
+    charx := midx + 2
+    chary := 200
+    action := "standing"
+    facing := ""
+    oldfacing := ""
+    loadfile := ""
+    headcolour := 983
+    bgcolour := 983
+    blockcolour := 983
+    ponwlk := 1
+    poncrl := 1
+    movegaptens := 1
+    isaves := 1
+    oktosavenew := true
+    frstmthrgh := true
+    loading (white)
+    View.Update
+    for i : (2498 - (round ((mstScrnHsGnUp) / blocksize) + 1)) * 10000 .. (2500 + (round (((mstScrnHsGnDwn * (-1)) + maxx) / blocksize) + 1)) * 10000
+	#block (i) := boolUnInit
+    end for
+end resetVariables
 
 %Set colour-change-detecting variables
 if bgcolour = 983 then
@@ -1768,217 +1878,227 @@ else
     oldblockcolour := blockcolour
 end if
 
-%open text file of all saved files' names
-open : savenames, ("Savenames.txt"), get, put, seek, mod
-
-%Create a list of all saved files' names
-if eof (savenames) = false then
-    loop
-	isaves += 1
-	get : savenames, menuitemsaves (isaves) : *
-	menuitemdelete (isaves - 1) := (menuitemsaves (isaves))
-	exit when eof (savenames)
-    end loop
-end if
-
-%close text file of all saved files' names
-close : savenames
-
-%Main menu loop
+%Entire program loop
 loop
-    %Clear and open autosave file
-    open : autosave, ("Autosave.txt"), get, put, seek
-    cls
-
-    %Disables buffer drawing
-    View.Set ("nooffscreenonly")
-
-    ReEnableStartGUIs
-
-    inmainmenu := true
-
-    %Run the GUIs to be used in main and pause menus
-    fork guis
-
-    ShowColourPreveiwDefault
-
-    %Wait until user clicks "start" button
+    %Main menu loop
     loop
-	exit when startgame
+
+	%open text file of all saved files' names
+	open : savenames, ("Savenames.txt"), get, put, seek, mod
+
+	%Create a list of all saved files' names
+	if eof (savenames) = false then
+	    loop
+		isaves += 1
+		get : savenames, menuitemsaves (isaves) : *
+		menuitemdelete (isaves - 1) := (menuitemsaves (isaves))
+		exit when eof (savenames)
+	    end loop
+	end if
+
+	%close text file of all saved files' names
+	close : savenames
+
+	%Clear and open autosave file
+	open : autosave, ("Autosave.txt"), get, put, seek
+	cls
+
+	%Disables buffer drawing
+	View.Set ("nooffscreenonly")
+
+	ReEnableStartGUIs
+
+	inmainmenu := true
+
+	%Run the GUIs to be used in main and pause menus
+	fork guis
+
+	ShowColourPreveiwDefault
+
+	%Wait until user clicks "start" button
+	loop
+	    exit when startgame
+	end loop
+
+	%Save main menu screen
+	Pic.Free (backpic)
+	backpic := Pic.New (0, maxy - 210, 340, maxy - 35)
+
+	%Get preview checkbox state
+	if GUI.GetCheckBox (cbprev) then
+	    preview := true
+	else
+	    preview := false
+	end if
+
+	%Get canfly checkbox state
+	if GUI.GetCheckBox (cbfly) then
+	    canfly := true
+	else
+	    canfly := false
+	end if
+
+	%Set default indicators
+	if bgcolour = 983 then
+	    resetdefaultbg := true
+	end if
+	if headcolour = 983 then
+	    resetdefaulthead := true
+	end if
+	if blockcolour = 983 then
+	    resetdefaultblk := true
+	end if
+
+	%Set program variables
+	inmainmenu := false
+	startgame := false
+
+	DisableAndHideGUIs
+
+	cls
+
+	%Allows for smooth animation
+	View.Set ("offscreenonly")
+
+	%Second loading screen
+	loading (white)
+
+	GetPreferences
+
+	AssignBlocksizeVariables
+
+	%Update background colour
+	Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+
+	GenerateWorld
+
+	GenerateOutScreenBlocks
+
+	WorldPreview
+
+	frstmthrgh := false
+	if preview = false then
+	    exit
+	end if
     end loop
 
-    %Save main menu screen
-    Pic.Free (backpic)
-    backpic := Pic.New (0, maxy - 210, 340, maxy - 35)
-
-    %Get preview checkbox state
-    if GUI.GetCheckBox (cbprev) then
-	preview := true
-    else
-	preview := false
+    if canfly then
+	flying := true
     end if
 
-    %Get canfly checkbox state
-    if GUI.GetCheckBox (cbfly) then
-	canfly := true
-    else
-	canfly := false
-    end if
+    loaded := false
 
-    %Set default indicators
-    if bgcolour = 983 then
-	resetdefaultbg := true
-    end if
-    if headcolour = 983 then
-	resetdefaulthead := true
-    end if
-    if blockcolour = 983 then
-	resetdefaultblk := true
-    end if
-
-    %Set program variables
-    inmainmenu := false
-    startgame := false
-
-    DisableAndHideGUIs
-
-    cls
-
-    %Allows for smooth animation
-    View.Set ("offscreenonly")
-
-    %Second loading screen
-    loading (white)
-
-    GetPreferences
-
-    AssignBlocksizeVariables
-
-    %Update background colour
-    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-
-    GenerateWorld
-
-    GenerateOutScreenBlocks
-
-    WorldPreview
-
-    frstmthrgh := false
-    if preview = false then
-	exit
-    end if
-end loop
-
-if canfly then
-    flying := true
-end if
-
-loaded := false
-
-%Show world
-View.Update
-
-%Game program loop
-loop
-
-    CharPointCoords
-
-    CharMustCrawl
-
-    %Character standing by default
-    action := "standing"
-
-    CharOnGround
-
-    CharOnLeftWall
-
-    CharOnRightWall
-
-    CharHitCeiling
-
-    %Get mouse input
-    Mouse.Where (xm, ym, cm)
-
-    %Get keyboard input
-    Input.KeyDown (arrow)
-
-    KeyAndParallelInput
-
-    ScreenSlide
-
-    AimGuideMovement
-
-    PlayerRightClick
-
-    PlayerLeftClick
-
-    PressPKey
-    if quitthegame then
-	GUI.Quit
-	exit
-    end if
-
-    PressDKey
-
-    PressAKey
-
-    PressSpaceKey
-
-    PressSKey
-
-    CharJump
-
-    %Turn on/off flying here
-
-    Gravity
-
-    FinalizeAction1
-
-    Animations
-
-    %Stop sprinting if crawling
-    if length (action) >= 8 and action (1 .. 8) = "crawling" then
-	sprintd := false
-	sprinta := false
-    end if
-
-    FinalizeAction2
-
-    CharImage
-
-    %Get character dimensions
-    charwidth := Pic.Width (character)
-    charheight := Pic.Height (character)
-
-    %Save background behind character
-    Pic.Free (backpic)
-    backpic := Pic.New (charx - charwidth div 2 - charudpxrange, chary - charudpxrange, charx + charwidth div 2 + charudpxrange, chary + charheight + charudpxrange)
-
-    CharDraw
-
-    AimGuideBacksaveAndDraw
-
-    %Show new screen
+    %Show world
     View.Update
 
-    EraseAimGuide
+    %Game program loop
+    loop
 
-    %Draw old unaltered background over character
-    Pic.Draw (backpic, charx - charwidth div 2 - charudpxrange, chary - charudpxrange, picCopy)
+	CharPointCoords
 
-    %Movement timer
-    movegap += 1
-    if movegap = 16 then
-	movegap := 0
-	movegaptens += 1
-	if movegaptens = 9 then
-	    movegaptens := 1
+	CharMustCrawl
+
+	%Character standing by default
+	action := "standing"
+
+	CharOnGround
+
+	CharOnLeftWall
+
+	CharOnRightWall
+
+	CharHitCeiling
+
+	%Get mouse input
+	Mouse.Where (xm, ym, cm)
+
+	%Get keyboard input
+	Input.KeyDown (arrow)
+
+	KeyAndParallelInput
+
+	ScreenSlide
+
+	AimGuideMovement
+
+	PlayerRightClick
+
+	PlayerLeftClick
+
+	PressPKey
+	if quitthegame then
+	    GUI.Quit
+	    exit
+	elsif menuReturn then
+	    menuReturn := false
+	    exit
 	end if
+
+	PressDKey
+
+	PressAKey
+
+	PressSpaceKey
+
+	PressSKey
+
+	CharJump
+
+	%Turn on/off flying here
+
+	Gravity
+
+	FinalizeAction1
+
+	Animations
+
+	%Stop sprinting if crawling
+	if length (action) >= 8 and action (1 .. 8) = "crawling" then
+	    sprintd := false
+	    sprinta := false
+	end if
+
+	FinalizeAction2
+
+	CharImage
+
+	%Get character dimensions
+	charwidth := Pic.Width (character)
+	charheight := Pic.Height (character)
+
+	%Save background behind character
+	Pic.Free (backpic)
+	backpic := Pic.New (charx - charwidth div 2 - charudpxrange, chary - charudpxrange, charx + charwidth div 2 + charudpxrange, chary + charheight + charudpxrange)
+
+	CharDraw
+
+	AimGuideBacksaveAndDraw
+
+	%Show new screen
+	View.Update
+
+	EraseAimGuide
+
+	%Draw old unaltered background over character
+	Pic.Draw (backpic, charx - charwidth div 2 - charudpxrange, chary - charudpxrange, picCopy)
+
+	%Movement timer
+	movegap += 1
+	if movegap = 16 then
+	    movegap := 0
+	    movegaptens += 1
+	    if movegaptens = 9 then
+		movegaptens := 1
+	    end if
+	end if
+
+	delay (0) %This delay to be adjusted with screen size and computer performance speed.
+    end loop
+    if quitthegame then
+	exit
     end if
-
-    delay (0)  %This delay to be adjusted with screen size and computer performance speed.
+    resetVariables
 end loop
-
 
 View.Set ("nooffscreenonly")
 colorback (white)
@@ -1995,8 +2115,10 @@ GUI.Disable (menubg)
 GUI.Disable (menublk)
 GUI.Disable (btncont)
 GUI.Disable (btnend)
+GUI.Disable (mainMenuButton)
 GUI.Hide (btncont)
 GUI.Hide (btnend)
+GUI.Hide (mainMenuButton)
 GUI.HideMenuBar
 cls
 
