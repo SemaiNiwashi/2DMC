@@ -105,7 +105,7 @@ var xm, ym, cm, s, character, rcharxl, rcharyd, rcharxr, rcharyu, rcursorxbb, rc
     srx, sry, slx, sly, sux, suy, sdx, sdy, autosave2, shiftspot, endspot : int
 var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y,
     iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2,
-    crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety : int := 0
+    crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety, offsetleftright : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
     mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput : boolean := false
 var action : string := "standing"
@@ -645,9 +645,7 @@ else
 end if
 
 %Assign values to variables that are calculated using "blocksize"
-if groundlevel < blocksize then
-    groundlevel := blocksize
-end if
+groundlevel := ((floor ((groundlevel - offsetx) / blocksize)) * blocksize + offsetx)
 crosshairsbb := Pic.Scale (crosshairsbbpre, blocksize, blocksize)
 crosshairsbb2 := Pic.Scale (crosshairsbbpre2, blocksize, blocksize)
 crosshairspb := Pic.Scale (crosshairspbpre, blocksize, blocksize)
@@ -718,10 +716,33 @@ procedure screenscroll (scrdirx : int, scrdiry : int)
     end loop
     srx := 0
     sry := 0
-    seek : autosave, *
-	offsetx += scrdirx
+    offsetx += scrdirx
     offsety += scrdiry
+    offsetleftright += scrdirx
     groundlevel += scrdiry
+
+    %Generate new ground
+    if scrdirx = 0 and scrdiry = 1 and groundlevel > 0 then %Screen up, make ground below
+	x := -blocksize + offsetx
+	y := -blocksize + offsety
+	loop
+	    tempcoords (1) := 100000000 + (x + 24999) * 10000 + (y + 4999)
+	    if #block (tempcoords (1)) = boolUnInit then
+		blkount += 1
+		Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), Rand.Int (33, 55)) %blockcolour)
+		block (tempcoords (1)) := true
+		put : autosave2, tempcoords (1)
+	    end if
+	    x += blocksize
+	    exit when x >= maxx
+	end loop
+	x := 0
+	y := 0
+    elsif scrdirx = 1 and scrdiry = 0 and groundlevel > 0 then %Screen left, make ground right
+
+    elsif scrdirx = -1 and scrdiry = 0 and groundlevel > 0 then %Screen right, make ground left
+
+    end if
 end screenscroll
 
 %Show world
@@ -852,6 +873,51 @@ loop
 
     %Get keyboard input
     Input.KeyDown (arrow)
+
+    %Screen sliding
+    seek : autosave, 0
+    if eof (autosave) = false and (charx <= 20 or charx >= maxx - 20 or chary <= 20 or chary + charheight >= maxy - 20) then
+	if charx <= 20 then
+	    screenscroll (1, 0)
+	    charx += 1
+	elsif charx >= maxx - 20 then
+	    screenscroll (-1, 0)
+	    charx -= 1
+	end if
+	if chary <= 20 then
+	    screenscroll (0, 1)
+	    chary += 1
+	elsif chary + charheight >= maxy - 20 then
+	    screenscroll (0, -1)
+	    chary -= 1
+	end if
+
+	%reset x and y offsets
+	if offsetx > blocksize - 1 then
+	    offsetx := 0
+	elsif offsetx < 0 then
+	    offsetx := blocksize - 1
+	end if
+	if offsety > blocksize - 1 then
+	    offsety := 0
+	elsif offsety < 0 then
+	    offsety := blocksize - 1
+	end if
+
+	%Update autosave file with new moved coordinates
+	seek : autosave2, 0
+	close : autosave
+	open : autosave, ("Autosave.txt"), get, put, seek
+	seek : autosave, 0
+	loop
+	    get : autosave2, autocoords
+	    put : autosave, autocoords
+	    exit when eof (autosave2)
+	end loop
+	close : autosave2
+    else
+	seek : autosave, *
+    end if
 
     %How the aim guide moves in accordance with the mouse
     if Math.Distance (charx, handheight, xm, ym) = 0 then
@@ -1144,7 +1210,6 @@ loop
 	action := "crawling"
     end if
 
-
     %Timer for double-tapping to sprint
     if sprintpossibled1 not= 0 then
 	sprintpossibled1 -= 1
@@ -1379,51 +1444,6 @@ loop
 	end if
     end if
 
-    %Screen sliding
-    seek : autosave, 0
-    if eof (autosave) = false and (charx <= 20 or charx >= maxx - 20 or chary <= 20 or chary + charheight >= maxy - 20) then
-	if charx <= 20 then
-	    screenscroll (1, 0) %fork?
-	    charx += 1
-	elsif charx >= maxx - 20 then
-	    screenscroll (-1, 0)  %fork?
-	    charx -= 1
-	end if
-	if chary <= 20 then
-	    screenscroll (0, 1)  %fork?
-	    chary += 1
-	elsif chary + charheight >= maxy - 20 then
-	    screenscroll (0, -1) %fork?
-	    chary -= 1
-	end if
-
-	%reset x and y offsets
-	if offsetx > blocksize - 1 then
-	    offsetx := 0
-	elsif offsetx < 0 then
-	    offsetx := blocksize - 1
-	end if
-	if offsety > blocksize - 1 then
-	    offsety := 0
-	elsif offsety < 0 then
-	    offsety := blocksize - 1
-	end if
-
-	%Update autosave file with new moved coordinates
-	seek : autosave2, 0
-	close : autosave
-	open : autosave, ("Autosave.txt"), get, put, seek
-	seek : autosave, 0
-	loop
-	    get : autosave2, autocoords
-	    put : autosave, autocoords
-	    exit when eof (autosave2)
-	end loop
-	close : autosave2
-    else
-	seek : autosave, *
-    end if
-
     %Get character dimensions
     charwidth := Pic.Width (character)
     charheight := Pic.Height (character)
@@ -1488,6 +1508,9 @@ loop
     end if
     %end if
 
+    locate (1, 1)
+    put groundlevel
+
     %Show new screen
     View.Update
 
@@ -1523,7 +1546,12 @@ loop
     delay (1)     %This delay to be adjusted with screen size and computer performance speed.
 end loop
 
+%Erase contents of autosave files
 close : autosave
+open : autosave, ("Autosave.txt"), get, put, seek
+close : autosave
+open : autosave2, ("Autosave2.txt"), get, put, seek
+close : autosave2
 
 %Disable all active GUI functions
 GUI.Disable (menuhead)
