@@ -108,8 +108,8 @@ var charheight : int := Pic.Height (stand)
 var arrow : array char of boolean
 var deltaTime : int
 var gametimeold : int := 0
-var charx : int := midx + 2
-var chary : int := 200
+var charx : real := midx + 2
+var chary : real := 200
 var backpic : int := Pic.New (0, 0, 2, 2)
 var screenpic : int := Pic.New (0, 0, 2, 2)
 var healthbar : int := Pic.New (0, 0, 2, 2)
@@ -119,17 +119,17 @@ var xm, ym, cm, s, character, rcharxl, rcharyd, rcharxr, rcharyu, rcursorxbb, rc
     btnstrt, btncont, btnend, mainMenuButton, savenames, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload, saveButton, nameTextField, nameLabel,
     oldbackcolour, saveFile, autosave, menudelete, oldblockcolour, handheight, tempi, linegx, linegy, idelete, null, backpiccross, backpicbox,
     srx, sry, slx, sly, sux, suy, sdx, sdy, shiftspot, endspot, mstScrnHsGnUp, mstScrnHsGnDwn, val, autocoords, cbprev, cbfly, bigx, bigy, saveasguiheight : int
-var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, movegap, wlk, crl, blkount, x, y,
+var sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, blocknum, gravcount, jumpcount, wlk, crl, blkount, x, y,
     iprevsaves, ireassign, jumpheight, crosshairsbb2, crosshairsbb, crosshairspb2, crosshairspb, mclickr, mclickl, guidecolour, offsetx, offsety,
-    offsetleftright, mstScrnHsGnLft, mstScrnHsGnRght, offsetupdown, offsetprevlr, offsetprevud, healthold : int := 0
+    offsetleftright, mstScrnHsGnLft, mstScrnHsGnRght, offsetupdown, offsetprevlr, offsetprevud, healthold, frametimer : int := 0
 var onground, onleftwall, onrightwall, hitceiling, walkleft, walkright, oldface, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
     mustcrawl, startgame, recentclick, loaded, quitthegame, norcursorinput, keyspc, keya, keys, keyd, keyp, preview, inmainmenu, resetdefaultbg,
     resetdefaulthead, resetdefaultblk, canfly, flying, menuReturn, forcedelete, returningFromPreview : boolean := false
 var action : string := "standing"
-var textfound, deletesaveread, headcolourstr, bgcolourstr, blockcolourstr, tempcolourstr : string
+var textfound, deletesaveread, headcolourstr, bgcolourstr, blockcolourstr : string
 var facing, oldfacing, loadfile : string := ""
 var headcolour, bgcolour, blockcolour : int := 983
-var ponwlk, poncrl, movegaptens, isaves : int := 1
+var ponwlk, poncrl, isaves : int := 1
 var item1, item2, item3 : array 1 .. 16 of int
 var item4 : array 0 .. 99 of int
 var item5 : array 1 .. 99 of int
@@ -160,39 +160,75 @@ Window.SetActive (MainWinID)
 %Range: x: -4999 to 5000, y: -2499 to 2500
 
 %Turn the integer value of a colour into a string
-procedure colourstringify (clr : int)
+function colourstringify (clr : int) : string
     if clr = 0 then
-	tempcolourstr := "White"
+	result "White"
     elsif clr = 8 then
-	tempcolourstr := "Light Grey"
+	result "Light Grey"
     elsif clr = 15 then
-	tempcolourstr := "Dark Grey"
+	result "Dark Grey"
     elsif clr = 7 then
-	tempcolourstr := "Black"
+	result "Black"
     elsif clr = 114 then
-	tempcolourstr := "Brown"
+	result "Brown"
     elsif clr = 12 then
-	tempcolourstr := "Red"
+	result "Red"
     elsif clr = 42 then
-	tempcolourstr := "Orange"
+	result "Orange"
     elsif clr = 14 then
-	tempcolourstr := "Yellow"
+	result "Yellow"
     elsif clr = 10 then
-	tempcolourstr := "Green"
+	result "Green"
     elsif clr = 2 then
-	tempcolourstr := "Dark Green"
+	result "Dark Green"
     elsif clr = 52 then
-	tempcolourstr := "Turquoise"
+	result "Turquoise"
     elsif clr = 9 then
-	tempcolourstr := "Blue"
+	result "Blue"
     elsif clr = 1 then
-	tempcolourstr := "Dark Blue"
+	result "Dark Blue"
     elsif clr = 34 then
-	tempcolourstr := "Purple"
+	result "Purple"
     elsif clr = 13 then
-	tempcolourstr := "Pink"
+	result "Pink"
     end if
 end colourstringify
+
+function numbercolourify (nbr : int) : int
+    if nbr = 1 then
+	result 983
+    elsif nbr = 2 then
+	result white
+    elsif nbr = 3 then
+	result grey
+    elsif nbr = 4 then
+	result darkgrey
+    elsif nbr = 5 then
+	result black
+    elsif nbr = 6 then
+	result 114
+    elsif nbr = 7 then
+	result brightred
+    elsif nbr = 8 then
+	result 42
+    elsif nbr = 9 then
+	result yellow
+    elsif nbr = 10 then
+	result brightgreen
+    elsif nbr = 11 then
+	result green
+    elsif nbr = 12 then
+	result 52
+    elsif nbr = 13 then
+	result brightblue
+    elsif nbr = 14 then
+	result blue
+    elsif nbr = 15 then
+	result 34
+    elsif nbr = 16 then
+	result brightpurple
+    end if
+end numbercolourify
 
 %If the game is to continue and menus are to close
 procedure start
@@ -215,17 +251,35 @@ procedure returnMain
     delay (10)
 end returnMain
 
+procedure drawTextSpecial (text : string, x, y : int, fontID, fontHeight, textcolor, justification : int, outlined : boolean, outlineThickness, outlineColor : int)
+    %0 = default left-justified (bottom left)
+    var xN : int := x %xNew/xNow
+    var yN : int := y %yNew/yNow
+    if justification = 1 then %right
+	xN := x - Font.Width (text, fontID)
+    elsif justification = 2 then %center
+	xN := x - Font.Width (text, fontID) div 2
+    elsif justification = 3 then %true center
+	xN := x - Font.Width (text, fontID) div 2
+	yN := y - fontHeight div 2
+    end if
+
+    if outlined then
+	Draw.Text (text, xN - outlineThickness, yN - outlineThickness, font1, outlineColor)
+	Draw.Text (text, xN - outlineThickness, yN + outlineThickness, font1, outlineColor)
+	Draw.Text (text, xN + outlineThickness, yN - outlineThickness, font1, outlineColor)
+	Draw.Text (text, xN + outlineThickness, yN + outlineThickness, font1, outlineColor)
+    end if
+    Draw.Text (text, xN, yN, font1, textcolor)
+end drawTextSpecial
+
 %Loading screen
 procedure loading (loadscreencolour : int)
     Draw.FillBox (0, 0, maxx, maxy, loadscreencolour)
     Pic.Draw (loadingScreen, 10, 10, picCopy)
     %Draw.FillOval (midx, midy, maxx div 2 - 10, maxy div 2 - 10, red)
     Draw.Oval (midx, midy, maxx div 2 - 10, maxy div 2 - 10, black)
-    Draw.Text ("LOADING...", midx - Font.Width ("LOADING...", font1) div 2 - 1, midy - 21, font1, black)
-    Draw.Text ("LOADING...", midx - Font.Width ("LOADING...", font1) div 2 - 1, midy - 19, font1, black)
-    Draw.Text ("LOADING...", midx - Font.Width ("LOADING...", font1) div 2 + 1, midy - 21, font1, black)
-    Draw.Text ("LOADING...", midx - Font.Width ("LOADING...", font1) div 2 + 1, midy - 19, font1, black)
-    Draw.Text ("LOADING...", midx - Font.Width ("LOADING...", font1) div 2, midy - 20, font1, loadscreencolour)
+    drawTextSpecial ("LOADING...", midx, midy, font1, 40, loadscreencolour, 3, true, 1, black)
     View.Update
 end loading
 
@@ -241,39 +295,7 @@ end DoNothing
 procedure HeadSelected
     for i : 1 .. 16
 	if item1 (i) = GUI.GetEventWidgetID then
-	    if i = 1 then
-		headcolour := 983
-	    elsif i = 2 then
-		headcolour := white
-	    elsif i = 3 then
-		headcolour := grey
-	    elsif i = 4 then
-		headcolour := darkgrey
-	    elsif i = 5 then
-		headcolour := black
-	    elsif i = 6 then
-		headcolour := 114
-	    elsif i = 7 then
-		headcolour := brightred
-	    elsif i = 8 then
-		headcolour := 42
-	    elsif i = 9 then
-		headcolour := yellow
-	    elsif i = 10 then
-		headcolour := brightgreen
-	    elsif i = 11 then
-		headcolour := green
-	    elsif i = 12 then
-		headcolour := 52
-	    elsif i = 13 then
-		headcolour := brightblue
-	    elsif i = 14 then
-		headcolour := blue
-	    elsif i = 15 then
-		headcolour := 34
-	    elsif i = 16 then
-		headcolour := brightpurple
-	    end if
+	    headcolour := numbercolourify (i)
 	    colourback (oldbackcolour)
 	    if headcolour = 983 then
 		Draw.FillBox (32, maxy - 67, 62, maxy - 37, oldbackcolour)
@@ -293,39 +315,7 @@ end HeadSelected
 procedure BackgroundSelected
     for i : 1 .. 16
 	if item2 (i) = GUI.GetEventWidgetID then
-	    if i = 1 then
-		bgcolour := 983
-	    elsif i = 2 then
-		bgcolour := white
-	    elsif i = 3 then
-		bgcolour := grey
-	    elsif i = 4 then
-		bgcolour := darkgrey
-	    elsif i = 5 then
-		bgcolour := black
-	    elsif i = 6 then
-		bgcolour := 114
-	    elsif i = 7 then
-		bgcolour := brightred
-	    elsif i = 8 then
-		bgcolour := 42
-	    elsif i = 9 then
-		bgcolour := yellow
-	    elsif i = 10 then
-		bgcolour := brightgreen
-	    elsif i = 11 then
-		bgcolour := green
-	    elsif i = 12 then
-		bgcolour := 52
-	    elsif i = 13 then
-		bgcolour := brightblue
-	    elsif i = 14 then
-		bgcolour := blue
-	    elsif i = 15 then
-		bgcolour := 34
-	    elsif i = 16 then
-		bgcolour := brightpurple
-	    end if
+	    bgcolour := numbercolourify (i)
 	    colourback (oldbackcolour)
 	    if bgcolour = 983 then
 		Draw.FillBox (145, maxy - 67, 175, maxy - 37, oldbackcolour)
@@ -345,39 +335,7 @@ end BackgroundSelected
 procedure BlocksSelected
     for i : 1 .. 16
 	if item3 (i) = GUI.GetEventWidgetID then
-	    if i = 1 then
-		blockcolour := 983
-	    elsif i = 2 then
-		blockcolour := white
-	    elsif i = 3 then
-		blockcolour := grey
-	    elsif i = 4 then
-		blockcolour := darkgrey
-	    elsif i = 5 then
-		blockcolour := black
-	    elsif i = 6 then
-		blockcolour := 114
-	    elsif i = 7 then
-		blockcolour := brightred
-	    elsif i = 8 then
-		blockcolour := 42
-	    elsif i = 9 then
-		blockcolour := yellow
-	    elsif i = 10 then
-		blockcolour := brightgreen
-	    elsif i = 11 then
-		blockcolour := green
-	    elsif i = 12 then
-		blockcolour := 52
-	    elsif i = 13 then
-		blockcolour := brightblue
-	    elsif i = 14 then
-		blockcolour := blue
-	    elsif i = 15 then
-		blockcolour := 34
-	    elsif i = 16 then
-		blockcolour := brightpurple
-	    end if
+	    blockcolour := numbercolourify (i)
 	    colourback (oldbackcolour)
 	    if blockcolour = 983 then
 		Draw.FillBox (265, maxy - 67, 295, maxy - 37, oldbackcolour)
@@ -1008,7 +966,7 @@ end WorldPreview
 %The coordinates of different points on the character
 procedure CharPointCoords
     %Height that the character's hands are
-    handheight := chary + charheight div 3 * 2
+    handheight := round (chary) + charheight div 3 * 2
 
     %Character rounded position
     rcharxl := (floor ((charx - charwidth div 2 - offsetx) / blocksize)) * blocksize + offsetx
@@ -1050,20 +1008,20 @@ end CharMustCrawl
 
 %If character is on the ground
 procedure CharOnGround
-    tempcoords (1) := (((rcharyd - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
-    tempcoords (2) := (((rcharyd - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
-    if ( #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2))) and (chary - offsety) / blocksize + offsety = (chary
-	    - offsety) div blocksize + offsety or chary = 0 then
+    tempcoords (1) := (((rcharyd - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999) %rounded block below left side of character
+    tempcoords (2) := (((rcharyd - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999) %rounded block below right side of character
+    if ( #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)))
+	    and (chary - offsety) / blocksize + offsety = (chary - offsety) div blocksize + offsety or chary = 0 then
 	onground := true
     else
 	onground := false
     end if
-    if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx)
-	    / blocksize + offsetx)) and chary > 0 then
+    if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false)
+	    and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx)) and chary > 0 then
 	onground := false
     end if
-    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) /
-	    blocksize + offsetx)) and chary > 0 then
+    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false)
+	    and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) / blocksize + offsetx)) and chary > 0 then
 	onground := false
     end if
 end CharOnGround
@@ -1332,18 +1290,15 @@ procedure PressPKey
 	GUI.ResetQuit
 	GUI.Show (btnend)
 	GUI.ShowMenuBar
-	colourstringify (headcolour)
 	Draw.FillBox (32, maxy - 67, 62, maxy - 37, headcolour)
 	Draw.Box (32, maxy - 67, 62, maxy - 37, black)
-	Draw.Text (tempcolourstr + " head", 1, maxy - 90, font2, black)
-	colourstringify (bgcolour)
+	Draw.Text (colourstringify (headcolour) + " head", 1, maxy - 90, font2, black)
 	Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
 	Draw.Box (145, maxy - 67, 175, maxy - 37, black)
-	Draw.Text (tempcolourstr + " background", 100, maxy - 90, font2, black)
-	colourstringify (blockcolour)
+	Draw.Text (colourstringify (bgcolour) + " background", 100, maxy - 90, font2, black)
 	Draw.FillBox (265, maxy - 67, 295, maxy - 37, blockcolour)
 	Draw.Box (265, maxy - 67, 295, maxy - 37, black)
-	Draw.Text (tempcolourstr + " blocks", 238, maxy - 90, font2, black)
+	Draw.Text (colourstringify (blockcolour) + " blocks", 238, maxy - 90, font2, black)
 	loop
 	    exit when startgame
 	end loop
@@ -1408,11 +1363,11 @@ procedure PressDKey
 	end if
 	if keys and onground or mustcrawl then
 	    if flying then
-		if movegap / 2 = movegap div 2 and not onrightwall then
+		if not onrightwall then %movegap: every other frame
 		    charx += 1 * deltaTime
 		end if
 	    else
-		if movegap = 0 and not onrightwall then
+		if not onrightwall then %movegap: every 16th frame
 		    charx += 1 * deltaTime
 		end if
 	    end if
@@ -1422,17 +1377,17 @@ procedure PressDKey
 		    charx += 1 * deltaTime
 		end if
 	    else
-		if (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and not onrightwall then
+		if not onrightwall then %movegap: every 4th frame
 		    charx += 1 * deltaTime
 		end if
 	    end if
 	else
 	    if flying then
-		if movegap / 2 = movegap div 2 and not onrightwall then
+		if not onrightwall then %movegap: every other frame
 		    charx += 1 * deltaTime
 		end if
 	    else
-		if (movegap = 0 or movegap = 8) and not onrightwall then
+		if not onrightwall then %movegap: every 8th frame
 		    charx += 1 * deltaTime
 		end if
 	    end if
@@ -1473,11 +1428,11 @@ procedure PressAKey
 	end if
 	if keys and onground or mustcrawl then
 	    if flying then
-		if movegap / 2 = movegap div 2 and not onleftwall then
+		if not onleftwall then %movegap: every other frame
 		    charx -= 1 * deltaTime
 		end if
 	    else
-		if movegap = 0 and not onleftwall then
+		if not onleftwall then %movegap: every 16th frame
 		    charx -= 1 * deltaTime
 		end if
 	    end if
@@ -1488,17 +1443,17 @@ procedure PressAKey
 			charx -= 1 * deltaTime
 		    end if
 		else
-		    if (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and not onleftwall then
+		    if not onleftwall then %movegap: every 4th frame
 			charx -= 1 * deltaTime
 		    end if
 		end if
 	    else
 		if flying then
-		    if movegap / 2 = movegap div 2 and not onleftwall then
+		    if not onleftwall then %movegap: every other frame
 			charx -= 1 * deltaTime
 		    end if
 		else
-		    if (movegap = 0 or movegap = 8) and not onleftwall then
+		    if not onleftwall then %movegap: every 8th frame
 			charx -= 1 * deltaTime
 		    end if
 		end if
@@ -1561,13 +1516,13 @@ procedure CharJump
 	    if hitceiling then
 		jumpcount := 0
 	    else
-		if (movegap = 0 or movegap = 3 or movegap = 5 or movegap = 8 or movegap = 10 or movegap = 13) and jumpcount >= 18 then
+		if jumpcount >= 18 then %movegap: every 2.5th frame (2, then 3, then 2, then 3)
 		    chary += 1 * deltaTime
 		    jumpcount -= 1 * deltaTime
-		elsif (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and jumpcount >= 9 and jumpcount < 18 then
+		elsif jumpcount >= 9 and jumpcount < 18 then %movegap: every 4th frame
 		    chary += 1 * deltaTime
 		    jumpcount -= 1 * deltaTime
-		elsif (movegap = 0 or movegap = 8) and jumpcount < 9 then
+		elsif jumpcount < 9 then %movegap: every 8th frame
 		    chary += 1 * deltaTime
 		    jumpcount -= 1 * deltaTime
 		end if
@@ -1582,16 +1537,16 @@ end CharJump
 procedure Gravity
     if onground = false and jumpcount = 0 and flying = false then
 	action := "falling"
-	if (movegap = 0 or movegap = 8) and gravcount < 9 then
+	if gravcount < 9 then %movegap: every 8th frame
 	    chary -= 1 * deltaTime
 	    gravcount += 1 * deltaTime
-	elsif (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and gravcount >= 9 and gravcount < 18 then
+	elsif gravcount >= 9 and gravcount < 18 then %movegap: every 4th frame
 	    chary -= 1 * deltaTime
 	    gravcount += 1 * deltaTime
-	elsif (movegap = 0 or movegap = 3 or movegap = 5 or movegap = 8 or movegap = 10 or movegap = 13) and gravcount >= 18 and gravcount < 30 then
+	elsif gravcount >= 18 and gravcount < 30 then %movegap: every 2.5th frame
 	    chary -= 1 * deltaTime
 	    gravcount += 1 * deltaTime
-	elsif (movegap = 0 or movegap = 2 or movegap = 4 or movegap = 6 or movegap = 8 or movegap = 10 or movegap = 12 or movegap = 14) and gravcount >= 30 and gravcount < 70 then
+	elsif gravcount >= 30 and gravcount < 70 then %movegap: every other frame
 	    chary -= 1 * deltaTime
 	    gravcount += 1 * deltaTime
 	elsif gravcount >= 70 then
@@ -1675,7 +1630,7 @@ end FinalizeAction1
 %Crawling and walking animations
 procedure Animations
     %Walking animation
-    if movegap = 0 and (movegaptens = 2 or movegaptens = 4 or movegaptens = 6 or movegaptens = 8) then
+    if frametimer mod 32 = 0 then %movegap: every 32nd frame
 	if wlk = 4 then
 	    ponwlk := -1
 	elsif wlk = 1 then
@@ -1685,7 +1640,7 @@ procedure Animations
     end if
 
     %Crawling animation
-    if movegap = 0 and (movegaptens = 4 or movegaptens = 8) then
+    if frametimer = 0 then %movegap: every 64th frame
 	if crl = 4 then
 	    poncrl := -1
 	elsif crl = 1 then
@@ -1819,19 +1774,19 @@ end CharImage
 procedure CharDraw
     %Draw character's head colour
     if action = "dying left" then
-	Draw.FillOval (charx - 4, chary + 4, 3, 3, headcolour)
+	Draw.FillOval (round (charx) - 4, round (chary) + 4, 3, 3, headcolour)
     elsif action = "dying right" then
-	Draw.FillOval (charx + 4, chary + 4, 3, 3, headcolour)
+	Draw.FillOval (round (charx) + 4, round (chary) + 4, 3, 3, headcolour)
     elsif action = "crawling left" or action = "crawlingstop left" then
-	Draw.FillOval (charx - 4, chary + 8, 3, 3, headcolour)
+	Draw.FillOval (round (charx) - 4, round (chary) + 8, 3, 3, headcolour)
     elsif action = "crawling right" or action = "crawlingstop right" or action = "crawlingstop" then
-	Draw.FillOval (charx + 4, chary + 8, 3, 3, headcolour)
+	Draw.FillOval (round (charx) + 4, round (chary) + 8, 3, 3, headcolour)
     else
-	Draw.FillOval (charx, chary + 21, 3, 3, headcolour)
+	Draw.FillOval (round (charx), round (chary) + 21, 3, 3, headcolour)
     end if
 
     %Draw character
-    Pic.Draw (character, charx - charwidth div 2, chary, picMerge)
+    Pic.Draw (character, round (charx) - charwidth div 2, round (chary), picMerge)
 end CharDraw
 
 %Save background behind aim guides and draw them
@@ -1947,7 +1902,7 @@ procedure resetVariables
     blocknum := 0
     gravcount := 0
     jumpcount := 0
-    movegap := 0
+    frametimer := 0
     wlk := 0
     crl := 0
     blkount := 0
@@ -2022,7 +1977,6 @@ procedure resetVariables
     blockcolour := 983
     ponwlk := 1
     poncrl := 1
-    movegaptens := 1
     isaves := 1
     oktosavenew := true
     frstmthrgh := true
@@ -2181,7 +2135,6 @@ loop
 	if deltaTime > 100 or deltaTime < 1 then
 	    deltaTime := 1
 	end if
-deltaTime := 1
 
 	CharPointCoords
 
@@ -2255,7 +2208,7 @@ deltaTime := 1
 
 	%Save background behind character
 	Pic.Free (backpic)
-	backpic := Pic.New (charx - charwidth div 2 - charudpxrange, chary - charudpxrange, charx + charwidth div 2 + charudpxrange, chary + charheight + charudpxrange)
+	backpic := Pic.New (round (charx) - charwidth div 2 - charudpxrange, round (chary) - charudpxrange, round (charx) + charwidth div 2 + charudpxrange, round (chary) + charheight + charudpxrange)
 
 	SetHealth
 
@@ -2268,6 +2221,17 @@ deltaTime := 1
 	IfDeadGameOver
 
 	%Show new screen
+
+	locate (1, 1)
+	put charx
+	put chary
+	put rcharxl
+	put rcharyd
+	put rcharxr
+	put rcharyu
+	put rcharyuceil
+	put rcharydfloor
+
 	View.Update
 
 	EraseHealthBar
@@ -2275,16 +2239,12 @@ deltaTime := 1
 	EraseAimGuide
 
 	%Draw old unaltered background over character
-	Pic.Draw (backpic, charx - charwidth div 2 - charudpxrange, chary - charudpxrange, picCopy)
+	Pic.Draw (backpic, round (charx) - charwidth div 2 - charudpxrange, round (chary) - charudpxrange, picCopy)
 
 	%Movement timer
-	movegap += 1
-	if movegap = 16 then
-	    movegap := 0
-	    movegaptens += 1
-	    if movegaptens = 9 then
-		movegaptens := 1
-	    end if
+	frametimer += 1
+	if frametimer = 32 then
+	    frametimer := 0
 	end if
 
     end loop
