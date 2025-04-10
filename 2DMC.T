@@ -12,13 +12,15 @@ View.Set ("position:top;right,graphics:640;400") %Smallest advisable:450,330
 buttonchoose ("multibutton")
 setscreen ("noecho")
 
+%Fixed for alt but NOWHERE ELSE: if you want to get the block type at a certain location (not just check if it equals something), it DOESN'T CONSIDER TERRAIN! Aka "if [thisblock x,y] = [thistype] then" WON'T WORK
 
-%Fix changing block color resetting screen colors
-%Fix player suffocating in creative mode
-%Fix if you delete a world at the top of the list, then play the game, then return to the main menu, loading is incorrect by one item (after the one that was deleted?) now
 %Fix clicking and then pausing sometimes clicks the button where your mouse was??
-%Fix gui loops not exiting properly (when quit button is pressed?)
+%Fix gui loops not exiting properly (when quit button is pressed?) (start->pause->returntomenu->quit)
+%Make gui pause create buttons only happen once(?) but it happens multiple times, yet no duplicates are created, which means... we succesfully deleted the old ones?!? Look into this!
 
+%Add physics to sand and water!
+%Add fire switching to different shades of red, orange, and yellow randomly
+%Make time affect sky color (rgb.addcolor 256, set to whatever)
 %Add swimming
 %Add alter jump height by amount space pressed
 %Make character an instance of a class
@@ -32,6 +34,7 @@ setscreen ("noecho")
 %   be assumed duplicated to the front, too. Only visible when the player steps forward, then they can't step back in
 %   there. Go "around" the house! :D
 
+%I think this was for attempts at fixing the screen jitter (?)
 var tempMin, tempMax : real := 68
 var timer : int := 0
 
@@ -42,7 +45,7 @@ const midy : int := maxy div 2
 const boolUnInit := 16#FF
 const jumpheight : real := 2.3
 const reach : real := 5
-const doubletapspeed : int := 100
+const doubletapspeed : int := 300
 var blockplacespeed : int := 130
 var blockbreakspeed : int := 130
 const playerSpeed : real := 5 / 1000
@@ -61,40 +64,48 @@ var trainLeft : boolean := true
 var trainbackpic : int := Pic.New (0, 0, 2, 2)
 %Block class
 const numBlockTypes : int := 16
-type blockClass :
+type blockStruct :
     record
 	id : int
 	name : string
-	solid : int
+	solid : boolean
+	physics : boolean
 	clr : int
     end record
-var blockType : array 0 .. numBlockTypes - 1 of blockClass
+var blockType : array 0 .. numBlockTypes - 1 of blockStruct
 
-procedure setBlockInfo (var blockIn : int, nameIn : string, solidIn : int, clrIn : int)
+procedure setBlockInfo (var blockIn : int, nameIn : string, solidIn : boolean, physicsIn : boolean, clrIn : int)
     blockType (blockIn).id := blockIn
     blockType (blockIn).name := nameIn
     blockType (blockIn).solid := solidIn
+    blockType (blockIn).physics := physicsIn
     blockType (blockIn).clr := clrIn
     blockIn += 1
 end setBlockInfo
 var iter : int := 0
 %Legend: name, isSolid, color
-setBlockInfo (iter, "void", 0, white)
-setBlockInfo (iter, "boarder", 1, white)
-setBlockInfo (iter, "air", 0, brightcyan)
-setBlockInfo (iter, "dirt", 1, 114)
-setBlockInfo (iter, "stone", 1, grey)
-setBlockInfo (iter, "grass", 1, green)
-setBlockInfo (iter, "leaves_nat", 0, brightgreen)
-setBlockInfo (iter, "leaves", 1, brightgreen)
-setBlockInfo (iter, "wood_nat", 0, brown)
-setBlockInfo (iter, "wood", 1, brown)
-setBlockInfo (iter, "platform", 2, brown)
-setBlockInfo (iter, "water", 0, 54)
-setBlockInfo (iter, "rail", 0, blue)
-setBlockInfo (iter, "ladder", 0, brown)
-setBlockInfo (iter, "wire", 0, brightred)
-setBlockInfo (iter, "pressure_plate", 0, grey)
+setBlockInfo (iter, "void", false, false, white)
+setBlockInfo (iter, "boarder", true, false, 20)
+setBlockInfo (iter, "air", false, false, brightcyan)
+setBlockInfo (iter, "dirt", true, false, 114)
+setBlockInfo (iter, "stone", true, false, grey)
+%setBlockInfo (iter, "sand", true, true, 91) %New!
+%setBlockInfo (iter, "mud", true, true, 91) %New!
+setBlockInfo (iter, "grass", true, false, green)
+setBlockInfo (iter, "leaves_nat", false, false, brightgreen)
+setBlockInfo (iter, "leaves", true, false, brightgreen)
+setBlockInfo (iter, "wood_nat", false, false, 186)
+setBlockInfo (iter, "wood", true, false, 186)
+setBlockInfo (iter, "platform", false, false, 114)
+setBlockInfo (iter, "water", false, true, 54)
+%setBlockInfo (iter, "lava", false, true, 54)
+%setBlockInfo (iter, "fire", false, false, 54)
+%setBlockInfo (iter, "oil", false, false, 54)
+setBlockInfo (iter, "rail", false, false, 29)
+setBlockInfo (iter, "ladder", false, false, 139)
+setBlockInfo (iter, "wire", false, false, brightred)
+setBlockInfo (iter, "pressure_plate", false, false, 175)
+
 
 %Variable declarations
 type vec2 :
@@ -105,7 +116,7 @@ type vec2i :
     record
 	x, y : int
     end record
-var blocksize : int := 16 %Must be > 15?
+var blocksize : int := 16 %Must be > 15
 var font1 := Font.New ("sans serif:40:bold")
 var font2 := Font.New ("sans serif:8:bold")
 var walkr : array 1 .. 4 of int
@@ -195,28 +206,34 @@ var healthbarback : int := Pic.New (0, 0, 2, 2)
 var deltaTime, xm, ym, cm, character, btnstrt, btncont, btnend, mainMenuButton, loadedsave, loadedsavepref, menuhead, menubg, menublk,
     menuload, saveButton, saveasguiheight, nameTextField, nameLabel, saveFile, menudelete, backpiccross, backpicbox, autocoords,
     cbprev, cbcreative, genVersion, seed, popupWinID : int
-var gametimeold, sprintpossibled1, sprintpossibled2, sprintpossiblea1, sprintpossiblea2, flypossible1, flypossible2, mclickr, mclickl,
+var gametimeold, sprintpossibled, sprintpossiblea, flypossible, mclickr, mclickl,
     healthold, crosshairsbb2, crosshairsbb, crosshairspb2, crosshairspb, mstScrnHsGnLft, mstScrnHsGnRght, mstScrnHsGnUp,
     mstScrnHsGnDwn : int := 0
-var onground, inground, onleftwall, onrightwall, hitceiling, sprintd, sprinta, recentstopd, recentstartd, recentstopa, recentstarta,
-    mustcrawl, startgame, recentclick, loaded, quitthegame, keyspc, keya, keys, keyd, keyp, preview, resetdefaultbg, resetdefaulthead,
-    resetdefaultblk, flying, menuReturn, returningFromPreview, inPauseMenu, scrollSlow, yesDelete, recentstopspace,
-    recentstartspace : boolean := false
+var onground, inground, onleftwall, onrightwall, hitceiling, sprintd, sprinta, recentstartd, recentstarta, recentstartspace,
+    mustcrawl, startgame, recentclick, loaded, quitthegame, keyspc, keya, keys, keyd, keyp, keyalt, preview, resetdefaulthead, flying,
+    menuReturn, returningFromPreview, inPauseMenu, scrollSlow, yesDelete : boolean := false
 var frstmthrgh, gmfrstmthrgh, survival : boolean := true
-var jumpcount, gravcount, frametimer, offsetleftright, offsetupdown, slowScrollSpeed : real := 0
+var jumpcount, gravcount, frametimer, offsetleftright, offsetupdown, slowScrollSpeed, timeOfDay : real := 0
 var ponwlk, poncrl, isaves, wlk, crl : int := 1
-var headcolour, bgcolour, blockcolour : int := 983
-var oldbackcolour : int := white
-var oldblockcolour : int := black
+var headcolour : int := 983
+var oldbackcolour, bgcolour : int := white
 var health : int := 1000
 var textfound : string
-var facing, oldfacing, loadfile, placingBlock : string := ""
+var placingBlock : blockStruct
+var facing, oldfacing, loadfile : string := ""
 var action, actionCurrent : string := "standing"
-var item1, item2, item3 : array 1 .. 16 of int
+var item1 : array 1 .. 16 of int
+var item2 : array 1 .. 12 of int
+var item3 : array 1 .. numBlockTypes of int
 var item4 : array 0 .. 99 of int
 var item5 : array 1 .. 99 of int
 var menuitemcolours : array 1 .. 16 of string (20) := init ("Default", "White", "Light Grey", "Dark Grey", "Black",
     "Brown", "Red", "Orange", "Yellow", "Green", "Dark Green", "Turquoise", "Blue", "Dark Blue", "Purple", "Pink")
+var menuitemtime : array 1 .. 12 of string (10) := init ("12:00am", "2:00am", "4:00am", "6:00am", "8:00am", "10:00am", "12:00pm", "2:00pm", "4:00pm", "6:00pm", "8:00pm", "10:00pm")
+var menuitemblock : array 1 .. numBlockTypes of string
+for i : 1 .. numBlockTypes
+    menuitemblock (i) := blockType (i - 1).name
+end for
 var menuitemsaves : array 0 .. 99 of string (50)
 var menuitemdelete : array 1 .. 99 of string (50)
 menuitemsaves (1) := "New"
@@ -227,6 +244,10 @@ if maxy >= 350 then
 else
     saveasguiheight := maxy - 120
 end if
+
+function LERP (data1, data2 : int, u : real) : int
+    result round (intreal (data1) * (1.0 - u) + intreal (data2) * u)
+end LERP
 
 %Range: x: -4999 to 5000, y: -2499 to 2500
 function blockID (blockName : string) : int
@@ -408,6 +429,38 @@ function numbercolourify (nbr : int) : int
     end if
 end numbercolourify
 
+function timestringify (timeCurr : real) : string
+    var am : boolean := timeCurr < 12
+    var hour : string := intstr (floor (timeCurr))
+    if strint (hour) > 12 then
+	hour := intstr (strint (hour) - 12)
+    end if
+    if hour = "0" then
+	hour := "12"
+    end if
+    var minute : string := intstr (LERP (0, 59, timeCurr - floor (timeCurr)))
+    if length (minute) < 2 then
+	minute := "0" + minute
+    end if
+    if am then
+	result hour + ":" + minute + "am"
+    else
+	result hour + ":" + minute + "pm"
+    end if
+end timestringify
+
+function timecolourify (nbr : real) : int
+    result brightcyan
+end timecolourify
+
+function timemenu (nbr : int) : int
+    result (nbr - 1) * 2
+end timemenu
+
+function blockmenu (nbr : int) : int
+    result nbr - 1
+end blockmenu
+
 procedure PicDrawTranslucentBox (x1, y1, x2, y2, clr : int, alpha : real)
     if alpha <= 0 then
 	return
@@ -436,7 +489,6 @@ end start
 
 %If user clicks "Quit" button
 procedure endgame
-    startgame := true
     quitthegame := true
     GUI.Quit
     delay (10)
@@ -511,43 +563,32 @@ procedure HeadSelected
 end HeadSelected
 
 %If the user selects an opting in the "Background Colour" menu
-procedure BackgroundSelected
-    for i : 1 .. 16
+procedure TimeSelected
+    for i : 1 .. 12
 	if item2 (i) = GUI.GetEventWidgetID then
-	    bgcolour := numbercolourify (i)
+	    timeOfDay := timemenu (i)
+	    bgcolour := timecolourify (timeOfDay)
 	    colourback (oldbackcolour)
-	    if bgcolour = 983 then
-		Draw.FillBox (137, maxy - 57, 188, maxy - 46, oldbackcolour)
-		Draw.FillBox (145, maxy - 67, 175, maxy - 37, oldbackcolour)
-		Draw.Text ("DEFAULT", 138, maxy - 55, font2, black)
-	    else
-		Draw.FillBox (137, maxy - 57, 188, maxy - 46, oldbackcolour)
-		Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
-		Draw.Box (145, maxy - 67, 175, maxy - 37, black)
-	    end if
+	    Draw.FillBox (137, maxy - 57, 188, maxy - 46, oldbackcolour)
+	    Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
+	    Draw.Box (145, maxy - 67, 175, maxy - 37, black)
 	    Draw.FillBox (99, maxy - 94, 232, maxy - 80, oldbackcolour)
-	    Draw.Text (menuitemcolours (i) + " background", 100, maxy - 90, font2, black)
+	    Draw.Text ("Time: " + timestringify (timeOfDay), 100, maxy - 90, font2, black)
 	end if
     end for
-end BackgroundSelected
+end TimeSelected
 
 %If the user selects an opting in the "Block Colour" menu
 procedure BlocksSelected
-    for i : 1 .. 16
+    for i : 1 .. numBlockTypes
 	if item3 (i) = GUI.GetEventWidgetID then
-	    blockcolour := numbercolourify (i)
+	    placingBlock := blockType (blockmenu (i))
 	    colourback (oldbackcolour)
-	    if blockcolour = 983 then
-		Draw.FillBox (257, maxy - 57, 308, maxy - 46, oldbackcolour)
-		Draw.FillBox (265, maxy - 67, 295, maxy - 37, oldbackcolour)
-		Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
-	    else
-		Draw.FillBox (257, maxy - 57, 308, maxy - 46, oldbackcolour)
-		Draw.FillBox (265, maxy - 67, 295, maxy - 37, blockcolour)
-		Draw.Box (265, maxy - 67, 295, maxy - 37, black)
-	    end if
+	    Draw.FillBox (257, maxy - 57, 308, maxy - 46, oldbackcolour)
+	    Draw.FillBox (265, maxy - 67, 295, maxy - 37, placingBlock.clr)
+	    Draw.Box (265, maxy - 67, 295, maxy - 37, black)
 	    Draw.FillBox (237, maxy - 94, 340, maxy - 80, oldbackcolour)
-	    Draw.Text (menuitemcolours (i) + " blocks", 238, maxy - 90, font2, black)
+	    Draw.Text (placingBlock.name + " blocks", 238, maxy - 90, font2, black)
 	end if
     end for
 end BlocksSelected
@@ -558,21 +599,16 @@ procedure setDeleteFlag
 end setDeleteFlag
 
 %If the user selects an option in the "Delete" menu
-procedure DeleteSelected %Long (forcedelete : boolean)
+procedure DeleteSelected
     var idelete : int
-    %if forcedelete then
-    %    idelete := 99
-    %else
     for i : 1 .. isaves - 1
 	if item5 (i) = GUI.GetEventWidgetID then
 	    idelete := i
 	end if
     end for
-    %end if
 
     %"Are you sure?" prompt
     yesDelete := false
-    %if not forcedelete then
     var popupWinID : int := Window.Open ("position:center;center,graphics:200;100,popup")
     colorback (grey)
     cls
@@ -593,7 +629,6 @@ procedure DeleteSelected %Long (forcedelete : boolean)
     end loop
     GUI.CloseWindow (popupWinID)
     GUI.ResetQuit
-    %end if
 
     if yesDelete then
 	if menuitemdelete (idelete) = loadfile and loaded then
@@ -602,7 +637,7 @@ procedure DeleteSelected %Long (forcedelete : boolean)
 	end if
 	File.Delete ("Saves\\" + menuitemdelete (idelete) + ".txt")
 	File.Delete ("Saves\\Preferences\\" + menuitemdelete (idelete) + ".txt")
-	%if not forcedelete then
+
 	GUI.Disable (item5 (idelete))
 	GUI.Disable (item4 (idelete + 1))
 	colourback (oldbackcolour)
@@ -612,15 +647,12 @@ procedure DeleteSelected %Long (forcedelete : boolean)
 	    locate (12, 1)
 	end if
 	put "Deleted ", menuitemdelete (idelete) + "                      "
-	%end if
+	GUI.Quit
+	View.Update
+	delay (500)
+	endgame
     end if
-end DeleteSelected %Long
-
-
-/*procedure DeleteSelected
- DeleteSelectedLong (false)
- end DeleteSelected*/
-
+end DeleteSelected
 
 %If the user selects an opting in the "Load" menu
 procedure LoadSelected
@@ -640,69 +672,12 @@ procedure LoadSelected
     end for
 end LoadSelected
 
-%The GUIs that are used for main and pause menus
-process guis
-    if gmfrstmthrgh then
-	btnstrt := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Start Game", start, 30, chr (13), false)
-	btnend := GUI.CreateButtonFull (midx - 150, maxy div 9 - 20, 300, "Quit", endgame, 30, chr (13), false)
-
-	cbprev := GUI.CreateCheckBox (maxx - 80, maxy - 70, "Preview", DoNothing)
-	cbcreative := GUI.CreateCheckBox (maxx - 80, maxy - 100, "Creative", DoNothing)
-
-	menuhead := GUI.CreateMenu ("Head Colour")
-	for i : 1 .. 16
-	    item1 (i) := GUI.CreateMenuItem (menuitemcolours (i), HeadSelected)
-	end for
-	menubg := GUI.CreateMenu ("Background Colour")
-	for i : 1 .. 16
-	    item2 (i) := GUI.CreateMenuItem (menuitemcolours (i), BackgroundSelected)
-	end for
-	menublk := GUI.CreateMenu ("Block Colour")
-	for i : 1 .. 16
-	    item3 (i) := GUI.CreateMenuItem (menuitemcolours (i), BlocksSelected)
-	end for
-	menudelete := GUI.CreateMenu ("Delete")
-	for i : 1 .. isaves - 1
-	    item5 (i) := GUI.CreateMenuItem (menuitemdelete (i), DeleteSelected)
-	end for
-	menuload := GUI.CreateMenu ("Load")
-	item4 (1) := GUI.CreateMenuItem (menuitemsaves (1), LoadSelected)
-	item4 (0) := GUI.CreateMenuItem (menuitemsaves (0), LoadSelected)
-	for i : 2 .. isaves
-	    item4 (i) := GUI.CreateMenuItem (menuitemsaves (i), LoadSelected)
-	end for
-	/*else
-	 GUI.Dispose (menudelete)
-	 menudelete := GUI.CreateMenu ("Delete")
-	 for i : 1 .. isaves - 1
-	 item5 (i) := GUI.CreateMenuItem (menuitemdelete (i), DeleteSelected)
-	 end for
-	 GUI.Dispose (item4 (1))
-	 item4 (1) := GUI.CreateMenuItem (menuitemsaves (1), LoadSelected)
-	 GUI.Dispose (item4 (0))
-	 item4 (0) := GUI.CreateMenuItem (menuitemsaves (0), LoadSelected)
-	 for i : 2 .. isaves
-	 GUI.Dispose (item4 (i))
-	 item4 (i) := GUI.CreateMenuItem (menuitemsaves (i), LoadSelected)
-	 end for*/
-    end if
-    loop
-	if startgame then
-	    exit
-	end if
-	exit when GUI.ProcessEvent
-    end loop
-end guis
-
 %Welcome screen
 var welcomeWidth : int := Font.Width ("Welcome to 2DMC!", font1)
 Draw.Text ("Welcome to 2DMC!", midx - welcomeWidth div 2, midy - 20, font1, black)
 locatexy (midx - length ("Click to continue") * 8 div 2, midy - 40)
 put "Click to continue"
 Draw.Box (midx - welcomeWidth div 2 - 10, maxy div 6 + 32, midx + welcomeWidth div 2 + 10, maxy div 6 * 5 - 32, black)
-
-%Delete blanks from saves %Honestly, seriously don't know what this was ever doing
-%DeleteSelectedLong (true)
 
 %Wait for click
 loop
@@ -768,7 +743,7 @@ function isBlock (xin : real, yin : real, blockIn : string, useTerrain : boolean
     if blockIn = "any" then
 	result blockType (foundType).name not= "air" and blockType (foundType).name not= "void"
     elsif blockIn = "solid" then
-	result blockType (foundType).solid = 1
+	result blockType (foundType).solid
     else
 	result blockType (foundType).name = blockIn
     end if
@@ -853,8 +828,8 @@ procedure saveWorld
 	put : loadedsavepref, pos.x
 	put : loadedsavepref, pos.y
 	put : loadedsavepref, headcolour
-	put : loadedsavepref, bgcolour
-	put : loadedsavepref, blockcolour
+	put : loadedsavepref, timeOfDay
+	put : loadedsavepref, placingBlock.id
 	put : loadedsavepref, blocksize
 	put : loadedsavepref, offsetupdown
 	put : loadedsavepref, offsetleftright
@@ -876,13 +851,65 @@ procedure saveWorld
     startgame := true
 end saveWorld
 
-%The GUIs that are only used on pause screen
-process pauseguis
+procedure createguis
+    btnstrt := GUI.CreateButtonFull (midx - 150, maxy div 6, 300, "Start Game", start, 30, chr (13), false)
+    btnend := GUI.CreateButtonFull (midx - 150, maxy div 9 - 20, 300, "Quit", endgame, 30, chr (13), false)
+
+    cbprev := GUI.CreateCheckBox (maxx - 80, maxy - 70, "Preview", DoNothing)
+    cbcreative := GUI.CreateCheckBox (maxx - 80, maxy - 100, "Creative", DoNothing)
+
+    menuhead := GUI.CreateMenu ("Head Colour")
+    for i : 1 .. 16
+	item1 (i) := GUI.CreateMenuItem (menuitemcolours (i), HeadSelected)
+    end for
+    menubg := GUI.CreateMenu ("     Time of Day   ")
+    for i : 1 .. 12
+	item2 (i) := GUI.CreateMenuItem (menuitemtime (i), TimeSelected)
+    end for
+    menublk := GUI.CreateMenu ("   Block Held   ")
+    for i : 1 .. numBlockTypes
+	item3 (i) := GUI.CreateMenuItem (menuitemblock (i), BlocksSelected)
+    end for
+    menudelete := GUI.CreateMenu ("Delete")
+    for i : 1 .. isaves - 1
+	item5 (i) := GUI.CreateMenuItem (menuitemdelete (i), DeleteSelected)
+    end for
+    menuload := GUI.CreateMenu ("Load")
+    item4 (1) := GUI.CreateMenuItem (menuitemsaves (1), LoadSelected)
+    item4 (0) := GUI.CreateMenuItem (menuitemsaves (0), LoadSelected)
+    for i : 2 .. isaves
+	item4 (i) := GUI.CreateMenuItem (menuitemsaves (i), LoadSelected)
+    end for
+
     saveButton := GUI.CreateButton (midx - 50, (saveasguiheight - 30), 100, "Save", saveWorld)
     nameTextField := GUI.CreateTextFieldFull (midx - 100, saveasguiheight, 200, "", NameEntered, GUI.INDENT, 0, 0)
     nameLabel := GUI.CreateLabelFull (midx - 105, saveasguiheight, "Save as:", 0, 0, GUI.RIGHT, 0)
     btncont := GUI.CreateButtonFull (midx - 150, maxy div 3, 300, "Continue", start, 30, chr (13), false)
     mainMenuButton := GUI.CreateButtonFull (midx - 150, maxy div 4.4 - 10, 300, "Return to Main Menu", returnMain, 30, chr (13), false)
+    GUI.Hide (saveButton)
+    GUI.Hide (nameTextField)
+    GUI.Hide (nameLabel)
+    GUI.Hide (btncont)
+    GUI.Hide (btnend)
+    GUI.Hide (mainMenuButton)
+end createguis
+
+%The GUIs that are used for main and pause menus
+process guis
+    loop
+	if startgame then
+	    exit
+	end if
+	exit when GUI.ProcessEvent
+    end loop
+end guis
+
+%The GUIs that are only used on pause screen
+process pauseguis
+    if gmfrstmthrgh then
+
+    end if
+    GUI.Show (btncont)
     GUI.SetText (nameTextField, textfound)
     loop
 	if startgame then
@@ -991,9 +1018,7 @@ procedure ReEnableStartGUIs
 	    returningFromPreview := false
 	end if
 	GUI.Enable (menuload)
-	GUI.Enable (item1 (1))
-	GUI.Enable (item2 (1))
-	GUI.Enable (item3 (1))
+	GUI.Enable (menudelete)
 	GUI.Enable (cbprev)
 	GUI.Enable (cbcreative)
 	GUI.Show (btnstrt)
@@ -1020,9 +1045,7 @@ end ShowColourPreveiwDefault
 %Disable and hide all GUIs
 procedure DisableAndHideGUIs
     GUI.Disable (menuload)
-    GUI.Disable (item1 (1))
-    GUI.Disable (item2 (1))
-    GUI.Disable (item3 (1))
+    GUI.Disable (menudelete)
     GUI.Disable (cbprev)
     GUI.Disable (cbcreative)
     GUI.Hide (btnstrt)
@@ -1078,15 +1101,14 @@ procedure GetPreferences
 	else
 	    get : loadedsavepref, nullreal
 	end if
-	if bgcolour = 983 then
-	    get : loadedsavepref, bgcolour
-	else
-	    get : loadedsavepref, nullreal
+	get : loadedsavepref, timeOfDay
+	get : loadedsavepref, instring
+	if strint (instring) < 0 or strint (instring) >= numBlockTypes then
+	    instring := "3"
 	end if
-	if blockcolour = 983 then
-	    get : loadedsavepref, blockcolour
-	else
-	    get : loadedsavepref, nullreal
+	placingBlock := blockType (strint (instring))
+	if placingBlock.id < 3 then
+	    placingBlock := blockType (blockID ("stone"))
 	end if
 	if keepmapblocksize then
 	    get : loadedsavepref, blocksize
@@ -1172,15 +1194,10 @@ procedure GetPreferences
 	if headcolour = 983 then
 	    headcolour := white
 	end if
-	if bgcolour = 983 then
-	    bgcolour := white
-	end if
-	if blockcolour = 983 then
-	    blockcolour := black
-	end if
+	timeOfDay := 0
+	placingBlock := blockType (blockID ("stone"))
 	CenterCamera
     end if
-    placingBlock := "stone"
     ClampOffsetToScreen
 end GetPreferences
 
@@ -1376,18 +1393,10 @@ procedure WorldPreview
 	offsetleftright := 0
 	offsetupdown := 0
 
-	%Reset colour defaults
-	if resetdefaultbg then
-	    bgcolour := 983
-	    resetdefaultbg := false
-	end if
+	%Reset head colour default
 	if resetdefaulthead then
 	    headcolour := 983
 	    resetdefaulthead := false
-	end if
-	if resetdefaultblk then
-	    blockcolour := 983
-	    resetdefaultblk := false
 	end if
     end if
 end WorldPreview
@@ -1402,6 +1411,7 @@ procedure KeyAndParallelInput
     keys := false
     keyd := false
     keyp := false
+    keyalt := false
 
     %Assign input variables for keyboard
     if arrow (' ') then
@@ -1418,6 +1428,9 @@ procedure KeyAndParallelInput
     end if
     if arrow ('p') then
 	keyp := true
+    end if
+    if arrow (KEY_ALT) then
+	keyalt := true
     end if
     if arrow ('l') then
 	for i : 0 .. 5
@@ -1437,7 +1450,7 @@ procedure KeyAndParallelInput
     for i : 0 .. 9
 	var c : char := intstr (i)
 	if arrow (c) then
-	    placingBlock := blockType (i).name
+	    placingBlock := blockType (i)
 	end if
     end for
 
@@ -1599,14 +1612,14 @@ procedure PlayerRightClick
 	    var mouseGX : real := toGameCdX (rcursorpb.x)
 	    var mouseGY : real := toGameCdY (rcursorpb.y)
 	    var mouseOnPlayer : boolean := false
-	    if blockType (blockID (placingBlock)).solid = 1 then
+	    if placingBlock.solid then
 		mouseOnPlayer := toBlock (mouseGX + 1) > leftSide () and toBlock (mouseGX) <= rightSide ()
 		    and toBlock (mouseGY + 1) > pos.y and toBlock (mouseGY) <= topSideCrouch ()
 	    end if
 	    if not mouseOnPlayer and not isBlock (mouseGX, mouseGY, "solid", true) then
-		if infinatePlacing or isBlock (mouseGX + 1, mouseGY, "solid", true) or isBlock (mouseGX - 1, mouseGY, "solid", true)
+		if infinatePlacing or placingBlock.physics or isBlock (mouseGX + 1, mouseGY, "solid", true) or isBlock (mouseGX - 1, mouseGY, "solid", true)
 			or isBlock (mouseGX, mouseGY + 1, "solid", true) or isBlock (mouseGX, mouseGY - 1, "solid", true) then
-		    setBlock (mouseGX, mouseGY, placingBlock)
+		    setBlock (mouseGX, mouseGY, placingBlock.name)
 		    DrawBlock (mouseGX, mouseGY, true)     %draws block you clicked, until a screen scroll/update
 		end if
 	    end if
@@ -1623,18 +1636,25 @@ end PlayerRightClick
 %If player left-clicks
 procedure PlayerLeftClick
     if cm = 1 and health > 0 and xm >= 0 and xm <= maxx and ym >= 0 and ym <= maxy then
-	if mclickl = 0 then
-	    mclickl := blockbreakspeed
-	end if
-	if mclickl = blockbreakspeed then
-	    if isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) then
-		setBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "air")
-		DrawBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), true)
+	if keyalt then
+	    placingBlock := blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y)))
+	    if placingBlock.name = "void" then
+		placingBlock := blockType (terrainQuery (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y)))
 	    end if
-	end if
-	mclickl -= 1
-	if mclickl = -1 then
-	    mclickl := blockbreakspeed
+	else
+	    if mclickl = 0 then
+		mclickl := blockbreakspeed
+	    end if
+	    if mclickl = blockbreakspeed then
+		if isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) then
+		    setBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "air")
+		    DrawBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), true)
+		end if
+	    end if
+	    mclickl -= 1
+	    if mclickl = -1 then
+		mclickl := blockbreakspeed
+	    end if
 	end if
     else
 	mclickl := 0
@@ -1647,7 +1667,6 @@ procedure PressPKey
 	inPauseMenu := true
 	View.Set ("nooffscreenonly")
 	oldbackcolour := bgcolour
-	oldblockcolour := blockcolour
 	fork pauseguis
 	Pic.Free (screenpic)
 	screenpic := Pic.New (0, 0, maxx, maxy)
@@ -1660,12 +1679,12 @@ procedure PressPKey
 	Draw.Text (colourstringify (headcolour) + " head", 1, maxy - 90, font2, black)
 	Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
 	Draw.Box (145, maxy - 67, 175, maxy - 37, black)
-	Draw.Text (colourstringify (bgcolour) + " background", 100, maxy - 90, font2, black)
-	Draw.FillBox (265, maxy - 67, 295, maxy - 37, blockcolour)
+	Draw.Text (timestringify (timeOfDay), 100, maxy - 90, font2, black)
+	Draw.FillBox (265, maxy - 67, 295, maxy - 37, placingBlock.clr)
 	Draw.Box (265, maxy - 67, 295, maxy - 37, black)
-	Draw.Text (colourstringify (blockcolour) + " blocks", 238, maxy - 90, font2, black)
+	Draw.Text (placingBlock.name + " blocks", 238, maxy - 90, font2, black)
 	loop
-	    exit when startgame
+	    exit when GUI.ProcessEvent %startgame
 	end loop
 
 	%If the quit button has not been clicked
@@ -1688,9 +1707,9 @@ procedure PressPKey
 	    %Loading screen
 	    loading (bgcolour)
 
-	    %Updates block and background colours
-	    if oldblockcolour not= blockcolour or oldbackcolour not= bgcolour then
-		Draw.FillBox (0, 0, maxx, maxy, bgcolour)     %a cls
+	    %Updates background colour
+	    if oldbackcolour not= bgcolour then
+		Draw.FillBox (0, 0, maxx, maxy, bgcolour)  %a cls
 		showWorld ()
 	    else
 		Pic.Draw (screenpic, 0, 0, picCopy)
@@ -1704,18 +1723,17 @@ end PressPKey
 %If 'd' key is pressed
 procedure PressDKey
     if keyd and health > 0 then
+	sprintpossiblea := 0 %Reset opposite sprint counter
 	if recentstartd then
 	    recentstartd := false
-	    if sprintpossibled2 = 0 then
-		sprintpossibled1 := doubletapspeed
+	    if sprintpossibled = 0 then
+		sprintpossibled := doubletapspeed
+	    elsif sprintpossibled not= 0 and (onground or flying) then
+		sprintpossibled := 0
+		sprintd := true
 	    end if
 	end if
-	if sprintpossibled2 not= 0 and (onground or flying) then
-	    sprintpossibled1 := 0
-	    sprintpossibled2 := 0
-	    sprintd := true
-	end if
-	if keys and onground or mustcrawl then
+	if keys and onground or mustcrawl then %crawling
 	    if flying then
 		if not onrightwall then
 		    pos.x += playerSpeed * 4 * deltaTime
@@ -1725,7 +1743,7 @@ procedure PressDKey
 		    pos.x += playerSpeed / 2 * deltaTime
 		end if
 	    end if
-	elsif sprintd then
+	elsif sprintd then %sprinting
 	    if flying then
 		if not onrightwall then
 		    pos.x += playerSpeed * 8 * deltaTime
@@ -1735,7 +1753,7 @@ procedure PressDKey
 		    pos.x += playerSpeed * 2 * deltaTime
 		end if
 	    end if
-	else
+	else %walking
 	    if flying then
 		if not onrightwall then
 		    pos.x += playerSpeed * 4 * deltaTime
@@ -1748,39 +1766,33 @@ procedure PressDKey
 	end if
 	action := "walking"
 	facing := "right"
-	recentstopd := true
     else
 	recentstartd := true
 	sprintd := false
-	if recentstopd and sprintpossibled1 not= 0 then
-	    recentstopd := false
-	    sprintpossibled2 := doubletapspeed
+    end if
+    %Timer for double-tapping to sprint right
+    if sprintpossibled > 0 then
+	sprintpossibled -= deltaTime
+	if sprintpossibled < 0 then
+	    sprintpossibled := 0
 	end if
-    end if
-    %Timers for double-tapping to sprint right
-    if sprintpossibled1 not= 0 then
-	sprintpossibled1 -= deltaTime
-    end if
-    if sprintpossibled2 not= 0 then
-	sprintpossibled2 -= deltaTime
     end if
 end PressDKey
 
 %If 'a' key is pressed
 procedure PressAKey
     if keya and health > 0 then
+	sprintpossibled := 0
 	if recentstarta then
 	    recentstarta := false
-	    if sprintpossiblea2 = 0 then
-		sprintpossiblea1 := doubletapspeed
+	    if sprintpossiblea = 0 then
+		sprintpossiblea := doubletapspeed
+	    elsif sprintpossiblea not= 0 and (onground or flying) then
+		sprintpossiblea := 0
+		sprinta := true
 	    end if
 	end if
-	if sprintpossiblea2 not= 0 and (onground or flying) then
-	    sprintpossiblea1 := 0
-	    sprintpossiblea2 := 0
-	    sprinta := true
-	end if
-	if keys and onground or mustcrawl then
+	if keys and onground or mustcrawl then %crawling
 	    if flying then
 		if not onleftwall then
 		    pos.x -= playerSpeed * 4 * deltaTime
@@ -1790,52 +1802,55 @@ procedure PressAKey
 		    pos.x -= playerSpeed / 2 * deltaTime
 		end if
 	    end if
-	else
-	    if sprinta then
-		if flying then
-		    if not onleftwall then
-			pos.x -= playerSpeed * 8 * deltaTime
-		    end if
-		else
-		    if not onleftwall then
-			pos.x -= playerSpeed * 2 * deltaTime
-		    end if
+	elsif sprinta then  %sprinting
+	    if flying then
+		if not onleftwall then
+		    pos.x -= playerSpeed * 8 * deltaTime
 		end if
 	    else
-		if flying then
-		    if not onleftwall then
-			pos.x -= playerSpeed * 4 * deltaTime
-		    end if
-		else
-		    if not onleftwall then
-			pos.x -= playerSpeed * deltaTime
-		    end if
+		if not onleftwall then
+		    pos.x -= playerSpeed * 2 * deltaTime
+		end if
+	    end if
+	else %walking
+	    if flying then
+		if not onleftwall then
+		    pos.x -= playerSpeed * 4 * deltaTime
+		end if
+	    else
+		if not onleftwall then
+		    pos.x -= playerSpeed * deltaTime
 		end if
 	    end if
 	end if
 	action := "walking"
 	facing := "left"
-	recentstopa := true
     else
 	recentstarta := true
 	sprinta := false
-	if recentstopa and sprintpossiblea1 not= 0 then
-	    recentstopa := false
-	    sprintpossiblea2 := doubletapspeed
+    end if
+    %Timer for double-tapping to sprint left
+    if sprintpossiblea > 0 then
+	sprintpossiblea -= deltaTime
+	if sprintpossiblea < 0 then
+	    sprintpossiblea := 0
 	end if
-    end if
-    %Timers for double-tapping to sprint left
-    if sprintpossiblea1 not= 0 then
-	sprintpossiblea1 -= deltaTime
-    end if
-    if sprintpossiblea2 not= 0 then
-	sprintpossiblea2 -= deltaTime
     end if
 end PressAKey
 
 %If spacebar is pressed
 procedure PressSpaceKey
     if keyspc and health > 0 then
+	if not survival and recentstartspace then
+	    recentstartspace := false
+	    if flypossible = 0 then
+		flypossible := doubletapspeed
+	    elsif flypossible not= 0 then
+		flypossible := 0
+		flying := not flying
+	    end if
+	end if
+
 	if (onground or flying) and not mustcrawl and not hitceiling then
 	    if flying then
 		pos.y += playerSpeed * 8 * deltaTime
@@ -1843,34 +1858,15 @@ procedure PressSpaceKey
 		jumpcount := jumpheight
 	    end if
 	end if
-
-	if recentstartspace then
-	    recentstartspace := false
-	    if flypossible2 = 0 then
-		flypossible1 := doubletapspeed
-	    end if
-	end if
-	if flypossible2 not= 0 then
-	    flypossible1 := 0
-	    flypossible2 := 0
-	    if not survival then
-		flying := not flying
-	    end if
-	end if
-	recentstopspace := true
     else
 	recentstartspace := true
-	if recentstopspace and flypossible1 not= 0 then
-	    recentstopspace := false
-	    flypossible2 := doubletapspeed
+    end if
+    %Timer for double-tapping to fly
+    if flypossible > 0 then
+	flypossible -= deltaTime
+	if flypossible < 0 then
+	    flypossible := 0
 	end if
-    end if
-    %Timers for double-tapping to sprint left
-    if flypossible1 not= 0 then
-	flypossible1 -= deltaTime
-    end if
-    if flypossible2 not= 0 then
-	flypossible2 -= deltaTime
     end if
 end PressSpaceKey
 
@@ -2080,9 +2076,11 @@ procedure CharInBlock
 		    end if
 		end for
 		inground := true
-		health -= 1
-		if health <= 0 then
-		    health := 0
+		if survival then
+		    health -= 1
+		    if health <= 0 then
+			health := 0
+		    end if
 		end if
 		exit
 	    end if
@@ -2458,7 +2456,7 @@ procedure AimGuideBacksaveAndDraw
 	    backpicbox := Pic.New (rcursorpb.x, rcursorpb.y, rcursorpb.x + blocksize - 1, rcursorpb.y + blocksize - 1)
 
 	    %Draw crosshairs for breaking blocks
-	    if isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) and blockcolour = black
+	    if isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) and blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y))).clr = black
 		    or not isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) and bgcolour = black then
 		Pic.Draw (crosshairsbb2, rcursorbb.x, rcursorbb.y, picMerge)
 	    else
@@ -2466,7 +2464,7 @@ procedure AimGuideBacksaveAndDraw
 	    end if
 
 	    %Draw box for placing blocks
-	    if isBlock (toGameCdX (rcursorpb.x), toGameCdY (rcursorpb.y), "any", true) and blockcolour = black
+	    if isBlock (toGameCdX (rcursorpb.x), toGameCdY (rcursorpb.y), "any", true) and blockType (block (toGameCdXR (rcursorpb.x)) (toGameCdYR (rcursorpb.y))).clr = black
 		    or not isBlock (toGameCdX (rcursorpb.x), toGameCdY (rcursorpb.y), "any", true) and bgcolour = black then
 		Pic.Draw (crosshairspb2, rcursorpb.x, rcursorpb.y, picMerge)
 	    else
@@ -2477,7 +2475,7 @@ procedure AimGuideBacksaveAndDraw
 	    backpiccross := Pic.New (rcursorbb.x, rcursorbb.y, rcursorbb.x + blocksize - 1, rcursorbb.y + blocksize - 1)
 
 	    %Draw crosshairs for breaking blocks and box for placing blocks
-	    if isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) and blockcolour = black
+	    if isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) and blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y))).clr = black
 		    or not isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) and bgcolour = black then
 		Pic.Draw (crosshairsbb2, rcursorbb.x, rcursorbb.y, picMerge)
 		Pic.Draw (crosshairspb2, rcursorpb.x, rcursorpb.y, picMerge)
@@ -2553,12 +2551,9 @@ end EraseAimGuide
 %End of main loop procedures
 
 procedure resetVariables
-    sprintpossibled1 := 0
-    sprintpossibled2 := 0
-    sprintpossiblea1 := 0
-    sprintpossiblea2 := 0
-    flypossible1 := 0
-    flypossible2 := 0
+    sprintpossibled := 0
+    sprintpossiblea := 0
+    flypossible := 0
     gravcount := 0
     jumpcount := 0
     frametimer := 0
@@ -2576,7 +2571,6 @@ procedure resetVariables
     blockplacespeed := 130
     blockbreakspeed := 130
     oldbackcolour := white
-    oldblockcolour := black
     infinatePlacing := false
     gmfrstmthrgh := false
     onground := false
@@ -2585,9 +2579,7 @@ procedure resetVariables
     hitceiling := false
     sprintd := false
     sprinta := false
-    recentstopd := false
     recentstartd := false
-    recentstopa := false
     recentstarta := false
     mustcrawl := false
     startgame := false
@@ -2599,10 +2591,9 @@ procedure resetVariables
     keys := false
     keyd := false
     keyp := false
+    keyalt := false
     preview := false
-    resetdefaultbg := false
     resetdefaulthead := false
-    resetdefaultblk := false
     flying := false
     menuReturn := false
     charwidth := toGameCdMeasure (Pic.Width (character) - Pic.Width (character) mod 2)
@@ -2615,8 +2606,6 @@ procedure resetVariables
     oldfacing := ""
     loadfile := ""
     headcolour := 983
-    bgcolour := 983
-    blockcolour := 983
     ponwlk := 1
     poncrl := 1
     isaves := 1
@@ -2672,6 +2661,9 @@ loop
 	ReEnableStartGUIs
 
 	%Run the GUIs to be used in main and pause menus
+	if gmfrstmthrgh then
+	    createguis
+	end if
 	fork guis
 	if #btnend not= 16#80000000 then
 	    GUI.Show (btnend)
@@ -2679,9 +2671,9 @@ loop
 
 	ShowColourPreveiwDefault
 
-	%Wait until user clicks "start" button
+	%Wait until user clicks "start" or "quit" button
 	loop
-	    exit when startgame
+	    exit when startgame or quitthegame
 	end loop
 
 	if quitthegame then
@@ -2707,15 +2699,9 @@ loop
 	    blockbreakspeed := 0
 	end if
 
-	%Set default indicators
-	if bgcolour = 983 then
-	    resetdefaultbg := true
-	end if
+	%Set head default indicator
 	if headcolour = 983 then
 	    resetdefaulthead := true
-	end if
-	if blockcolour = 983 then
-	    resetdefaultblk := true
 	end if
 
 	%Set program variables
