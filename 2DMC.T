@@ -4,8 +4,7 @@
 %File Name: 2DMC.t
 %Date: Feb. 11, 2013
 
-%Make using GUI features possible
-import GUI
+import GUI %Make using GUI features possible
 
 %Program settings
 View.Set ("position:top;right,graphics:640;400") %Smallest advisable:450,330
@@ -17,22 +16,23 @@ setscreen ("noecho")
 %Can't see tnt in block list
 %Can't see all worlds in block list
 %Text for "mangroveworldsaved" overlaps save text field
+%Make player's update box form-fit to the player by placing it at the *old* location (unless I've already done that)
 %Make screen scrolling faster by moving the background picture and just updating the blocks at the edge of the screen
+%Fix player holding click to place blocks while crawling backwards makes spacing of 1, but then when screen is scrolling, it makes spacing of 2.
 /*
  -Background makes block not infinite IF it is a wall-type tile!
  -Dirt, stone, any physics block that generates underground, and liquids CANNOT be used as wall tiles.
  -Dirt and stone can still be used as background though, for decorative purposes.
  -Liquids and physics blocks can never go on the background layer.
  -While on the go-around layer, you cannot place blocks or walls (breaking through a wall is allowed - think breaking into your house if you are stuck out for some reason)
- -No background blocks underground
- -Only naturally occuring terrain blocks can be infinite (dirt, stone, sand, water (not ores?))
- -ORRRR! Background blocks only have a go-around effect (or can only be placed(X)) if [there is no solid block on them] || [there is an air block on the foreground within 2 squares of them]!
+ X-No background blocks underground
+ X-Only naturally occuring terrain blocks can be infinite (dirt, stone, sand, water (not ores?))
+ X-ORRRR! Background blocks only have a go-around effect (or can only be placed(X)) if [there is no solid block on them] || [there is an air block on the foreground within 2 squares of them]!
  -Trees on whole regular blocks, no "nat wood" - this way, can climb them and jump from treetop to treetop
  -Wood: Can be climbed like a ladder if just a pole (new animation for this?)
  -Hotbar 1,2,3 are three tools: foreground, background, and terrain(terrain tool is just foreground tool, but removes any background blocks behind it)
  -Tools other than foreground have to be unlocked/acquired/crafted
  -Rest of hotbar is blocks
- -First try struct of two int1s - bg and block
  */
 %Add physics to sand and water!
 %Add fire switching to different shades of red, orange, and yellow randomly
@@ -59,6 +59,7 @@ var timer : int := 0
 const midx : int := maxx div 2
 const midy : int := maxy div 2
 const boolUnInit := 16#FF
+const intUnInit := 16#80000000
 const thisGenVersion : int := 3
 const jumpheight : real := 2.3
 const reach : real := 5
@@ -79,7 +80,10 @@ var trainx : real := 10
 var trainy : real := 3
 var trainLeft : boolean := true
 var trainbackpic : int := Pic.New (0, 0, 2, 2)
+var imgDir : string := "Images\\"
+var imgType : string := ".bmp"
 
+%Type declarations for blocks
 %Block class
 type blockStruct :
     record
@@ -168,7 +172,7 @@ if iter not= numBlockTypes then
     quit
 end if
 
-%Variable declarations
+%Type declarations pt 2
 type vec2 :
     record
 	x, y : real
@@ -185,258 +189,28 @@ type cursorClr : enum (black, white)
 type motion : enum (back)
 type backdir : enum (left, right)
 
-var blocksize : int := 16 %Must be > 15 %Edit: Oh really? Maybe now... ?
-
-%walk, 1-4, l/r, ""/c
-%crawl, 1-4, l/r, ""/c
-%falljump, ""/c, (c's)l/r
-%stand, ""/c, (c's)l/r
-%jump, l/r, (""/c)/(r/l)
-%fall, l/r, (""/c)/(r/l)
-%dead, ""/l/r
-%crosshairs, bb/pb, ""/2
-
-%Major: 1-4, ""/l/r, ""/c, bb/pb/ ""/2
-
-var sprite : array 0 .. 7 of array 0 .. 3 of array 0 .. 2 of array 0 .. 1 of int
-
-var spriteFileNames : array 0 .. 7 of string := init ("walk", "crawl", "falljump", "stand", "jump", "fall", "dead", "crosshairs")
-var spritelr : array 0 .. 2 of string := init ("", "l", "r")
-var spritec : array 0 .. 1 of string := init ("", "c")
-var spriteb : array 0 .. 1 of string := init ("bb", "pb")
-var sprite2 : array 0 .. 1 of string := init ("", "2")
-
-var imgDir : string := "Images\\"
-var imgType : string := ".bmp"
-%var nullPic : int := Pic.FileNew(imgDir + "dead" + imgType)
-for action : 0 .. 7
-    for frame : 1 .. 4
-	for leftright : 0 .. 2
-	    for isc : 0 .. 1
-		for blockborp : 0 .. 1
-		    for twoornah : 0 .. 1
-			var filename : string := "null"
-			if action <= 1 and frame <= 4 and leftright > 0 and blockborp = 0 and twoornah = 0 then %walk, crawl
-			    filename := spriteFileNames (action) + intstr (frame) + spritelr (leftright) + spritec (isc)
-			    sprite (action) (frame - 1) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
-			elsif action >= 2 and action <= 3 and frame = 1 and leftright > 0 and blockborp = 0 and twoornah = 0 then %falljump, stand
-			    if isc = 0 then
-				if leftright = 1 then
-				    filename := spriteFileNames (action) + spritec (isc)
-				    sprite (action) (frame - 1) (0) (isc) := Pic.FileNew (imgDir + filename + imgType)
-				end if
-			    else
-				filename := spriteFileNames (action) + spritec (isc) + spritelr (leftright)
-				sprite (action) (frame - 1) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
-			    end if
-			elsif action >= 4 and action <= 5 and frame = 1 and leftright > 0 and twoornah = 0 then % jump, fall
-			    if blockborp = 0 then
-				if isc = 0 then
-				    if leftright = 1 then
-					filename := spriteFileNames (action) + spritelr (leftright) + spritelr (2)
-				    else
-					filename := spriteFileNames (action) + spritelr (leftright) + spritelr (1)
-				    end if
-				    sprite (action) (frame - 1) (0) (leftright - 1) := Pic.FileNew (imgDir + filename + imgType)
-				end if
-			    else
-				filename := spriteFileNames (action) + spritelr (leftright) + spritec (isc)
-				sprite (action) (frame - 1) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
-			    end if
-			elsif action = 6 and frame = 1 and isc = 0 and blockborp = 0 and twoornah = 0 then %dead
-			    filename := spriteFileNames (action) + spritelr (leftright)
-			    sprite (action) (frame - 1) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
-			elsif action = 7 and frame = 1 and leftright = 0 and isc = 0 then %crosshairs
-			    filename := spriteFileNames (action) + spriteb (blockborp) + sprite2 (twoornah)
-			    sprite (action) (frame - 1) (blockborp) (twoornah) := Pic.FileNew (imgDir + filename + imgType)
-			end if
-			/*if filename = "null" and blockborp = 0 and twoornah = 0 then %Wouldn't work, too much changing the indicies going on up above.
-			 sprite (action) (frame - 1) (leftright) (isc) := nullPic
-			 end if*/
-		    end for
-		end for
-	    end for
-	end for
-    end for
-end for
-
-var walkr : array 1 .. 4 of int
-walkr (1) := sprite (ord (sprt.walk)) (0) (2) (0)
-walkr (2) := sprite (ord (sprt.walk)) (1) (2) (0)
-walkr (3) := sprite (ord (sprt.walk)) (2) (2) (0)
-walkr (4) := sprite (ord (sprt.walk)) (3) (2) (0)
-var walkl : array 1 .. 4 of int
-walkl (1) := sprite (ord (sprt.walk)) (0) (1) (0)
-walkl (2) := sprite (ord (sprt.walk)) (1) (1) (0)
-walkl (3) := sprite (ord (sprt.walk)) (2) (1) (0)
-walkl (4) := sprite (ord (sprt.walk)) (3) (1) (0)
-var crawlr : array 1 .. 4 of int
-crawlr (1) := sprite (ord (sprt.crawl)) (0) (2) (0)
-crawlr (2) := sprite (ord (sprt.crawl)) (1) (2) (0)
-crawlr (3) := sprite (ord (sprt.crawl)) (2) (2) (0)
-crawlr (4) := sprite (ord (sprt.crawl)) (3) (2) (0)
-var crawll : array 1 .. 4 of int
-crawll (1) := sprite (ord (sprt.crawl)) (0) (1) (0)
-crawll (2) := sprite (ord (sprt.crawl)) (1) (1) (0)
-crawll (3) := sprite (ord (sprt.crawl)) (2) (1) (0)
-crawll (4) := sprite (ord (sprt.crawl)) (3) (1) (0)
-var walkrc : array 1 .. 4 of int
-walkrc (1) := sprite (ord (sprt.walk)) (0) (2) (1)
-walkrc (2) := sprite (ord (sprt.walk)) (1) (2) (1)
-walkrc (3) := sprite (ord (sprt.walk)) (2) (2) (1)
-walkrc (4) := sprite (ord (sprt.walk)) (3) (2) (1)
-var walklc : array 1 .. 4 of int
-walklc (1) := sprite (ord (sprt.walk)) (0) (1) (1)
-walklc (2) := sprite (ord (sprt.walk)) (1) (1) (1)
-walklc (3) := sprite (ord (sprt.walk)) (2) (1) (1)
-walklc (4) := sprite (ord (sprt.walk)) (3) (1) (1)
-var crawlrc : array 1 .. 4 of int
-crawlrc (1) := sprite (ord (sprt.crawl)) (0) (2) (1)
-crawlrc (2) := sprite (ord (sprt.crawl)) (1) (2) (1)
-crawlrc (3) := sprite (ord (sprt.crawl)) (2) (2) (1)
-crawlrc (4) := sprite (ord (sprt.crawl)) (3) (2) (1)
-var crawllc : array 1 .. 4 of int
-crawllc (1) := sprite (ord (sprt.crawl)) (0) (1) (1)
-crawllc (2) := sprite (ord (sprt.crawl)) (1) (1) (1)
-crawllc (3) := sprite (ord (sprt.crawl)) (2) (1) (1)
-crawllc (4) := sprite (ord (sprt.crawl)) (3) (1) (1)
-var jump : int := sprite (ord (sprt.falljump)) (0) (0) (0)
-var jumpcr : int := sprite (ord (sprt.falljump)) (0) (2) (1)
-var jumpcl : int := sprite (ord (sprt.falljump)) (0) (1) (1)
-var jumpr : int := sprite (ord (sprt.jump)) (0) (2) (0)
-var jumpl : int := sprite (ord (sprt.jump)) (0) (1) (0)
-var jumprc : int := sprite (ord (sprt.jump)) (0) (2) (1)
-var jumplc : int := sprite (ord (sprt.jump)) (0) (1) (1)
-var jumprl : int := sprite (ord (sprt.jump)) (0) (ord (motion.back)) (ord (backdir.left)) % (action)(frame)(isSpecial=0)(spleft=0) %rl %facing left
-var jumplr : int := sprite (ord (sprt.jump)) (0) (ord (motion.back)) (ord (backdir.right)) % (action)(frame)(isSpecial=0)(spright=1) %lr %facing right
-var fallr : int := sprite (ord (sprt.fall)) (0) (2) (0)
-var falll : int := sprite (ord (sprt.fall)) (0) (1) (0)
-var fallrc : int := sprite (ord (sprt.fall)) (0) (2) (1)
-var falllc : int := sprite (ord (sprt.fall)) (0) (1) (1)
-var fallrl : int := sprite (ord (sprt.fall)) (0) (ord (motion.back)) (ord (backdir.left)) % (action)(frame)(isSpecial=0)(spleft=0) %rl %facing left
-var falllr : int := sprite (ord (sprt.fall)) (0) (ord (motion.back)) (ord (backdir.right)) % (action)(frame)(isSpecial=0)(spright=1) %lr %facing right
-var fall : int := sprite (ord (sprt.falljump)) (0) (0) (0)
-var fallcr : int := sprite (ord (sprt.falljump)) (0) (2) (1)
-var fallcl : int := sprite (ord (sprt.falljump)) (0) (1) (1)
-var stand : int := sprite (ord (sprt.stand)) (0) (0) (0)
-var standcr : int := sprite (ord (sprt.stand)) (0) (2) (1)
-var standcl : int := sprite (ord (sprt.stand)) (0) (1) (1)
-var dead : int := sprite (ord (sprt.dead)) (0) (0) (0)
-var deadl : int := sprite (ord (sprt.dead)) (0) (1) (0)
-var deadr : int := sprite (ord (sprt.dead)) (0) (2) (0)
-var crosshairsbbpre : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.isbb)) (ord (cursorClr.black)) % (action)(frame)(isbb=0)(colorblack=0)
-var crosshairsbbpre2 : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.isbb)) (ord (cursorClr.white)) % (action)(frame)(isbb=0)(colorwhite=1)
-var crosshairspbpre : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.ispb)) (ord (cursorClr.black)) % (action)(frame)(ispb=1)(colorblack=0)
-var crosshairspbpre2 : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.ispb)) (ord (cursorClr.white)) % (action)(frame)(ispb=1)(colorwhite=1)
-
-
-/*
- var walkr : array 1 .. 4 of int
- walkr (1) := Pic.FileNew ("Images\\walk1r.bmp")
- walkr (2) := Pic.FileNew ("Images\\walk2r.bmp")
- walkr (3) := Pic.FileNew ("Images\\walk3r.bmp")
- walkr (4) := Pic.FileNew ("Images\\walk4r.bmp")
- var walkl : array 1 .. 4 of int
- walkl (1) := Pic.FileNew ("Images\\walk1l.bmp")
- walkl (2) := Pic.FileNew ("Images\\walk2l.bmp")
- walkl (3) := Pic.FileNew ("Images\\walk3l.bmp")
- walkl (4) := Pic.FileNew ("Images\\walk4l.bmp")
- var crawlr : array 1 .. 4 of int
- crawlr (1) := Pic.FileNew ("Images\\crawl1r.bmp")
- crawlr (2) := Pic.FileNew ("Images\\crawl2r.bmp")
- crawlr (3) := Pic.FileNew ("Images\\crawl3r.bmp")
- crawlr (4) := Pic.FileNew ("Images\\crawl4r.bmp")
- var crawll : array 1 .. 4 of int
- crawll (1) := Pic.FileNew ("Images\\crawl1l.bmp")
- crawll (2) := Pic.FileNew ("Images\\crawl2l.bmp")
- crawll (3) := Pic.FileNew ("Images\\crawl3l.bmp")
- crawll (4) := Pic.FileNew ("Images\\crawl4l.bmp")
- var walkrc : array 1 .. 4 of int
- walkrc (1) := Pic.FileNew ("Images\\walk1rc.bmp") %click
- walkrc (2) := Pic.FileNew ("Images\\walk2rc.bmp") %click
- walkrc (3) := Pic.FileNew ("Images\\walk3rc.bmp") %click
- walkrc (4) := Pic.FileNew ("Images\\walk4rc.bmp") %click
- var walklc : array 1 .. 4 of int
- walklc (1) := Pic.FileNew ("Images\\walk1lc.bmp") %click
- walklc (2) := Pic.FileNew ("Images\\walk2lc.bmp") %click
- walklc (3) := Pic.FileNew ("Images\\walk3lc.bmp") %click
- walklc (4) := Pic.FileNew ("Images\\walk4lc.bmp") %click
- var crawlrc : array 1 .. 4 of int
- crawlrc (1) := Pic.FileNew ("Images\\crawl1rc.bmp") %click
- crawlrc (2) := Pic.FileNew ("Images\\crawl2rc.bmp") %click
- crawlrc (3) := Pic.FileNew ("Images\\crawl3rc.bmp") %click
- crawlrc (4) := Pic.FileNew ("Images\\crawl4rc.bmp") %click
- var crawllc : array 1 .. 4 of int
- crawllc (1) := Pic.FileNew ("Images\\crawl1lc.bmp") %click
- crawllc (2) := Pic.FileNew ("Images\\crawl2lc.bmp") %click
- crawllc (3) := Pic.FileNew ("Images\\crawl3lc.bmp") %click
- crawllc (4) := Pic.FileNew ("Images\\crawl4lc.bmp") %click
- var jump : int := Pic.FileNew ("Images\\falljump.bmp")
- var jumpcr : int := Pic.FileNew ("Images\\falljumpcr.bmp") %click
- var jumpcl : int := Pic.FileNew ("Images\\falljumpcl.bmp") %click
- var jumpr : int := Pic.FileNew ("Images\\jumpr.bmp")
- var jumpl : int := Pic.FileNew ("Images\\jumpl.bmp")
- var jumprc : int := Pic.FileNew ("Images\\jumprc.bmp") %click
- var jumplc : int := Pic.FileNew ("Images\\jumplc.bmp") %click
- var jumprl : int := Pic.FileNew ("Images\\jumprl.bmp") %click
- var jumplr : int := Pic.FileNew ("Images\\jumplr.bmp") %click
- var fallr : int := Pic.FileNew ("Images\\fallr.bmp")
- var falll : int := Pic.FileNew ("Images\\falll.bmp")
- var fallrc : int := Pic.FileNew ("Images\\fallrc.bmp") %click
- var falllc : int := Pic.FileNew ("Images\\falllc.bmp") %click
- var fallrl : int := Pic.FileNew ("Images\\fallrl.bmp") %click
- var falllr : int := Pic.FileNew ("Images\\falllr.bmp") %click
- var fall : int := Pic.FileNew ("Images\\falljump.bmp")
- var fallcr : int := Pic.FileNew ("Images\\falljumpcr.bmp") %click
- var fallcl : int := Pic.FileNew ("Images\\falljumpcl.bmp") %click
- var stand : int := Pic.FileNew ("Images\\stand.bmp")
- var standcr : int := Pic.FileNew ("Images\\standcr.bmp") %click
- var standcl : int := Pic.FileNew ("Images\\standcl.bmp") %click
- var dead : int := Pic.FileNew ("Images\\dead.bmp")
- var deadl : int := Pic.FileNew ("Images\\deadl.bmp")
- var deadr : int := Pic.FileNew ("Images\\deadr.bmp")
- var crosshairsbbpre : int := Pic.FileNew ("Images\\crosshairsbb.bmp")
- var crosshairsbbpre2 : int := Pic.FileNew ("Images\\crosshairsbb2.bmp")
- var crosshairspbpre : int := Pic.FileNew ("Images\\crosshairspb.bmp")
- var crosshairspbpre2 : int := Pic.FileNew ("Images\\crosshairspb2.bmp")
- */
-var loadingScreen1 : int := Pic.FileNew ("Images\\loadingScreen.bmp")
+%Global variable declarations
+var blocksize : int := 16 %Must be > 15 %Edit: Oh really? Maybe now...
+var loadingScreen1 : int := Pic.FileNew (imgDir + "loadingScreen" + imgType)
 var font1 := Font.New ("sans serif:40:bold")
 var font2 := Font.New ("sans serif:8:bold")
 var loadingScreen : int := Pic.Scale (loadingScreen1, maxx - 20, maxy - 20)
-var charwidth : real := Pic.Width (stand) / blocksize
-var charheight : real := Pic.Height (stand) / blocksize
 var arrow : array char of boolean
-var pos, oldPos : vec2
-var rcursorbb, rcursorpb : vec2i
-pos.x := 0
-pos.y := 0
-oldPos.x := pos.x
-oldPos.y := pos.y
 var backpic : int := Pic.New (0, 0, 2, 2)
 var screenpic : int := Pic.New (0, 0, 2, 2)
-var healthbar : int := Pic.New (0, 0, 2, 2)
 var healthbarback : int := Pic.New (0, 0, 2, 2)
-var deltaTime, xm, ym, cm, character, btnstrt, btncont, btnend, mainMenuButton, loadedsave, loadedsavepref, menuhead, menubg, menublk,
-    menuload, saveButton, saveasguiheight, nameTextField, nameLabel, saveFile, menudelete, backpiccross, backpicbox, autocoords,
-    cbprev, cbcreative, genVersion, seed, popupWinID : int
-var gametimeold, sprintpossibled, sprintpossiblea, flypossible, mclickr, mclickl,
-    healthold, crosshairsbb2, crosshairsbb, crosshairspb2, crosshairspb, mstScrnHsGnLft, mstScrnHsGnRght, mstScrnHsGnUp,
-    mstScrnHsGnDwn : int := 0
-var onground, inground, onleftwall, onrightwall, hitceiling, sprintd, sprinta, recentstartd, recentstarta, recentstartspace,
-    mustcrawl, recentclick, loaded, quitthegame, keyspc, keya, keys, keyd, keyp, keyalt, preview, resetdefaulthead, flying,
-    menuReturn, returningFromPreview, inPauseMenu, scrollSlow, yesDelete : boolean := false
-var gmfrstmthrgh, survival : boolean := true
-var jumpcount, gravcount, frametimer, offsetleftright, offsetupdown, slowScrollSpeed : real := 0
+var deltaTime, xm, ym, cm, btnstrt, btncont, btnend, mainMenuButton, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload,
+    saveButton, saveasguiheight, nameTextField, nameLabel, saveFile, menudelete, cbprev, cbcreative, genVersion, seed, popupWinID : int
+var gametimeold, mstScrnHsGnLft, mstScrnHsGnRght, mstScrnHsGnUp, mstScrnHsGnDwn : int := 0
+var loaded, quitthegame, keyspc, keya, keys, keyd, keyp, keyalt, preview, resetdefaulthead, menuReturn, returningFromPreview,
+    inPauseMenu, scrollSlow, yesDelete : boolean := false
+var gmfrstmthrgh : boolean := true
+var offsetleftright, offsetupdown, slowScrollSpeed : real := 0
 var timeOfDay : real := -1
-var ponwlk, poncrl, isaves, wlk, crl : int := 1
-var headcolour : int := -1
+var isaves : int := 1
 var oldbackcolour, bgcolour : int := white
-var health : int := 1000
-var placingBlock : blockStruct := blockType (ord (blk.error))
 var textfound : string
-var facing, oldfacing, loadfile, importedBlockList : string := ""
-var action, actionCurrent : string := "standing"
+var loadfile, importedBlockList : string := ""
 var item1 : array 1 .. 16 of int
 var item2 : array 1 .. 13 of int
 var item3 : array 1 .. numBlockTypes of int
@@ -466,6 +240,114 @@ else
     saveasguiheight := maxy - 120
 end if
 
+
+%PLAYER CLASS STUFF
+
+%walk, 1-4, l/r, ""/c
+%crawl, 1-4, l/r, ""/c
+%falljump, ""/c, (c's)l/r
+%stand, ""/c, (c's)l/r
+%jump, l/r, (""/c)/(r/l)
+%fall, l/r, (""/c)/(r/l)
+%dead, ""/l/r
+%crosshairs, bb/pb, ""/2
+
+%Major: 1-4, ""/l/r, ""/c, bb/pb/ ""/2
+
+var sprite : array 0 .. 7 of array 0 .. 3 of array 0 .. 2 of array 0 .. 1 of int
+
+var spriteFileNames : array 0 .. 7 of string := init ("walk", "crawl", "falljump", "stand", "jump", "fall", "dead", "crosshairs")
+var spritelr : array 0 .. 2 of string := init ("", "l", "r")
+var spritec : array 0 .. 1 of string := init ("", "c")
+var spriteb : array 0 .. 1 of string := init ("bb", "pb")
+var sprite2 : array 0 .. 1 of string := init ("", "2")
+
+%var nullPic : int := Pic.FileNew(imgDir + "dead" + imgType)
+for action : 0 .. 7
+    for frame : 0 .. 3
+	for leftright : 0 .. 2
+	    for isc : 0 .. 1
+		for blockborp : 0 .. 1
+		    for twoornah : 0 .. 1
+			var filename : string := "null"
+			if action <= 1 and leftright > 0 and blockborp = 0 and twoornah = 0 then %walk, crawl
+			    filename := spriteFileNames (action) + intstr (frame + 1) + spritelr (leftright) + spritec (isc)
+			    sprite (action) (frame) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
+			elsif action >= 2 and action <= 3 and frame = 0 and leftright > 0 and blockborp = 0 and twoornah = 0 then %falljump, stand
+			    if isc = 0 then
+				if leftright = 1 then
+				    filename := spriteFileNames (action) + spritec (isc)
+				    sprite (action) (frame) (0) (isc) := Pic.FileNew (imgDir + filename + imgType)
+				end if
+			    else
+				if action = 3 and frame = 0 and leftright not= 0 and isc = 1 then %standrc and lc .bmp do not exist! I've been using a frame from walk!
+				    filename := spriteFileNames (ord (sprt.walk)) + "2" + spritelr (leftright) + spritec (isc)
+				else
+				    filename := spriteFileNames (action) + spritec (isc) + spritelr (leftright)
+				end if
+				sprite (action) (frame) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
+			    end if
+			elsif action >= 4 and action <= 5 and frame = 0 and leftright > 0 and twoornah = 0 then % jump, fall
+			    if blockborp = 0 then
+				if isc = 0 then
+				    if leftright = 1 then
+					filename := spriteFileNames (action) + spritelr (leftright) + spritelr (2)
+				    else
+					filename := spriteFileNames (action) + spritelr (leftright) + spritelr (1)
+				    end if
+				    sprite (action) (frame) (0) (leftright - 1) := Pic.FileNew (imgDir + filename + imgType)
+				end if
+			    else
+				filename := spriteFileNames (action) + spritelr (leftright) + spritec (isc)
+				sprite (action) (frame) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
+			    end if
+			elsif action = 6 and frame = 0 and isc = 0 and blockborp = 0 and twoornah = 0 then %dead
+			    filename := spriteFileNames (action) + spritelr (leftright)
+			    sprite (action) (frame) (leftright) (isc) := Pic.FileNew (imgDir + filename + imgType)
+			elsif action = 7 and frame = 0 and leftright = 0 and isc = 0 then %crosshairs
+			    filename := spriteFileNames (action) + spriteb (blockborp) + sprite2 (twoornah)
+			    sprite (action) (frame) (blockborp) (twoornah) := Pic.FileNew (imgDir + filename + imgType)
+			end if
+			/*if filename = "null" and blockborp = 0 and twoornah = 0 then %Wouldn't work, too much changing the indicies going on up above.
+			 sprite (action) (frame) (leftright) (isc) := nullPic
+			 end if*/
+		    end for
+		end for
+	    end for
+	end for
+    end for
+end for
+
+%PLAYER CLASS VARIABLES
+var stand : int := sprite (ord (sprt.stand)) (0) (0) (0)
+var crawlr : int := sprite (ord (sprt.crawl)) (0) (2) (0)
+var crosshairsbbpre : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.isbb)) (ord (cursorClr.black)) % (action)(frame)(isbb=0)(colorblack=0)
+var crosshairsbbpre2 : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.isbb)) (ord (cursorClr.white)) % (action)(frame)(isbb=0)(colorwhite=1)
+var crosshairspbpre : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.ispb)) (ord (cursorClr.black)) % (action)(frame)(ispb=1)(colorblack=0)
+var crosshairspbpre2 : int := sprite (ord (sprt.crosshairs)) (0) (ord (cursor.ispb)) (ord (cursorClr.white)) % (action)(frame)(ispb=1)(colorwhite=1)
+
+var charwidth : real := Pic.Width (stand) / blocksize
+var charheight : real := Pic.Height (stand) / blocksize
+var pos, oldPos : vec2
+var rcursorbb, rcursorpb : vec2i
+pos.x := 0
+pos.y := 0
+oldPos.x := pos.x
+oldPos.y := pos.y
+var character, backpiccross, backpicbox : int
+var sprintpossibled, sprintpossiblea, flypossible, mclickr, mclickl, healthold, crosshairsbb2, crosshairsbb, crosshairspb2,
+    crosshairspb, action, actionCurrent, frame, isClick, facing : int := 0
+var onground, inground, onleftwall, onrightwall, hitceiling, sprintd, sprinta, recentstartd, recentstarta, recentstartspace,
+    mustcrawl, recentclick, flying, moving : boolean := false
+var survival : boolean := true
+var jumpcount, gravcount, frametimer : real := 0
+var headcolour : int := -1
+var health : int := 1000
+var placingBlock : blockStruct := blockType (ord (blk.error))
+var oldfacing : string := ""
+
+
+%-------------Functions-----------------
 function LERP (data1, data2 : int, u : real) : int
     result round (intreal (data1) * (1.0 - u) + intreal (data2) * u)
 end LERP
@@ -509,7 +391,7 @@ function toGameCdMeasure (val : real) : real
     result val / blocksize
 end toGameCdMeasure
 
-var crouchheight : real := toGameCdMeasure (Pic.Height (crawlr (1)))
+var crouchheight : real := toGameCdMeasure (Pic.Height (crawlr))
 var standheight : real := toGameCdMeasure (Pic.Height (stand))
 
 function decodeX (coordcode : int) : int
@@ -554,14 +436,6 @@ end topSideOld
 function topSideCrouch () : real
     result pos.y + crouchheight
 end topSideCrouch
-
-function isAction (testForAction : string) : boolean
-    result length (action) >= length (testForAction) and action (1 .. length (testForAction)) = testForAction
-end isAction
-
-function isActionCurrent (testForAction : string) : boolean
-    result length (actionCurrent) >= length (testForAction) and actionCurrent (1 .. length (testForAction)) = testForAction
-end isActionCurrent
 
 function smallestOf (in1, in2 : real) : real
     if in1 <= in2 then
@@ -1594,7 +1468,7 @@ procedure AssignStartingVariables
     crosshairspb2 := Pic.Scale (crosshairspbpre2, blocksize, blocksize)
     Pic.SetTransparentColor (crosshairsbb2, 7)
     Pic.SetTransparentColor (crosshairspb2, 7)
-    crouchheight := toGameCdMeasure (Pic.Height (crawlr (1)))
+    crouchheight := toGameCdMeasure (Pic.Height (crawlr))
     standheight := toGameCdMeasure (Pic.Height (stand))
 end AssignStartingVariables
 
@@ -2145,6 +2019,7 @@ end PressPKey
 %If 'd' key is pressed
 procedure PressDKey
     if keyd and health > 0 then
+	moving := true
 	sprintpossiblea := 0 %Reset opposite sprint counter
 	if recentstartd then
 	    recentstartd := false
@@ -2186,8 +2061,8 @@ procedure PressDKey
 		end if
 	    end if
 	end if
-	action := "walking"
-	facing := "right"
+	action := ord (sprt.walk)
+	facing := 2 %"right"
     else
 	recentstartd := true
 	sprintd := false
@@ -2204,6 +2079,7 @@ end PressDKey
 %If 'a' key is pressed
 procedure PressAKey
     if keya and health > 0 then
+	moving := true
 	sprintpossibled := 0
 	if recentstarta then
 	    recentstarta := false
@@ -2245,8 +2121,8 @@ procedure PressAKey
 		end if
 	    end if
 	end if
-	action := "walking"
-	facing := "left"
+	action := ord (sprt.walk)
+	facing := 1 %"left"
     else
 	recentstarta := true
 	sprinta := false
@@ -2297,11 +2173,7 @@ end PressSpaceKey
 procedure PressSKey
     if keys and health > 0 then
 	if onground then
-	    if keya or keyd then
-		action := "crawling"
-	    else
-		action := "crawlingstop"
-	    end if
+	    action := ord (sprt.crawl)
 	elsif flying then
 	    pos.y -= playerSpeed * 8 * deltaTime
 	end if
@@ -2312,10 +2184,10 @@ end PressSKey
 procedure CharJump
     if not mustcrawl and not flying then
 	if jumpcount = jumpheight then
-	    facing := ""
+	    facing := 0
 	end if
 	if jumpcount > 0 then
-	    action := "jumping"
+	    action := ord (sprt.jump)
 	    if hitceiling then
 		jumpcount := 0
 	    else
@@ -2331,7 +2203,7 @@ procedure CharJump
 	end if
 
 	if not onground and jumpcount = 0 then
-	    action := "falling"
+	    action := ord (sprt.fall)
 	end if
     end if
 end CharJump
@@ -2450,7 +2322,7 @@ procedure CharMustCrawl
     if Pic.Height (stand) > blocksize then
 	mustcrawl := false
 	var headHeightLevel : real := topSide ()
-	if isActionCurrent ("crawling") then
+	if actionCurrent = ord (sprt.crawl) then %isActionCurrent ("crawling") then
 	    headHeightLevel += 1
 	end if
 	var checkCount : int := ceil (charwidth)
@@ -2462,7 +2334,7 @@ procedure CharMustCrawl
 	for i : 0 .. checkCount - 1
 	    if isBlockR (leftSide () + i, headHeightLevel, blkGroup.solid, 1, true) then
 		mustcrawl := true
-		actionCurrent := "crawling"
+		actionCurrent := ord (sprt.crawl)
 		charheight := crouchheight
 		exit
 	    end if
@@ -2557,7 +2429,7 @@ procedure CharSnapDownFall
 	end if
 	if canStand then
 	    mustcrawl := false
-	    actionCurrent := "falling"
+	    actionCurrent := ord (sprt.fall)
 	    charheight := standheight
 	end if
     end if
@@ -2611,221 +2483,117 @@ procedure SetHealth
     end if
 end SetHealth
 
-%Finish the first part of assigning a usable value to "action"
-procedure FinalizeAction1
+%Crawling and walking animations
+procedure Animations
+    %Character image used if forced crawling
+    if mustcrawl then
+	action := ord (sprt.crawl)
+    end if
+    %Walking/Crawling animations
+    if (frametimer >= 30 and action not= ord (sprt.crawl) and (sprinta or sprintd) or frametimer >= 50 and action not= ord (sprt.crawl))
+	    or (frametimer >= 80 and action = ord (sprt.crawl)) then
+	frametimer := 0
+	frame += 1
+	if frame > 5 then
+	    frame := 0
+	end if
+    end if
+end Animations
+
+%Finalizing "action" and deciding what character image is being used
+procedure CharImage
     %Incorporate looking direction into action when not jumping or falling
-    if health > 0 and action (1 .. 7) not= "jumping" and action (1 .. 7) not= "falling" then
+    if health > 0 and action not= ord (sprt.jump) and action not= ord (sprt.fall) then
 	if cm not= 0 then
 	    if toGameCdX (xm) >= pos.x then
-		facing := "right"
+		facing := 2 %"right"
 	    else
-		facing := "left"
+		facing := 1 %"left"
 	    end if
 	end if
     end if
 
     if health = 0 then
-	action := "dying"
+	action := ord (sprt.dead)
     end if
 
-    %Incorporate motion direction into action
-    if health = 0 and onground or health not= 0 then
-	if facing not= "" then
-	    action += " "
-	end if
-	action += facing
-    end if
-
-    if action = "dying" then
-	action += "xx"
-    end if
-
-    %Incorporate looking direction into action when jumping or falling
-    if action (1 .. 7) = "jumping" or action (1 .. 7) = "falling" then
-	if cm not= 0 then
-	    if toGameCdX (xm) >= pos.x then
-		if action = "falling left" or action = "jumping left" then
-		    action += " "
-		    action += "facing right"
-		end if
-	    else
-		if action = "falling right" or action = "jumping right" then
-		    action += " "
-		    action += "facing left"
-		end if
-	    end if
-	end if
-    end if
-end FinalizeAction1
-
-%Crawling and walking animations
-procedure Animations
-    %Walking animation
-    if frametimer >= 30 and not isAction ("crawling") and (sprinta or sprintd) or frametimer >= 50 and not isAction ("crawling") then
-	frametimer := 0
-	if wlk = 4 then
-	    ponwlk := -1
-	elsif wlk = 1 then
-	    ponwlk := 1
-	end if
-	wlk += ponwlk
-    end if
-
-    %Crawling animation
-    if frametimer >= 80 and isAction ("crawling") then
-	frametimer := 0
-	if crl = 4 then
-	    poncrl := -1
-	elsif crl = 1 then
-	    poncrl := 1
-	end if
-	crl += poncrl
-    end if
-end Animations
-
-%Finish the second part of assigning a usable value to "action"
-procedure FinalizeAction2
     %Directionless fall
-    if (action = "falling left" or action = "falling right") and not keya and not keyd and not onground then
-	action := "falling"
+    if action = ord (sprt.fall) and not keya and not keyd and not onground then
+	facing := 0
     end if
 
-    %Character image used if forced crawling
-    if mustcrawl then
-	if action = "standing" then
-	    action := "crawlingstop"
-	elsif action = "walking left" then
-	    action := "crawling left"
-	elsif action = "walking right" then
-	    action := "crawling right"
-	elsif action = "standing left" then
-	    action := "crawlingstop left"
-	elsif action = "standing right" then
-	    action := "crawlingstop right"
-	end if
+    var finalAction : int := action
+    var finalFrame : int := frame
+    if frame > 3 then
+	finalFrame := 6 - frame
     end if
-end FinalizeAction2
+    var finalLeftRight : int := facing
+    var finalIsClick : int := isClick
 
-%What character image is being used
-procedure CharImage
-    if health not= 0 then
-	if cm = 0 then     %Image if not clicking
-	    if action = "walking left" then
-		character := walkl (wlk)
-	    elsif action = "walking right" then
-		character := walkr (wlk)
-	    elsif action = "crawlingstop" then
-		character := crawlr (2)
-	    elsif action = "crawlingstop left" then
-		character := crawll (2)
-	    elsif action = "crawlingstop right" then
-		character := crawlr (2)
-	    elsif action = "crawling left" then
-		character := crawll (crl)
-	    elsif action = "crawling right" then
-		character := crawlr (crl)
-	    elsif action = "falling" then
-		character := fall
-	    elsif action = "falling left" then
-		character := falll
-	    elsif action = "falling right" then
-		character := fallr
-	    elsif action = "jumping" then
-		character := jump
-	    elsif action = "jumping left" then
-		character := jumpl
-	    elsif action = "jumping right" then
-		character := jumpr
-	    elsif action = "standing left" then
-		character := walkl (2)
-	    elsif action = "standing right" then
-		character := walkr (2)
-	    elsif action = "standing" then
-		character := stand
+    %Set falljump direction based on mouse location
+    if (finalAction = ord (sprt.jump) or finalAction = ord (sprt.fall)) and facing = 0 then
+	finalAction := ord (sprt.falljump)
+	if isClick = 1 then
+	    if toGameCdX (xm) >= pos.x then
+		finalLeftRight := 2 %"right"
+	    else
+		finalLeftRight := 1 %"left"
 	    end if
-	else     %Image if clicking
-	    if action = "walking left" then
-		character := walklc (wlk)
-	    elsif action = "walking right" then
-		character := walkrc (wlk)
-	    elsif action = "crawlingstop" then
-		character := crawlrc (2)
-	    elsif action = "crawlingstop left" then
-		character := crawllc (2)
-	    elsif action = "crawlingstop right" then
-		character := crawlrc (2)
-	    elsif action = "crawling left" then
-		character := crawllc (crl)
-	    elsif action = "crawling right" then
-		character := crawlrc (crl)
-	    elsif action = "falling" then
-		if toGameCdX (xm) >= pos.x then
-		    character := fallcr
-		else
-		    character := fallcl
-		end if
-	    elsif action = "falling left" then
-		character := falllc
-	    elsif action = "falling right" then
-		character := fallrc
-	    elsif action = "falling left facing right" then
-		character := falllr
-	    elsif action = "falling right facing left" then
-		character := fallrl
-	    elsif action = "jumping" then
-		if toGameCdX (xm) >= pos.x then
-		    character := jumpcr
-		else
-		    character := jumpcl
-		end if
-	    elsif action = "jumping left" then
-		character := jumplc
-	    elsif action = "jumping right" then
-		character := jumprc
-	    elsif action = "jumping left facing right" then
-		character := jumplr
-	    elsif action = "jumping right facing left" then
-		character := jumprl
-	    elsif action = "standing left" then
-		character := walklc (2)
-	    elsif action = "standing right" then
-		character := walkrc (2)
-	    end if
-	end if
-    else
-	if action = "dyingxx" then
-	    character := dead
-	elsif action = "dying left" then
-	    character := deadl
-	elsif action = "dying right" then
-	    character := deadr
 	end if
     end if
+
+    %Fix value of frame(finalFrame) when there's no sprite for its current value
+    if finalAction > ord (sprt.crawl) then
+	finalFrame := 0
+    elsif finalAction <= ord (sprt.crawl) and not moving then
+	finalFrame := 1
+    end if
+    %Fix value of facing(finalLeftRight) when there's no sprite for its current value
+    if finalLeftRight = 0 and (finalAction <= ord (sprt.crawl)  %If no facing and: walk or crawl
+	    or (finalAction = ord (sprt.falljump) or finalAction = ord (sprt.stand)) and (isClick = 1)) then %or (falljump or stand) and clicking
+	finalLeftRight := 2
+    elsif ((finalAction = ord (sprt.stand) or finalAction = ord (sprt.falljump)) and finalIsClick = 0) then
+	finalLeftRight := 0
+    elsif (finalAction = ord (sprt.jump) or finalAction = ord (sprt.fall)) and finalIsClick = 1 then %jumplr and jumprl and stuff are saved under facing =0, click=left/right
+	%Incorporate looking direction into action when jumping or falling
+	if toGameCdX (xm) >= pos.x then
+	    if finalLeftRight = 1 then
+		finalIsClick := ord (backdir.left)
+		finalLeftRight := 0
+	    end if
+	else
+	    if finalLeftRight = 2 then
+		finalIsClick := ord (backdir.right)
+		finalLeftRight := 0
+	    end if
+	end if
+    end if
+    %Fix value of isClick(finalIsClick) when there's no sprite for its current value
+    if finalIsClick not= 0 and finalAction = ord (sprt.dead) then
+	finalIsClick := 0
+    end if
+
+    character := sprite (finalAction) (finalFrame) (finalLeftRight) (finalIsClick)
 end CharImage
+
 
 %Draw character image and head colour
 procedure CharDraw
     %Draw character's head colour
     var offsetx : int := 0
-    var offsety : int := 0
-    if action = "dying left" then
-	offsetx := -4
-	offsety := 4
-    elsif action = "dying right" then
+    var offsety : int := 21
+    if action = ord (sprt.crawl) or action = ord (sprt.dead) then
 	offsetx := 4
 	offsety := 4
-    elsif action = "crawling left" or action = "crawlingstop left" then
-	offsetx := -4
-	offsety := 8
-    elsif action = "crawling right" or action = "crawlingstop right" or action = "crawlingstop" then
-	offsetx := 4
-	offsety := 8
-    else
-	offsety := 21
+	if facing = 1 then
+	    offsetx *= -1
+	end if
+	if action = ord (sprt.crawl) then
+	    offsety += 4
+	end if
     end if
-
     Draw.FillOval (toScrnCdX (pos.x) + offsetx, toScrnCdY (pos.y) + offsety, 3, 3, headcolour)
-    
+
     %Draw character
     /*
      var charxcdreal : real := ((pos.x - charwidth / 2) - offsetleftright) * blocksize
@@ -2850,14 +2618,6 @@ procedure CharDraw
      put tempMin, " ", tempMax
      put charxcd*/
 
-
-    /*var finalFrame : int := frame
-    var finalLeftRight : int := leftright
-    var finalIsClick : int := isClick
-    if action > sprt.crawl then
-	frame := 0
-    end if*/
-    %Pic.Draw (sprite (action) (finalFrame) (finalLeftRight) (finalIsClick), toScrnCdX (leftSide ()), toScrnCdY (pos.y), picMerge)
     Pic.Draw (character, toScrnCdX (leftSide ()), toScrnCdY (pos.y), picMerge)
 end CharDraw
 
@@ -2985,8 +2745,7 @@ procedure resetVariables
     gravcount := 0
     jumpcount := 0
     frametimer := 0
-    wlk := 1
-    crl := 1
+    frame := 0
     crosshairsbb2 := 0
     crosshairsbb := 0
     crosshairspb2 := 0
@@ -3027,12 +2786,10 @@ procedure resetVariables
     pos.x := 0
     pos.y := 0
     health := 1000
-    action := "standing"
-    facing := ""
+    action := ord (sprt.stand)
+    facing := 0
     oldfacing := ""
     loadfile := ""
-    ponwlk := 1
-    poncrl := 1
     if loaded then
 	headcolour := -1
 	timeOfDay := -1
@@ -3210,6 +2967,10 @@ loop
 
 	%Get mouse input
 	Mouse.Where (xm, ym, cm)
+	isClick := 0
+	if cm not= 0 then
+	    isClick := 1
+	end if
 
 	%Get keyboard input
 	Input.KeyDown (arrow)
@@ -3232,7 +2993,8 @@ loop
 
 	%Character standing by default
 	actionCurrent := action     %Save current action (continuing from last frame) for detection purposes
-	action := "standing"
+	action := ord (sprt.stand)
+	moving := false
 
 	Gravity
 
@@ -3250,17 +3012,13 @@ loop
 
 	ScreenSlide
 
-	FinalizeAction1
-
 	Animations
 
 	%Stop sprinting if crawling
-	if isAction ("crawling") then
+	if action = ord (sprt.crawl) then
 	    sprintd := false
 	    sprinta := false
 	end if
-
-	FinalizeAction2
 
 	CharImage
 
