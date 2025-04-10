@@ -11,9 +11,22 @@ View.Set ("position:top;right,graphics:640;400") %Smallest advisable:450,330
 buttonchoose ("multibutton")
 setscreen ("noecho")
 %Framerate goal: deltatime of 6-7 on still, 17-20 on screen scrolling
+%wtf happened??? DDD:
 
-%constrain p2's virtual cursor to within the screen, and add an arrow that points to p2 when they are off-screen
+
+%Restrict blocks you can access in creative mode - no void, no error, no air.
+%When you place boarder blocks, they show up visibly until a screen update - should be always... invisible? or... hmm.
+%   Are they bedrock, or barrier? at top, barrier is nice, at bottom, bedrock is. Maybe I should differentiate those two into two different blocks? Boarder, and DarkBorder
+%head color "brown" is broken
 %Colors for the preview are all wrong.
+%Add three shades for each block - normal, dark(, and extra dark? when you're stepping around things, do they go dark, and does the background thus go darker?)
+%auto-jump
+%Doors
+%variable height jump, change max height jump will get to based on how long youve held the space bar.
+%   and fix bump down in the middle of the jump while you're at it!
+%Head falls out of body if you fall to your death - no "crumpled dead" animation frame
+%constrain p2's virtual cursor to within the screen, and add an arrow that points to p2 when they are off-screen
+
 %Dropdowns go off-screen. See "CreateTextBoxChoiceCustom.t"
 %Text for "_________ saved" and other "put"s move based on user's set font size. Only use Draw.Text.
 %Make player's update box form-fit to the player by placing it at the *old* location (unless I've already done that)
@@ -33,19 +46,16 @@ setscreen ("noecho")
  -Hotbar 1,2,3 are three tools: foreground, background, and terrain(terrain tool is just foreground tool, but removes any background blocks behind it)
  -Tools other than foreground have to be unlocked/acquired/crafted
  -Rest of hotbar is blocks
+ -Player 2 hotbar is ctrl+1234etc
  */
-%In gen version 4, add whether or not the playing is flying to the preferences file
+%In gen version 4, add whether or not the player is flying to the preferences file(?)
 %Add physics to sand and water!
 %Make leaves act like ladders/water - free movement when touching them > 50%
 %Add fire switching to different shades of red, orange, and yellow randomly
-%Make time affect sky color (rgb.addcolor 256, set to whatever)
 %Add swimming
 %Add alter jump height by amount space pressed
 %Add seed in preferences(?) file?
-%Add different block types (solid, platform, decoration)
-%Add background blocks?
 %Add physics blocks!
-%Add entity class (for things like train)!
 %Add ability to step "around" objects - would work really well if I have background tiles like terraria, where they could
 %   be assumed duplicated to the front, too. Only visible when the player steps forward, then they can't step back in
 %   there. Go "around" the house! :D
@@ -62,6 +72,8 @@ const MAX_ENTITIES : int := 99
 const boolUnInit := 16#FF
 const intUnInit := 16#80000000
 const thisGenVersion : int := 3
+const zoomMode : boolean := true
+const multiplayerIsLocal : boolean := true
 const timeSpeed : real := 0.00001
 const charudpxrange := 30
 var bareBonesPreview : boolean := true
@@ -80,6 +92,7 @@ type blockStruct :
 	name : string
 	solid : boolean
 	physics : boolean
+	transparent : boolean
 	clr : int
     end record
 
@@ -93,10 +106,12 @@ type blockGroup :
     record
 	any : int1
 	solid : int1
+	solidOrPlatform : int1
     end record
 var blkGroup : blockGroup
 blkGroup.any := -1
 blkGroup.solid := -2
+blkGroup.solidOrPlatform := -3
 
 %Block entry spot 1
 type blk : enum (void, boarder, air, error, dirt, stone, sand, sandstone, mud, grass,
@@ -106,7 +121,7 @@ type blk : enum (void, boarder, air, error, dirt, stone, sand, sandstone, mud, g
 var numBlockTypes : int := ord (upper (blk)) + 1
 var blockType : array 0 .. numBlockTypes - 1 of blockStruct
 
-procedure setBlockInfo (var blockIn : int, nameIn : string, solidIn : boolean, physicsIn : boolean, r, g, b : int)
+procedure setBlockInfo (var blockIn : int, nameIn : string, solidIn, physicsIn, transparentIn : boolean, r, g, b : int)
     if blockIn > numBlockTypes then
 	put "ERROR! \"blk\" enum list does not match \"setBlockInfo\" list!"
 	delay (3000)
@@ -116,6 +131,7 @@ procedure setBlockInfo (var blockIn : int, nameIn : string, solidIn : boolean, p
     blockType (blockIn).name := nameIn
     blockType (blockIn).solid := solidIn
     blockType (blockIn).physics := physicsIn
+    blockType (blockIn).transparent := transparentIn
     if 32 + blockIn > maxcolor then
 	var res : int := RGB.AddColor (r / 255, g / 255, b / 255)
 	if res = 1 then
@@ -130,30 +146,30 @@ end setBlockInfo
 
 var iter : int := 0
 %Block entry spot 2
-%Legend: name, isSolid, hasPhysics, color(r,g,b)
-setBlockInfo (iter, "void", false, false, 255, 255, 255)
-setBlockInfo (iter, "boarder", true, false, 56, 56, 56)
-setBlockInfo (iter, "air", false, false, 0, 255, 255)
-setBlockInfo (iter, "error", true, false, 255, 0, 255)
-setBlockInfo (iter, "dirt", true, false, 113, 56, 0)
-setBlockInfo (iter, "stone", true, false, 192, 192, 192)
-setBlockInfo (iter, "sand", true, true, 255, 235, 182)
-setBlockInfo (iter, "sandstone", true, false, 237, 203, 92)
-setBlockInfo (iter, "mud", true, true, 255, 235, 182)
-setBlockInfo (iter, "grass", true, false, 0, 128, 0)
-setBlockInfo (iter, "leaves", false, false, 0, 255, 0)
-setBlockInfo (iter, "wood", true, false, 65, 32, 0)
-setBlockInfo (iter, "planks", true, false, 196, 156, 81)
-setBlockInfo (iter, "platform", false, false, 113, 56, 0)
-setBlockInfo (iter, "water", false, true, 0, 125, 255)
-setBlockInfo (iter, "lava", false, true, 0, 125, 255)
-setBlockInfo (iter, "fire", false, false, 0, 125, 255)
-setBlockInfo (iter, "oil", false, false, 0, 125, 255)
-setBlockInfo (iter, "rail", false, false, 203, 203, 203)
-setBlockInfo (iter, "ladder", false, false, 113, 97, 56)
-setBlockInfo (iter, "wire", false, false, 255, 0, 0)
-setBlockInfo (iter, "pressure_plate", false, false, 81, 89, 113)
-setBlockInfo (iter, "tnt", false, false, 255, 0, 0)
+%Legend: name, isSolid, hasPhysics, transparent, color(r,g,b)
+setBlockInfo (iter, "void", false, false, true, 255, 255, 255)
+setBlockInfo (iter, "boarder", true, false, true, 56, 56, 56)
+setBlockInfo (iter, "air", false, false, true, 0, 255, 255)
+setBlockInfo (iter, "error", true, false, false, 255, 0, 255)
+setBlockInfo (iter, "dirt", true, false, false, 113, 56, 0)
+setBlockInfo (iter, "stone", true, false, false, 192, 192, 192)
+setBlockInfo (iter, "sand", true, true, false, 255, 235, 182)
+setBlockInfo (iter, "sandstone", true, false, false, 237, 203, 92)
+setBlockInfo (iter, "mud", true, true, false, 100, 235, 182)
+setBlockInfo (iter, "grass", true, false, false, 0, 128, 0)
+setBlockInfo (iter, "leaves", false, false, false, 0, 255, 0)
+setBlockInfo (iter, "wood", true, false, false, 65, 32, 0)
+setBlockInfo (iter, "planks", true, false, false, 196, 156, 81)
+setBlockInfo (iter, "platform", false, false, true, 113, 56, 0)
+setBlockInfo (iter, "water", false, true, false, 0, 125, 255)
+setBlockInfo (iter, "lava", false, true, false, 255, 0, 0)
+setBlockInfo (iter, "fire", false, false, false, 255, 125, 0)
+setBlockInfo (iter, "oil", false, false, false, 125, 125, 0)
+setBlockInfo (iter, "rail", false, false, true, 203, 203, 203)
+setBlockInfo (iter, "ladder", false, false, true, 113, 97, 56)
+setBlockInfo (iter, "wire", false, false, true, 255, 0, 0)
+setBlockInfo (iter, "pressure_plate", false, false, true, 81, 89, 113)
+setBlockInfo (iter, "tnt", false, false, false, 255, 0, 0)
 
 if iter not= numBlockTypes then
     put "ERROR! \"blk\" enum list does not match \"setBlockInfo\" list!"
@@ -179,16 +195,16 @@ var blocksize : int := 16 %Must be > 15 %Edit: Oh really? Maybe now...
 var loadingScreen1 : int := Pic.FileNew (imgDir + "loadingScreen" + imgType)
 var font1 := Font.New ("sans serif:40:bold")
 var font2 := Font.New ("sans serif:8:bold")
+var menuFont := Font.New ("sans serif:14")
 var loadingScreen : int := Pic.Scale (loadingScreen1, maxx - 20, maxy - 20)
 var arrow : array char of boolean
 var backpic : int := Pic.New (0, 0, 2, 2)
 var screenpic : int := Pic.New (0, 0, 2, 2)
-var deltaTime, xm, ym, cm, btnstrt, btncont, btnend, mainMenuButton, loadedsave, loadedsavepref, menuhead, menubg, menublk, menuload,
+var deltaTime, xm, ym, cm, btnstrt, btncont, btnend, mainMenuButton, loadedsave, loadedsavepref, menuhead, menubg, menuload,
     saveButton, saveasguiheight, nameTextField, nameLabel, saveFile, menudelete, cbprev, cbcreative, cbmultiplayer, genVersion, seed,
     popupWinID : int
 var gametimeold, mstScrnHsGnLft, mstScrnHsGnRght, mstScrnHsGnUp, mstScrnHsGnDwn, numEntities : int := 0
-var loaded, quitthegame, preview, resetdefaulthead, resetdefaulttime, resetdefaultblock, menuReturn,
-    inPauseMenu, scrollSlow, yesConfirm, recentclick, keyp : boolean := false
+var loaded, quitthegame, preview, menuReturn, inPauseMenu, scrollSlow, yesConfirm, recentclick, keyp : boolean := false
 var gmfrstmthrgh : boolean := true
 var offsetleftright, offsetupdown, slowScrollSpeed : real := 0
 var timeOfDay, oldTimeColorVal, oldTime : real := -1
@@ -198,7 +214,6 @@ var textfound : string
 var loadfile, importedBlockList : string := ""
 var item1 : array 1 .. 16 of int
 var item2 : array 1 .. 13 of int
-var item3 : array 1 .. numBlockTypes of int
 var item4 : array 0 .. 99 of int
 var item5 : array 1 .. 99 of int
 var menuitemcolours : array 1 .. 16 of string (20) := init ("Default", "White", "Light Grey", "Dark Grey", "Black",
@@ -321,18 +336,30 @@ var block : array - XLIMIT .. XLIMIT of array - YLIMIT .. YLIMIT of blockVec
 %Terrain generation rules
 function terrainQuery (x, y : int, layer : int1) : int
     if genVersion < 4 then %Flat world terrain gen
-	if layer not= ord (layerId.background) then %foreground, or both - only okay because background gen is always void!
+	if layer not= ord (layerId.background) then %foreground, or both - only okay because background gen is always air!
 	    if y < 0 then
 		result ord (blk.dirt)
 	    else
 		result ord (blk.air)
 	    end if
 	else
-	    result ord (blk.void)
+	    result ord (blk.air)
 	end if
     end if
     result ord (blk.air)
 end terrainQuery
+
+function isGroup (typeIn, groupIn : int1) : boolean
+    if groupIn = blkGroup.any then
+	result typeIn not= ord (blk.air) and typeIn not= ord (blk.void)
+    elsif groupIn = blkGroup.solid then
+	result blockType (typeIn).solid
+    elsif groupIn = blkGroup.solidOrPlatform then
+	result blockType (typeIn).solid or blockType (typeIn).id = ord (blk.platform)
+    else
+	result typeIn = groupIn
+    end if
+end isGroup
 
 %Check block function
 function isBlock (cdx, cdy : int, blockIn : int1, layer : int1, useTerrain : boolean) : boolean
@@ -356,19 +383,14 @@ function isBlock (cdx, cdy : int, blockIn : int1, layer : int1, useTerrain : boo
 	foundType := terrainQuery (cdx, cdy, layer)
     end if
 
-    if blockIn = blkGroup.any then
-	result foundType not= ord (blk.air) and foundType not= ord (blk.void)
-    elsif blockIn = blkGroup.solid then
-	result blockType (foundType).solid
-    else
-	result foundType = blockIn
-    end if
+    result isGroup (foundType, blockIn)
 end isBlock
 
-function isBlockR (xin, yin : real, blockIn : int1, layer : int1, useTerrain : boolean) : boolean
+function isBlockR (xin, yin : real, blockIn, layer : int1, useTerrain : boolean) : boolean
     result isBlock (toBlock (xin), toBlock (yin), blockIn, layer, useTerrain)
 end isBlockR
 
+%Make this pass background as int1 layerid rather than boolean, for readability(?) But this can never be both...
 function getBlock (x, y : real, background, useTerrain : boolean) : blockStruct
     var cdx : int := toBlock (x)
     var cdy : int := toBlock (y)
@@ -431,6 +453,7 @@ function raycastLine (x1, y1, x2, y2, rangeIn : real, var rayHit, rayBefore : ve
     end loop
 end raycastLine
 
+%Make this pass background as int1 layerid rather than boolean, for readability(?) But this can never be both...
 procedure setBlock (x, y : real, blockIn : int1, background : boolean)
     var cdx : int := toBlock (x)
     var cdy : int := toBlock (y)
@@ -445,28 +468,32 @@ procedure setBlock (x, y : real, blockIn : int1, background : boolean)
     end if
 end setBlock
 
-procedure DrawBlockScrn (x, y, clr : int)
-    Draw.FillBox (x, y, x + blocksize - 1, y + blocksize - 1, clr)
+procedure DrawBlockScrn (x, y, blockIn : int, clr : int)
+    if blockIn = ord (blk.platform) then
+	Draw.FillBox (x, y + blocksize div 4 * 3, x + blocksize - 1, y + blocksize - 1, clr)
+    else
+	Draw.FillBox (x, y, x + blocksize - 1, y + blocksize - 1, clr)
+    end if
 end DrawBlockScrn
 
-function getBlockLocColor (x, y : int, useTerrain : boolean) : int
-    var foundTypeBlock : blockStruct := getBlock (x, y, false, useTerrain)
-    if not isBlock (x, y, blkGroup.any, 1, useTerrain) then %slower than necessary?
-	var foundTypeBg : blockStruct := getBlock (x, y, true, useTerrain)
-	if foundTypeBg.id not= ord (blk.void) then
-	    result foundTypeBg.clr
-	end if
+%Make this pass background as int1 layerid rather than boolean, for readability(?) But this can never be both...
+function getBlockLocColor (x, y : int, background, useTerrain : boolean) : int
+    var foundTypeBlock : blockStruct := getBlock (x, y, background, useTerrain)
+    if isGroup (foundTypeBlock.id, blkGroup.any) then
+	result foundTypeBlock.clr
+    else
+	result blockType (ord (blk.air)).clr
     end if
-    result foundTypeBlock.clr
 end getBlockLocColor
 
 procedure DrawBlock (x, y : int, useTerrain : boolean)
-    DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), getBlockLocColor (x, y, useTerrain))
+    if blockType (block (x) (y).block).transparent then
+	DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), block (x) (y).bg, getBlockLocColor (x, y, true, useTerrain))
+    end if
+    if isBlockR (x, y, blkGroup.any, ord (layerId.foreground), true) then
+	DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), block (x) (y).block, getBlockLocColor (x, y, false, useTerrain))
+    end if
 end DrawBlock
-
-procedure DrawBlockClr (x, y : real, clr : int)
-    DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), clr)
-end DrawBlockClr
 
 procedure DrawBlockR (x, y : real, useTerrain : boolean)
     DrawBlock (toBlock (x), toBlock (y), useTerrain)
@@ -477,7 +504,7 @@ class entity
     import vec2, vec2i, blockStruct, blockType, blk, blocksize, imgDir, imgType,
 	toGameCdMeasure, toScrnCdX, toScrnCdY, toGameCdX, toGameCdY, toGameCdXR, toGameCdYR, toBlock,
 	isBlock, raycastLine, blkGroup, setBlock, DrawBlock, getBlock, isBlockR, Math, block,
-	bgcolour, charudpxrange, PicDrawTranslucentBox
+	bgcolour, charudpxrange, PicDrawTranslucentBox, numBlockTypes, menuFont
     export Initialize, Update, PreDraw, DrawEntity, DrawGUI, UnDraw
 
     procedure Initialize
@@ -501,11 +528,11 @@ end entity
 
 class player
     inherit entity
-    import scrollSlow
+    import scrollSlow, zoomMode, numPlayers, multiplayerIsLocal
     export headcolour, placingBlock, SetHeadColour, SetPlacingBlock, pos, health, survival,
 	leftSide, rightSide, topSide, SetPosX, SetPosY, SetHealth, FinalVariableAssingment,
 	KeyboardInput, HandleMouse, SetSurvival, HandleKeyboard, ResetVariables, DebugDraw,
-	SetPlayerNumber, CopyProperties
+	SetPlayerNumber, CopyProperties, menuOpen, SetOther, CloseMenu
 
 
     %Enums for readability
@@ -513,6 +540,29 @@ class player
     type cursor : enum (isbb, ispb)
     type cursorClr : enum (black, white)
     type backdir : enum (left, right)
+    type menuItem :
+	record
+	    id : int
+	    count : int
+	end record
+    type menuType :
+	record
+	    rows : int
+	    columns : int
+	    pos : vec2i
+	    size : vec2i
+	    selected : int
+	    highlighted : int
+	    inventoryItems : array 0 .. 99 of menuItem
+	    numInvItems : int
+	    backpic : int
+	    pic : int
+	    regen : boolean
+	    opacity : int
+	    squareSize : int
+	    squareSpacing : int
+	    recentClick : boolean
+	end record
 
     const jumpheight : real := 2.3
     const doubletapspeed : int := 300
@@ -521,12 +571,14 @@ class player
     const gravAmount : real := 0.025
     const virtualMouseSpeed : real := 0.2
 
-    var blockplacespeed : int := 130
+    var blockplacespeed : int := 130 %Change in SetSurvival too
     var blockbreakspeed : int := 130
     var reach : real := 5
     var playerSpeed : real := 5 / 1000
 
     var playerNum : int := 1
+    var otherPlayer : pointer to player := nil
+    var menu : menuType
     var charbackpic : int := Pic.New (0, 0, 2, 2)
     var healthbarback : int := Pic.New (0, 0, 2, 2)
     var sprite : array 0 .. 7 of array 0 .. 3 of array 0 .. 2 of array 0 .. 1 of int
@@ -543,13 +595,20 @@ class player
     var sprintpossibled, sprintpossiblea, flypossible, mclickr, mclickl, healthold, crosshairsbb2, crosshairsbb, crosshairspb2,
 	crosshairspb, action, actionCurrent, frame, isClick, facing, xm, ym, cm : int := 0
     var onground, inground, onleftwall, onrightwall, hitceiling, sprintd, sprinta, recentstartd, recentstarta, recentstartspace,
-	mustcrawl, flying, moving, keyspc, keya, keys, keyd, keyalt, keyi, keyj, keyk, keyl, keyr, keyy, keyb, keyq, keye : boolean := false
+	recentstartE, mustcrawl, flying, moving, keyspc, keya, keys, keyd, keyalt, keyi, keyj, keyk, keyl, keyu, keyo, keyq, keye,
+	localMultiplayer, menuOpen, showCreativeInv : boolean := false
     var survival : boolean := true
     var jumpcount, gravcount, frametimer : real := 0
     var virtualXm, virtualYm : real := -100000
     var headcolour : int := -1
     var health : int := 1000
-    var placingBlock : blockStruct := blockType (ord (blk.error))
+
+    %Pic.New (maxx div 8 - 1, 19, (maxx div 4 * 3) + maxx div 8 + 1, 41) %Pic.New (0, 19, maxx, 41)
+    %Draw.Box (maxx div 8, 20, (maxx div 4 * 3) + maxx div 8, 40, 10)
+
+    var healthBarStart : int := maxx div 8
+    var healthBarEnd : int := round (maxx div 4 * 3.5)
+    var placingBlock : blockStruct := blockType (ord (blk.void))
     var oldfacing : string := ""
 
     forward procedure LoadSprites
@@ -563,6 +622,31 @@ class player
 	pos.y := 0
 	oldPos.x := pos.x
 	oldPos.y := pos.y
+
+	menu.rows := 4
+	menu.columns := 10
+	menu.highlighted := -1
+	menu.selected := -1
+	menu.squareSpacing := 3
+	menu.size.x := maxx - maxx div 3
+	menu.size.y := round (menu.size.x * (menu.rows / menu.columns))
+	if menu.size.y > maxy - maxy div 4 then
+	    menu.size.y := maxy - maxy div 4
+	    menu.size.x := round (menu.size.y * (menu.columns / menu.rows))
+	end if
+	menu.squareSize := (menu.size.x - menu.squareSpacing * (menu.columns - 1)) div menu.columns
+	menu.size.x := menu.squareSize * menu.columns + menu.squareSpacing * (menu.columns + 1)
+	menu.size.y := menu.squareSize * menu.rows + menu.squareSpacing * (menu.rows + 1)
+
+	menu.pos.x := (maxx - menu.size.x) div 2
+	menu.pos.y := (maxy - menu.size.y) div 2
+
+	menu.numInvItems := 0
+	menu.regen := true
+	menu.opacity := 85
+	menu.backpic := Pic.New (0, 0, 2, 2)
+	menu.pic := Pic.New (0, 0, 2, 2)
+	menu.recentClick := true
 
 	LoadSprites ()
 
@@ -585,6 +669,16 @@ class player
 
     %Assign values to variables that are calculated using "blocksize"
     procedure FinalVariableAssingment
+	if numPlayers > 1 and multiplayerIsLocal then
+	    localMultiplayer := true
+	    if playerNum = 1 then
+		healthBarStart := maxx div 16
+		healthBarEnd := round (maxx div 4 * 1.775)
+	    else
+		healthBarStart := round (maxx div 4 * 2.125)
+		healthBarEnd := round (maxx div 4 * 3.775)
+	    end if
+	end if
 	crosshairsbb := Pic.Scale (crosshairsbbpre, blocksize, blocksize)
 	crosshairsbb2 := Pic.Scale (crosshairsbbpre2, blocksize, blocksize)
 	crosshairspb := Pic.Scale (crosshairspbpre, blocksize, blocksize)
@@ -675,6 +769,10 @@ class player
 	end if
     end LoadSprites
 
+    procedure SetOther (other : pointer to player)
+	otherPlayer := other
+    end SetOther
+
     procedure SetHeadColour (clr : int)
 	headcolour := clr
     end SetHeadColour
@@ -728,9 +826,20 @@ class player
 	health := newHealth
     end SetHealth
 
+    procedure CloseMenu
+	menuOpen := false
+	menu.selected := -1
+	menu.highlighted := -1
+    end CloseMenu
+
     procedure SetSurvival (newState : boolean)
 	survival := newState
-	if not survival then
+	if survival then
+	    showCreativeInv := false
+	    blockplacespeed := 130
+	    blockbreakspeed := 130
+	else
+	    showCreativeInv := true
 	    blockplacespeed := 0
 	    blockbreakspeed := 0
 	end if
@@ -738,9 +847,25 @@ class player
 
     procedure CopyProperties (other : pointer to player)
 	pos := other -> pos
-	headcolour := other -> headcolour
-	survival := other -> survival
+	SetHeadColour (other -> headcolour)
+	SetSurvival (other -> survival)
     end CopyProperties
+
+    function menuIndex (x, y : int) : int
+	if x >= 0 and y >= 0 then
+	    result y * menu.columns + x
+	else
+	    result - 1
+	end if
+    end menuIndex
+
+    function menuSlotX (ind : int) : int
+	result ind mod menu.columns
+    end menuSlotX
+
+    function menuSlotY (ind : int) : int
+	result floor (ind / menu.columns)
+    end menuSlotY
 
     %Get input for keyboard and parallelport
     procedure KeyboardInput (arrow : array char of boolean)
@@ -755,14 +880,13 @@ class player
 	keyj := false
 	keyk := false
 	keyl := false
-	keyr := false
-	keyy := false
-	keyb := false
+	keyu := false
+	keyo := false
 	keyq := false
 	keye := false
 
 	%Assign input variables for keyboard
-	if playerNum = 1 and (arrow (' ') or arrow ('w')) or playerNum = 2 and (arrow ('t') or arrow ('b')) then
+	if playerNum = 1 and (arrow (' ') or arrow ('w') or arrow (KEY_UP_ARROW)) or playerNum = 2 and (arrow ('t') or arrow ('n')) then
 	    keyspc := true
 	end if
 	if playerNum = 1 and (arrow ('a') or arrow (KEY_LEFT_ARROW)) or playerNum = 2 and arrow ('f') then
@@ -774,12 +898,16 @@ class player
 	if playerNum = 1 and (arrow ('d') or arrow (KEY_RIGHT_ARROW)) or playerNum = 2 and arrow ('h') then
 	    keyd := true
 	end if
+	if playerNum = 1 and arrow ('e') or playerNum = 2 and arrow ('y') then
+	    keye := true
+	end if
+	if playerNum = 1 and arrow (KEY_ALT) or playerNum = 2 and arrow ('b') then
+	    keyalt := true
+	end if
+
 	if playerNum = 1 then
 	    if arrow ('q') then
 		keyq := true
-	    end if
-	    if arrow ('e') then
-		keye := true
 	    end if
 	end if
 	if playerNum = 2 then
@@ -795,18 +923,12 @@ class player
 	    if arrow ('l') then
 		keyl := true
 	    end if
-	    if arrow ('r') then
-		keyr := true
+	    if arrow ('u') then
+		keyu := true
 	    end if
-	    if arrow ('y') then
-		keyy := true
+	    if arrow ('o') then
+		keyo := true
 	    end if
-	    if arrow ('b') then
-		keyb := true
-	    end if
-	end if
-	if arrow (KEY_ALT) then
-	    keyalt := true
 	end if
 
 	for i : 0 .. 9
@@ -816,6 +938,43 @@ class player
 	    end if
 	end for
     end KeyboardInput
+
+    procedure MenuInteraction
+	if menuOpen then
+	    var slotx : int := floor ((xm - (menu.pos.x + menu.squareSpacing)) / (menu.squareSize + menu.squareSpacing))
+	    var sloty : int := (menu.rows - 1) - floor ((ym - (menu.pos.y + menu.squareSpacing)) / (menu.squareSize + menu.squareSpacing))
+
+	    if slotx < 0 or slotx > menu.columns - 1 then
+		slotx := -1
+	    end if
+	    if sloty < 0 or sloty > menu.rows - 1 then
+		sloty := -1
+	    end if
+	    menu.highlighted := menuIndex (slotx, sloty)
+
+	    if cm = 1 and menu.recentClick and menu.highlighted not= -1 then
+		menu.recentClick := false
+		if menu.selected = menu.highlighted then
+		    menu.selected := -1
+		    placingBlock := blockType (ord (blk.void))
+		else
+		    menu.selected := menu.highlighted
+		    if not survival and showCreativeInv then
+			if menu.selected < numBlockTypes then
+			    placingBlock := blockType (menu.selected)
+			end if
+		    else
+			if menu.selected < menu.numInvItems then
+			    placingBlock := blockType (menu.inventoryItems (menu.selected).id)
+			end if
+		    end if
+		end if
+	    end if
+	    if cm not= 1 then
+		menu.recentClick := true
+	    end if
+	end if
+    end MenuInteraction
 
     %How the aim guide moves in accordance with the mouse
     procedure AimGuideMovement
@@ -865,7 +1024,7 @@ class player
 
 	    %Fix block placing indicator if diagonal
 	    if abs (toGameCdX (rcursorbb.x) - toGameCdX (rcursorpb.x)) + abs (toGameCdY (rcursorbb.y) - toGameCdY (rcursorpb.y)) > 1 then
-		if not isBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), blkGroup.solid, 1, true) then
+		if not isBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), blkGroup.solidOrPlatform, 1, true) then
 		    rcursorpb.x := rcursorbb.x
 		    rcursorpb.y := rcursorbb.y
 		else
@@ -906,10 +1065,10 @@ class player
 			end if
 			optionB.y := toBlock (toGameCdY (rcursorbb.y))
 		    end if
-		    if not isBlock (optionA.x, optionA.y, blkGroup.solid, 1, true) then
+		    if not isBlock (optionA.x, optionA.y, blkGroup.solidOrPlatform, 1, true) then
 			rcursorpb.x := toScrnCdX (optionA.x)
 			rcursorpb.y := toScrnCdY (optionA.y)
-		    elsif not noOptionB and not isBlock (optionB.x, optionB.y, blkGroup.solid, 1, true) then
+		    elsif not noOptionB and not isBlock (optionB.x, optionB.y, blkGroup.solidOrPlatform, 1, true) then
 			rcursorpb.x := toScrnCdX (optionB.x)
 			rcursorpb.y := toScrnCdY (optionB.y)
 		    end if
@@ -921,32 +1080,36 @@ class player
     %If player right-clicks
     procedure PlayerRightClick
 	if cm = 100 and health > 0 and xm >= 0 and xm <= maxx and ym >= 0 and ym <= maxy then
-	    if mclickr = 0 then
-		mclickr := blockplacespeed
-	    end if
-	    if mclickr = blockplacespeed then
-		var mouseGX : int := toGameCdXR (rcursorpb.x)
-		var mouseGY : int := toGameCdYR (rcursorpb.y)
-		var mouseOnPlayer : boolean := false
-		if placingBlock.solid then
-		    mouseOnPlayer := mouseGX + 1 > leftSide () and mouseGX <= rightSide ()
-			and mouseGY + 1 > pos.y and mouseGY <= topSideCrouch ()
+	    if keyalt then
+		placingBlock := getBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), false, true)
+	    elsif placingBlock.id not= ord (blk.void) then
+		if mclickr = 0 then
+		    mclickr := blockplacespeed
 		end if
-		if not mouseOnPlayer and not isBlock (mouseGX, mouseGY, blkGroup.solid, 1, true) then
-		    var againstValidBlock : boolean :=
-			isBlock (mouseGX + 1, mouseGY, blkGroup.any, 1, true) or
-			isBlock (mouseGX - 1, mouseGY, blkGroup.any, 1, true) or
-			isBlock (mouseGX, mouseGY + 1, blkGroup.any, 1, true) or
-			isBlock (mouseGX, mouseGY - 1, blkGroup.any, 1, true)
-		    if not survival or placingBlock.physics or againstValidBlock then
-			setBlock (mouseGX, mouseGY, placingBlock.id, false)
-			DrawBlock (mouseGX, mouseGY, true) %draws block you clicked, until a screen scroll/update
+		if mclickr = blockplacespeed then
+		    var mouseGX : int := toGameCdXR (rcursorpb.x)
+		    var mouseGY : int := toGameCdYR (rcursorpb.y)
+		    var mouseOnPlayer : boolean := false
+		    if placingBlock.solid then
+			mouseOnPlayer := mouseGX + 1 > leftSide () and mouseGX <= rightSide ()
+			    and mouseGY + 1 > pos.y and mouseGY <= topSideCrouch ()
+		    end if
+		    if not mouseOnPlayer and not isBlock (mouseGX, mouseGY, blkGroup.solidOrPlatform, 1, true) then
+			var againstValidBlock : boolean :=
+			    isBlock (mouseGX + 1, mouseGY, blkGroup.any, 1, true) or
+			    isBlock (mouseGX - 1, mouseGY, blkGroup.any, 1, true) or
+			    isBlock (mouseGX, mouseGY + 1, blkGroup.any, 1, true) or
+			    isBlock (mouseGX, mouseGY - 1, blkGroup.any, 1, true)
+			if not survival or placingBlock.physics or againstValidBlock then
+			    setBlock (mouseGX, mouseGY, placingBlock.id, false)
+			    DrawBlock (mouseGX, mouseGY, true) %draws block you clicked, until a screen scroll/update
+			end if
 		    end if
 		end if
-	    end if
-	    mclickr -= 1
-	    if mclickr = -1 then
-		mclickr := blockplacespeed
+		mclickr -= 1
+		if mclickr = -1 then
+		    mclickr := blockplacespeed
+		end if
 	    end if
 	else
 	    mclickr := 0
@@ -956,22 +1119,18 @@ class player
     %If player left-clicks
     procedure PlayerLeftClick
 	if cm = 1 and health > 0 and xm >= 0 and xm <= maxx and ym >= 0 and ym <= maxy then
-	    if keyalt then
-		placingBlock := getBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), false, true)
-	    else
-		if mclickl = 0 then
-		    mclickl := blockbreakspeed
+	    if mclickl = 0 then
+		mclickl := blockbreakspeed
+	    end if
+	    if mclickl = blockbreakspeed then
+		if isBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), blkGroup.any, 1, true) then
+		    setBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), ord (blk.air), false)
+		    DrawBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), true)
 		end if
-		if mclickl = blockbreakspeed then
-		    if isBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), blkGroup.any, 1, true) then
-			setBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), ord (blk.air), false)
-			DrawBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), true)
-		    end if
-		end if
-		mclickl -= 1
-		if mclickl = -1 then
-		    mclickl := blockbreakspeed
-		end if
+	    end if
+	    mclickl -= 1
+	    if mclickl = -1 then
+		mclickl := blockbreakspeed
 	    end if
 	else
 	    mclickl := 0
@@ -983,11 +1142,12 @@ class player
 	    xm := xmIn
 	    ym := ymIn
 	    cm := cmIn
-	    if cm = 0 then
-		if keyq then
+	    if localMultiplayer and zoomMode then
+		if cm = 1 then
+		    cm := 0
+		end if
+		if cm = 0 and keyq then
 		    cm := 1
-		elsif keye then
-		    cm := 100
 		end if
 	    end if
 	elsif playerNum = 2 then
@@ -996,26 +1156,13 @@ class player
 		virtualYm := toScrnCdY (pos.y) + 10
 	    end if
 
-	    if keyr then
+	    if keyu then
 		cm := 1
-	    elsif keyy then
+	    elsif keyo then
 		cm := 100
 	    else
 		cm := 0
 	    end if
-	    /*cm := 0
-	     if keyb and recentstartb then
-	     recentstartb := false
-	     cm := 1
-	     else
-	     recentstartb := true
-	     end if
-	     if keym and recentstartm then
-	     recentstartm := false
-	     cm := 100
-	     else
-	     recentstartm := true
-	     end if*/
 	    if keyi then
 		virtualYm += virtualMouseSpeed * deltaTime
 	    end if
@@ -1037,11 +1184,14 @@ class player
 	    isClick := 1
 	end if
 
+	MenuInteraction
+
 	AimGuideMovement
 
-	PlayerRightClick
-
-	PlayerLeftClick
+	if not menuOpen then
+	    PlayerRightClick
+	    PlayerLeftClick
+	end if
     end HandleMouse
 
 
@@ -1209,6 +1359,21 @@ class player
 	end if
     end PressSKey
 
+    procedure PressEKey
+	if keye and health > 0 then
+	    if recentstartE then
+		recentstartE := false
+		if menuOpen then
+		    CloseMenu ()
+		elsif not menuOpen and not (localMultiplayer and otherPlayer -> menuOpen) then
+		    menuOpen := true
+		end if
+	    end if
+	else
+	    recentstartE := true
+	end if
+    end PressEKey
+
     procedure HandleKeyboard (deltaTime : int)
 	%Character standing by default
 	actionCurrent := action     %Save current action (continuing from last frame) for detection purposes
@@ -1222,6 +1387,8 @@ class player
 	PressSpaceKey (deltaTime)
 
 	PressSKey (deltaTime)
+
+	PressEKey
 
     end HandleKeyboard
 
@@ -1283,6 +1450,12 @@ class player
 	end if
     end CharJump
 
+    function isSolidSurfaceR (xin, yin : real) : boolean
+	var xr : int := toBlock (xin)
+	var yr : int := toBlock (yin)
+	result isBlock (xr, yr, blkGroup.solid, 1, true) or block (xr) (yr).block = ord (blk.platform) and not keys
+    end isSolidSurfaceR
+
     %If character is on the ground or hit the ceiling
     procedure CharOnSurface
 	%if this frame's blockrounded ground position is in a block, and last frame's isn't, then move to between those two positions
@@ -1293,17 +1466,17 @@ class player
 	%Ceiling
 	var flewIntoBlock : boolean := false
 	var blockAbove : boolean := false
-
 	var checkCount : int := ceil (charwidth)
 	if toBlock (rightSide ()) - toBlock (leftSide ()) > checkCount - 1 then
 	    checkCount += 1
 	end if
+
 	for i : 0 .. checkCount - 1
 	    %Floor
-	    if isBlockR (leftSide () + i, pos.y, blkGroup.solid, 1, true) and not isBlockR (leftSide () + i, oldPos.y, blkGroup.solid, 1, true) then
+	    if isSolidSurfaceR (leftSide () + i, pos.y) and not isBlockR (leftSide () + i, oldPos.y, blkGroup.solid, 1, true) and toBlock (pos.y) < toBlock (oldPos.y) then
 		fellIntoBlock := true
 		exit when flewIntoBlock
-	    elsif isBlockR (leftSide () + i, pos.y - 1, blkGroup.solid, 1, true) then
+	    elsif isSolidSurfaceR (leftSide () + i, pos.y - 1) then
 		blockBelow := true
 	    end if
 	    %Ceiling
@@ -1677,7 +1850,7 @@ class player
 		backpiccross := Pic.New (rcursorbb.x, rcursorbb.y, rcursorbb.x + blocksize - 1, rcursorbb.y + blocksize - 1)
 	    end if
 	    if playerNum = 2 then
-		%Save background behind crosshairs
+		%Save background behind virtual cursor
 		backpicvirtmouse := Pic.New (xm, ym - cursorHeight + 1, xm + cursorWidth - 1, ym)
 	    end if
 	end if
@@ -1695,7 +1868,13 @@ class player
 	%Save background behind health bar
 	if survival then
 	    Pic.Free (healthbarback)
-	    healthbarback := Pic.New (0, 19, maxx, 41) %Pic.New (maxx div 8 - 1, 19, (maxx div 4 * 3) + maxx div 8 + 1, 41)
+	    healthbarback := Pic.New (healthBarStart - 1, 19, healthBarEnd + 1, 41) %Pic.New (0, 19, maxx, 41) %
+	end if
+
+	%save background behind menu
+	if menuOpen then
+	    Pic.Free (menu.backpic)
+	    menu.backpic := Pic.New (menu.pos.x - 1, menu.pos.y - 1, menu.pos.x + (maxx - menu.pos.x), menu.pos.y + menu.size.y + 15) %14 for menuFont size to stick up above menu, 1 for buffer (good measure)
 	end if
     end PreDraw
 
@@ -1791,13 +1970,75 @@ class player
     procedure DrawHealthBar
 	if survival then
 	    if health not= 0 then
-		PicDrawTranslucentBox (maxx div 8, 20, maxx div 8 + round ((maxx div 4 * 3 / 100) * (health / 10)), 40, brightgreen, 0.5)
-		Draw.Box (maxx div 8, 20, (maxx div 4 * 3) + maxx div 8, 40, 10)
+		PicDrawTranslucentBox (healthBarStart, 20, healthBarStart + round (((healthBarEnd - healthBarStart) / 100) * (health / 10)), 40, brightgreen, 0.5)
+		Draw.Box (healthBarStart, 20, healthBarEnd, 40, 10)
 	    else
-		Draw.Box (maxx div 8, 20, (maxx div 4 * 3) + maxx div 8, 40, brightred)
+		Draw.Box (healthBarStart, 20, healthBarEnd, 40, brightred)
 	    end if
 	end if
     end DrawHealthBar
+
+    procedure generateMenuImage
+	Draw.FillBox (menu.pos.x, menu.pos.y, menu.pos.x + menu.size.x, menu.pos.y + menu.size.y, gray)
+	for iy : 0 .. menu.rows - 1
+	    for ix : 0 .. menu.columns - 1
+		var xcord : int := menu.pos.x + menu.squareSpacing + ix * (menu.squareSize + menu.squareSpacing)
+		var ycord : int := menu.pos.y + menu.squareSpacing + (menu.rows - 1 - iy) * (menu.squareSize + menu.squareSpacing)
+		if not survival and showCreativeInv then
+		    if menuIndex (ix, iy) < numBlockTypes then
+			Draw.FillBox (xcord + 3, ycord + 3, xcord + menu.squareSize - 3, ycord + menu.squareSize - 3, blockType (menuIndex (ix, iy)).clr)
+		    end if
+		else
+		    if menuIndex (ix, iy) < menu.numInvItems then
+			Draw.FillBox (xcord + 3, ycord + 3, xcord + menu.squareSize - 3, ycord + menu.squareSize - 3, blockType (menu.inventoryItems (menuIndex (ix, iy)).id).clr)
+		    end if
+		end if
+		Draw.Box (xcord, ycord, xcord + menu.squareSize, ycord + menu.squareSize, black)
+	    end for
+	end for
+	Pic.Free (menu.pic)
+	menu.pic := Pic.New (menu.pos.x, menu.pos.y, menu.pos.x + menu.size.x, menu.pos.y + menu.size.y)
+    end generateMenuImage
+
+    procedure DrawMenu
+	if menuOpen then
+	    if menu.regen then
+		menu.regen := false
+		generateMenuImage
+		%reload background
+		Pic.Draw (menu.backpic, menu.pos.x - 1, menu.pos.y - 1, picCopy)
+	    end if
+	    %draw menu image
+	    Pic.DrawSpecial (menu.pic, menu.pos.x, menu.pos.y, picCopy, picBlend + menu.opacity, 0)
+
+	    if menu.selected not= -1 then
+		var xcord : int := menu.pos.x + menu.squareSpacing + menuSlotX (menu.selected) * (menu.squareSize + menu.squareSpacing)
+		var ycord : int := menu.pos.y + menu.squareSpacing + (menu.rows - 1 - menuSlotY (menu.selected)) * (menu.squareSize + menu.squareSpacing)
+		Draw.Box (xcord + 1, ycord + 1, xcord + menu.squareSize - 1, ycord + menu.squareSize - 1, green)
+	    end if
+	    if menu.highlighted not= -1 then
+		var xcord : int := menu.pos.x + menu.squareSpacing + menuSlotX (menu.highlighted) * (menu.squareSize + menu.squareSpacing)
+		var ycord : int := menu.pos.y + menu.squareSpacing + (menu.rows - 1 - menuSlotY (menu.highlighted)) * (menu.squareSize + menu.squareSpacing)
+		if cm = 1 then
+		    Draw.Box (xcord + 1, ycord + 1, xcord + menu.squareSize - 1, ycord + menu.squareSize - 1, yellow)
+		else
+		    Draw.Box (xcord + 1, ycord + 1, xcord + menu.squareSize - 1, ycord + menu.squareSize - 1, white)
+		end if %aaaaaaaaaaaaaaaaaaaaa
+
+		if not survival and showCreativeInv then
+		    if menu.highlighted < numBlockTypes then
+			Draw.Text (blockType (menu.highlighted).name, xm, ym, menuFont, black)
+		    end if
+		else
+		    if menu.highlighted < menu.numInvItems then
+			Draw.Text (blockType (menu.inventoryItems (menu.highlighted).id).name, xm, ym, menuFont, black)
+		    end if
+		end if
+	    end if
+	else
+	    menu.regen := true
+	end if
+    end DrawMenu
 
     procedure DebugDraw
 	locate (1, 1)
@@ -1819,14 +2060,19 @@ class player
     end DebugDraw
 
     body procedure DrawGUI
-	DrawAimGuide
+	if not menuOpen then
+	    DrawAimGuide
+	end if
+
 	DrawHealthBar
+
+	DrawMenu
+
+	%DebugDraw
 
 	if playerNum = 2 and health > 0 then
 	    Pic.Draw (virtualCursor, xm, ym - cursorHeight + 1, picMerge)
 	end if
-
-	%DebugDraw
     end DrawGUI
 
     %Erase guide graphics
@@ -1853,16 +2099,22 @@ class player
 	end if
     end EraseAimGuide
 
+    procedure EraseMenu
+	if menuOpen then
+	    Pic.Draw (menu.backpic, menu.pos.x - 1, menu.pos.y - 1, picCopy)
+	end if
+    end EraseMenu
+
     %Erase the health bar by redrawing its background
     procedure EraseHealthBar
 	if survival then
-	    Pic.Draw (healthbarback, 0, 19, picCopy)
+	    Pic.Draw (healthbarback, healthBarStart - 1, 19, picCopy)
 	end if
     end EraseHealthBar
 
     body procedure UnDraw
+	EraseMenu
 	EraseHealthBar
-
 	EraseAimGuide
 
 	%Draw old unaltered background over character
@@ -1907,7 +2159,7 @@ class player
 	/*%
 	 if loaded then
 	 headcolour := -1
-	 placingBlock := blockType (ord (blk.error))
+	 placingBlock := blockType (ord (blk.void))
 	 end if*/
 	blockplacespeed := 130
 	blockbreakspeed := 130
@@ -2065,16 +2317,6 @@ function timemenu (nbr : int) : int
     end if
 end timemenu
 
-function blockmenu (nbr : int) : int
-    if nbr = 1 then
-	result ord (blk.error)
-    elsif nbr > ord (blk.error) + 1 then
-	result nbr - 1
-    else
-	result nbr - 2
-    end if
-end blockmenu
-
 %If the game is to continue and menus are to close
 procedure start
     GUI.Quit
@@ -2164,18 +2406,6 @@ procedure ShowColourPreview
 	Draw.Box (145, maxy - 67, 175, maxy - 37, black)
 	Draw.Text ("Time: " + timestringify (timeOfDay), 115, maxy - 90, font2, black)
     end if
-
-    Draw.FillBox (237, maxy - 94, 340, maxy - 80, bgcolour)
-    Draw.FillBox (257, maxy - 57, 308, maxy - 46, bgcolour)
-    if player1 -> placingBlock.id = ord (blk.error) then
-	Draw.FillBox (265, maxy - 67, 295, maxy - 37, bgcolour)
-	Draw.Text ("DEFAULT", 258, maxy - 55, font2, black)
-	Draw.Text ("Default blocks", 238, maxy - 90, font2, black)
-    else
-	Draw.FillBox (265, maxy - 67, 295, maxy - 37, player1 -> placingBlock.clr)
-	Draw.Box (265, maxy - 67, 295, maxy - 37, black)
-	Draw.Text (player1 -> placingBlock.name + " blocks", 238, maxy - 90, font2, black)
-    end if
 end ShowColourPreview
 
 %If the user selects an option in the "Head Colour" menu
@@ -2204,16 +2434,6 @@ procedure TimeSelected
 	end if
     end for
 end TimeSelected
-
-%If the user selects an option in the "Block Colour" menu
-procedure BlocksSelected
-    for i : 1 .. numBlockTypes
-	if item3 (i) = GUI.GetEventWidgetID then
-	    player1 -> SetPlacingBlock (blockType (blockmenu (i)))
-	    ShowColourPreview
-	end if
-    end for
-end BlocksSelected
 
 procedure GUIConfirm
     yesConfirm := true
@@ -2378,9 +2598,9 @@ procedure LoadSelected
 
 		GUI.SetCheckBox (cbcreative, not isSurvival)
 		loaded := true
-		player1 -> SetHeadColour (-1)
+		player1 -> SetHeadColour (-1) %Why? Why not the saved value for these three?
 		timeOfDay := -1
-		player1 -> SetPlacingBlock (blockType (ord (blk.error)))
+		player1 -> SetPlacingBlock (blockType (ord (blk.void)))
 		ShowColourPreview
 		put "World: ", loadfile + "                      "
 	    end if
@@ -2426,10 +2646,10 @@ procedure saveWorld
 	for x : mstScrnHsGnLft .. mstScrnHsGnRght
 	    for y : mstScrnHsGnDwn .. mstScrnHsGnUp
 		var blockBlock, bgBlock : int1 := 0
-		if not isBlock (x, y, ord (blk.void), 1, false) and block (x) (y).block not= terrainQuery (x, y, 1) then
+		if not isBlock (x, y, ord (blk.void), ord (layerId.foreground), false) and block (x) (y).block not= terrainQuery (x, y, ord (layerId.foreground)) then
 		    blockBlock := block (x) (y).block
 		end if
-		if not isBlock (x, y, ord (blk.void), 0, false) and block (x) (y).bg not= terrainQuery (x, y, 0) then
+		if not isBlock (x, y, ord (blk.void), ord (layerId.background), false) and block (x) (y).bg not= terrainQuery (x, y, ord (layerId.background)) then
 		    bgBlock := block (x) (y).bg
 		end if
 		if blockBlock not= 0 or bgBlock not= 0 then
@@ -2464,10 +2684,6 @@ procedure createguis
     for i : 1 .. 13
 	item2 (i) := GUI.CreateMenuItem (menuitemtime (i), TimeSelected)
     end for
-    menublk := GUI.CreateMenu ("   Block Held   ")
-    for i : 1 .. numBlockTypes
-	item3 (i) := GUI.CreateMenuItem (menuitemblock (i), BlocksSelected)
-    end for
     menudelete := GUI.CreateMenu ("Delete")
     for i : 1 .. isaves - 1
 	item5 (i) := GUI.CreateMenuItem (menuitemdelete (i), DeleteSelected)
@@ -2499,7 +2715,6 @@ procedure showMainMenuGUIs
     GUI.Enable (menudelete)
     GUI.Enable (item1 (1))
     GUI.Enable (item2 (1))
-    GUI.Enable (item3 (1))
     GUI.ResetQuit
     GUI.Refresh
 end showMainMenuGUIs
@@ -2509,7 +2724,6 @@ procedure hideMainMenuGUIs
     GUI.Disable (menudelete)
     GUI.Disable (item1 (1))
     GUI.Disable (item2 (1))
-    GUI.Disable (item3 (1))
     GUI.Hide (btnstrt)
     GUI.Hide (btnend)
     GUI.Hide (cbprev)
@@ -2804,18 +3018,16 @@ procedure GetPreferences
 	else
 	    get : loadedsavepref, nullreal
 	end if
-	if player1 -> placingBlock.id = ord (blk.error) then
-	    get : loadedsavepref, instring
-	    tempInt := strint (instring)
-	    if tempInt < 0 or tempInt >= numBlockTypes then
-		tempInt := ord (blk.dirt)
-	    end if
-	    player1 -> SetPlacingBlock (blockType (tempInt))
-	else
-	    get : loadedsavepref, nullreal
+	%Get placingBlock type
+	get : loadedsavepref, instring
+	tempInt := strint (instring)
+	if tempInt < 0 or tempInt >= numBlockTypes then
+	    tempInt := ord (blk.dirt)
 	end if
-	if genVersion <= 1 or player1 -> placingBlock.id = ord (blk.error) then
-	    player1 -> SetPlacingBlock (blockType (ord (blk.dirt)))
+	player1 -> SetPlacingBlock (blockType (tempInt))
+
+	if genVersion <= 1 then
+	    player1 -> SetPlacingBlock (blockType (ord (blk.void)))
 	end if
 	if keepmapblocksize then
 	    get : loadedsavepref, blocksize
@@ -2919,9 +3131,7 @@ procedure GetPreferences
 	if timeOfDay = -1 then
 	    timeOfDay := 12
 	end if
-	if player1 -> placingBlock.id = ord (blk.error) then
-	    player1 -> SetPlacingBlock (blockType (ord (blk.dirt)))
-	end if
+	player1 -> SetPlacingBlock (blockType (ord (blk.void)))
 	CenterCamera
     end if
     ClampOffsetToScreen
@@ -3093,13 +3303,13 @@ procedure WorldPreview
 		     end if*/
 		    var foundType : int := block (cdx) (cdy).block
 		    if not bareBonesPreview then
-			if blockType (foundType).name = "void" then
-			    foundType := terrainQuery (cdx, cdy, 1)
-			    if blockType (foundType).name = "air" then
+			if blockType (foundType).id = ord (blk.void) then
+			    foundType := terrainQuery (cdx, cdy, ord (layerId.foreground))
+			    if blockType (foundType).id = ord (blk.air) then
 				foundType := block (cdx) (cdy).bg
-				if blockType (foundType).name = "void" then
-				    foundType := terrainQuery (cdx, cdy, 0)
-				    if blockType (foundType).name = "void" then
+				if blockType (foundType).id = ord (blk.void) then
+				    foundType := terrainQuery (cdx, cdy, ord (layerId.background))
+				    if blockType (foundType).id = ord (blk.void) then
 					foundType := ord (blk.air)
 				    end if
 				end if
@@ -3149,20 +3359,6 @@ procedure WorldPreview
 
 	offsetleftright := 0
 	offsetupdown := 0
-
-	%Reset menu option colour defaults
-	if resetdefaulthead then
-	    player1 -> SetHeadColour (-1)
-	    resetdefaulthead := false
-	end if
-	if resetdefaulttime then
-	    timeOfDay := -1
-	    resetdefaulttime := false
-	end if
-	if resetdefaultblock then
-	    player1 -> SetPlacingBlock (blockType (ord (blk.error)))
-	    resetdefaultblock := false
-	end if
     end if
 end WorldPreview
 
@@ -3182,7 +3378,7 @@ procedure KeyboardInput
 
     %Give input to players
     player1 -> KeyboardInput (arrow)
-    if numPlayers > 1 then
+    if numPlayers > 1 and multiplayerIsLocal then
 	player2 -> KeyboardInput (arrow)
     end if
 end KeyboardInput
@@ -3217,6 +3413,10 @@ procedure PressPKey
 	    %or any other button will be, then pause, it will act as if you clicked the button.
 	    var t : boolean := GUI.ProcessEvent %Gobbles up 10 last events to prevent processing
 	end for
+	player1 -> CloseMenu ()
+	if numPlayers > 1 then
+	    player2 -> CloseMenu ()
+	end if
 	inPauseMenu := true
 	View.Set ("nooffscreenonly")
 	oldTime := timeOfDay
@@ -3230,9 +3430,6 @@ procedure PressPKey
 	Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
 	Draw.Box (145, maxy - 67, 175, maxy - 37, black)
 	Draw.Text (timestringify (timeOfDay), 100, maxy - 90, font2, black)
-	Draw.FillBox (265, maxy - 67, 295, maxy - 37, player1 -> placingBlock.clr)
-	Draw.Box (265, maxy - 67, 295, maxy - 37, black)
-	Draw.Text (player1 -> placingBlock.name + " blocks", 238, maxy - 90, font2, black)
 	loop
 	    exit when GUI.ProcessEvent
 	end loop
@@ -3292,7 +3489,7 @@ end IfDeadGameOver
 
 procedure resetVariables
     player1 -> ResetVariables
-    if numPlayers > 1 then
+    if numPlayers > 1 and multiplayerIsLocal then
 	player2 -> ResetVariables
     end if
 
@@ -3310,9 +3507,6 @@ procedure resetVariables
 
     keyp := false
     preview := false
-    resetdefaulthead := false
-    resetdefaulttime := false
-    resetdefaultblock := false
     menuReturn := false
 
     loading (white)
@@ -3443,8 +3637,17 @@ loop
 	%Get iscreative checkbox state
 	player1 -> SetSurvival (not GUI.GetCheckBox (cbcreative))
 
+	if numEntities not= 0 then
+	    locate (1, 1)
+	    put "Error! Player was not first entity!"
+	    View.Update
+	    delay (2000)
+	    numEntities := 0
+	end if
 	if GUI.GetCheckBox (cbmultiplayer) then
 	    numPlayers := 2
+	    player1 -> SetOther (player2)
+	    player2 -> SetOther (player1)
 	    entities (numEntities) := player1
 	    numEntities += 1
 	    entities (numEntities) := player2
@@ -3456,14 +3659,14 @@ loop
 	end if
 
 	%Set menu option default indicator
+	%- These three are set when getpreferences / final variable assignment happens, so tell them that it was a false alarm and to reset if it was just a preview run
+	var resetdefaulthead : boolean := false
+	var resetdefaulttime : boolean := false
 	if player1 -> headcolour = -1 then
 	    resetdefaulthead := true
 	end if
 	if timeOfDay = -1 then
 	    resetdefaulttime := true
-	end if
-	if player1 -> placingBlock.id = ord (blk.error) then
-	    resetdefaultblock := true
 	end if
 
 	hideMainMenuGUIs
@@ -3480,7 +3683,7 @@ loop
 
 	%Assign values to variables that are calculated using "blocksize"
 	player1 -> FinalVariableAssingment
-	if numPlayers > 1 then
+	if numPlayers > 1 and multiplayerIsLocal then
 	    player2 -> SetPlacingBlock (blockType (ord (blk.dirt)))
 	    player2 -> FinalVariableAssingment
 	    player2 -> CopyProperties (player1)
@@ -3493,6 +3696,20 @@ loop
 	GenerateWorld
 
 	WorldPreview
+
+	if preview then
+	    resetVariables
+
+	    %Reset menu option colour defaults
+	    if resetdefaulthead then
+		player1 -> SetHeadColour (-1)
+		resetdefaulthead := false
+	    end if
+	    if resetdefaulttime then
+		timeOfDay := -1
+		resetdefaulttime := false
+	    end if
+	end if
 
 	if not preview then
 	    exit
@@ -3523,7 +3740,7 @@ loop
 	KeyboardInput
 
 	player1 -> HandleMouse (xm, ym, cm, deltaTime)
-	if numPlayers > 1 then
+	if numPlayers > 1 and multiplayerIsLocal then
 	    player2 -> HandleMouse (-1, -1, -1, deltaTime)
 	end if
 
@@ -3611,7 +3828,6 @@ cls
 %Disable all active GUI functions
 GUI.Disable (menuhead)
 GUI.Disable (menubg)
-GUI.Disable (menublk)
 GUI.Disable (btnend)
 if #btncont not= 16#80000000 then
     GUI.Disable (btncont)
