@@ -915,43 +915,846 @@ procedure WorldPreview
 	close : autosave
     end if
 end WorldPreview
-/*
- procedure
 
- end
- /*
- procedure
+%Beginning of main loop processes
 
- end
- /*
- procedure
+%The coordinates of different points on the character
+procedure CharPointCoords
+    %Height that the character's hands are
+    handheight := chary + charheight div 3 * 2
 
- end
- /*
- procedure
+    %Character rounded position
+    rcharxl := (floor ((charx - charwidth div 2 - offsetx) / blocksize)) * blocksize + offsetx
+    rcharyd := (ceil ((chary - offsety) / blocksize)) * blocksize + offsety
+    rcharxr := (floor ((charx + charwidth div 2 - offsetx) / blocksize)) * blocksize + offsetx
+    rcharyu := (floor ((chary + charheight + 1 - offsety) / blocksize)) * blocksize + offsety
+    rcharyuceil := (ceil ((chary + charheight + 1 - offsety) / blocksize)) * blocksize + offsety
+    rcharydfloor := (floor ((chary - offsety) / blocksize)) * blocksize + offsety
+end CharPointCoords
 
- end
- /*
- procedure
+%If character must crawl
+procedure CharMustCrawl
+    if Pic.Height (stand) > blocksize then
+	if length (action) >= 8 and action (1 .. 8) = "crawling" then
+	    tempcoords (1) := (((rcharyuceil - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
+	else
+	    tempcoords (1) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
+	end if
+	if length (action) >= 8 and action (1 .. 8) = "crawling" then
+	    tempcoords (2) := (((rcharyuceil - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
+	else
+	    tempcoords (2) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
+	end if
+	if ( #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2))) and onground then
+	    mustcrawl := true
+	else
+	    mustcrawl := false
+	end if
+	if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 -
+		offsetx) / blocksize + offsetx)) then
+	    mustcrawl := false
+	end if
+	if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) /
+		blocksize + offsetx)) then
+	    mustcrawl := false
+	end if
+    end if
+end CharMustCrawl
 
- end
- /*
- procedure
+%If character is on the ground
+procedure CharOnGround
+    tempcoords (1) := (((rcharyd - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
+    tempcoords (2) := (((rcharyd - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
+    if ( #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2))) and (chary - offsety) / blocksize + offsety = (chary
+	    - offsety) div blocksize + offsety or chary = 0 then
+	onground := true
+    else
+	onground := false
+    end if
+    if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx)
+	    / blocksize + offsetx)) and chary > 0 then
+	onground := false
+    end if
+    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) /
+	    blocksize + offsetx)) and chary > 0 then
+	onground := false
+    end if
+end CharOnGround
 
- end
- /*
- procedure
+%If character is against a wall to the left
+procedure CharOnLeftWall
+    tempcoords (1) := (((rcharydfloor - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
+    tempcoords (2) := (((rcharydfloor + blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
+    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or charx - charwidth div 2 = 0 then
+	onleftwall := true
+    elsif charheight > blocksize and #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) then
+	onleftwall := true
+    else
+	onleftwall := false
+    end if
+end CharOnLeftWall
 
- end
- /*
- procedure
+%If character is against a wall to the right
+procedure CharOnRightWall
+    tempcoords (1) := (((rcharydfloor - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
+    tempcoords (2) := (((rcharydfloor + blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
+    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or charx + charwidth div 2 = maxx then
+	onrightwall := true
+    elsif charheight > blocksize and #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) then
+	onrightwall := true
+    else
+	onrightwall := false
+    end if
+end CharOnRightWall
 
- end
- /*
- procedure
+%If character is against the ceiling
+procedure CharHitCeiling
+    tempcoords (1) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
+    tempcoords (2) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
+    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) or rcharyu >= maxy then
+	hitceiling := true
+    else
+	hitceiling := false
+    end if
+    if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx)
+	    / blocksize + offsetx)) and rcharyu < maxy then
+	hitceiling := false
+    end if
+    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) /
+	    blocksize + offsetx)) and rcharyu < maxy then
+	hitceiling := false
+    end if
+end CharHitCeiling
 
- end
- */
+%Get input for keyboard and parallelport
+procedure KeyAndParallelInput
+    %Reset input variables
+    keyspc := false
+    keya := false
+    keys := false
+    keyd := false
+    keyp := false
+
+    %Assign input variables for keyboard
+    if arrow (' ') then
+	keyspc := true
+    end if
+    if arrow ('a') then
+	keya := true
+    end if
+    if arrow ('s') then
+	keys := true
+    end if
+    if arrow ('d') then
+	keyd := true
+    end if
+    if arrow ('p') then
+	keyp := true
+    end if
+
+    %If parallel port input is enabled
+    if parallelinput then
+	%Get parallel port input
+	val := parallelget
+
+	%Assign input variables for parallel port
+	if val = 1 or val = 1 + 2 then %Etc., etc., ...
+	    keyspc := true
+	end if
+	if val = 2 then
+	    keya := true
+	end if
+	if val = 3 then
+	    keys := true
+	end if
+	if val = 4 then
+	    keyd := true
+	end if
+	if val = 5 then
+	    keyp := true
+	end if
+    end if
+end KeyAndParallelInput
+
+%Screen sliding
+procedure ScreenSlide
+    seek : autosave, 0
+    if eof (autosave) = false and (charx - charwidth <= pxscrollclearance or charx + charwidth >= maxx - pxscrollclearance or chary <= pxscrollclearance or chary + charheight >= maxy -
+	    pxscrollclearance) then
+	if charx - charwidth div 2 <= pxscrollclearance then
+	    screenscroll (1, 0)
+	    charx += 1
+	elsif charx + charwidth div 2 >= maxx - pxscrollclearance then
+	    screenscroll (-1, 0)
+	    charx -= 1
+	end if
+	if chary <= pxscrollclearance then
+	    screenscroll (0, 1)
+	    chary += 1
+	elsif chary + charheight >= maxy - pxscrollclearance then
+	    screenscroll (0, -1)
+	    chary -= 1
+	end if
+
+	%reset x and y offsets
+	if offsetx > blocksize - 1 then
+	    offsetx := 0
+	elsif offsetx < 0 then
+	    offsetx := blocksize - 1
+	end if
+	if offsety > blocksize - 1 then
+	    offsety := 0
+	elsif offsety < 0 then
+	    offsety := blocksize - 1
+	end if
+    else
+	seek : autosave, *
+    end if
+end ScreenSlide
+
+%How the aim guide moves in accordance with the mouse
+procedure AimGuideMovement
+    if Math.Distance (charx, handheight, xm, ym) = 0 then
+	xinc := (xm - charx) / 0.1
+    else
+	xinc := (xm - charx) / Math.Distance (charx, handheight, xm, ym)
+    end if
+    if Math.Distance (charx, handheight, xm, ym) = 0 then
+	yinc := (ym - handheight) / 0.1
+    else
+	yinc := (ym - handheight) / Math.Distance (charx, handheight, xm, ym)
+    end if
+    tempi := round (reach)
+    for i : 1 .. round (reach)
+	if norcursorinput = false then
+	    rcursorxbb := ((floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize) + offsetx
+	    rcursorybb := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
+	    rcursorxpb := rcursorxbb
+	    rcursorypb := rcursorybb
+	    tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
+	    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) then
+		tempi := i
+		rcursorxbb := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
+		rcursorybb := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
+		rcursorxpb := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
+		rcursorypb := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
+		norcursorinput := true
+	    end if
+	else %This is just to slow it down so that there is the same delay whether you are looking at a block or not. I am not convinced that it is nessecary.
+	    null := ((floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize) + offsetx
+	    null := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
+	    null := rcursorxbb
+	    null := rcursorybb
+	    null := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
+	    if #block (null) not= boolUnInit and block (null) then
+		null := i
+		null := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
+		null := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
+		null := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
+		null := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
+		null := 1
+	    end if
+	end if
+    end for
+    norcursorinput := false
+    if Math.Distance (charx, handheight, xm, ym) < Math.Distance (charx, handheight, charx + xinc * tempi, handheight + yinc * tempi) then
+	rcursorxbb := (floor ((xm - offsetx) / blocksize)) * blocksize + offsetx
+	rcursorybb := (floor ((ym - offsety) / blocksize)) * blocksize + offsety
+	rcursorxpb := (floor ((xm - offsetx) / blocksize)) * blocksize + offsetx
+	rcursorypb := (floor ((ym - offsety) / blocksize)) * blocksize + offsety
+    end if
+end AimGuideMovement
+
+%If player right-clicks
+procedure PlayerRightClick
+    if cm = 100 then
+	if mclickr = 0 then
+	    mclickr := blockplacespeed
+	end if
+	if mclickr = blockplacespeed then
+	    if (rcursorxpb not= rcharxl and rcursorxpb not= rcharxr) or rcursorypb not= rcharydfloor then
+		tempcoords (1) := (((rcursorypb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxpb - offsetleftright) div blocksize + 4999)
+		x := (tempcoords (1) - (floor (tempcoords (1) / 10000) * 10000) - 4999) * blocksize + offsetleftright
+		y := (floor (tempcoords (1) / 10000) - 2499) * blocksize + offsetupdown
+		tempcoords (2) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x + blocksize - offsetleftright) div blocksize + 4999)
+		tempcoords (3) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x - blocksize - offsetleftright) div blocksize + 4999)
+		tempcoords (4) := (((y + blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
+		tempcoords (5) := (((y - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
+		if #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) or #block (tempcoords (3)) not= boolUnInit and block (tempcoords (3)) or
+		    #block (tempcoords (4)) not= boolUnInit and block (tempcoords (4)) or #block (tempcoords (5)) not= boolUnInit and block (tempcoords (5)) then
+		    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) then
+			Draw.FillBox (rcursorxpb, rcursorypb, rcursorxpb + (blocksize - 1), rcursorypb + (blocksize - 1), blockcolour)
+			block (tempcoords (1)) := true
+			blkount += 1
+			seek : autosave, *
+			put : autosave, tempcoords (1)
+		    end if
+		end if
+	    end if
+	end if
+	mclickr -= 1
+	if mclickr = -1 then
+	    mclickr := blockplacespeed
+	end if
+    else
+	mclickr := 0
+    end if
+end PlayerRightClick
+
+%If player left-clicks
+procedure PlayerLeftClick
+    if cm = 1 then
+	if mclickl = 0 then
+	    mclickl := blockbreakspeed
+	end if
+	if mclickl = blockbreakspeed then
+	    tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
+	    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) then
+		Draw.FillBox (rcursorxbb, rcursorybb, rcursorxbb + (blocksize - 1), rcursorybb + (blocksize - 1), bgcolour)
+		block (tempcoords (1)) := false
+		blkount -= 1
+	    end if
+	end if
+	mclickl -= 1
+	if mclickl = -1 then
+	    mclickl := blockbreakspeed
+	end if
+    else
+	mclickl := 0
+    end if
+end PlayerLeftClick
+
+%If 'p' key is pressed
+procedure PressPKey
+    if keyp then
+	View.Set ("nooffscreenonly")
+	oldbackcolour := bgcolour
+	oldblockcolour := blockcolour
+	fork pauseguis
+	Pic.Free (screenpic)
+	screenpic := Pic.New (0, 0, maxx, maxy)
+	Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+	GUI.ResetQuit
+	GUI.ShowMenuBar
+	colourstringify (headcolour)
+	Draw.FillBox (32, maxy - 67, 62, maxy - 37, headcolour)
+	Draw.Box (32, maxy - 67, 62, maxy - 37, black)
+	Draw.Text (tempcolourstr + " head", 1, maxy - 90, font2, black)
+	colourstringify (bgcolour)
+	Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
+	Draw.Box (145, maxy - 67, 175, maxy - 37, black)
+	Draw.Text (tempcolourstr + " background", 100, maxy - 90, font2, black)
+	colourstringify (blockcolour)
+	Draw.FillBox (265, maxy - 67, 295, maxy - 37, blockcolour)
+	Draw.Box (265, maxy - 67, 295, maxy - 37, black)
+	Draw.Text (tempcolourstr + " blocks", 238, maxy - 90, font2, black)
+	loop
+	    exit when startgame
+	end loop
+
+	%If the quit button has been clicked
+	if not quitthegame then
+
+	    %Temporarily disable and hide all GUIs
+	    GUI.Quit
+	    GUI.Hide (quitButton)
+	    GUI.Hide (nameTextField)
+	    GUI.Hide (nameLabel)
+	    GUI.Hide (btncont)
+	    GUI.Hide (btnend)
+	    GUI.HideMenuBar
+
+	    %Reset game-continuing variable
+	    startgame := false
+	    View.Set ("offscreenonly")
+
+	    %Loading screen
+	    loading (bgcolour)
+
+	    %Updates block and background colours
+	    if oldblockcolour not= blockcolour or oldbackcolour not= bgcolour then
+		Draw.FillBox (0, 0, maxx, maxy, bgcolour)
+		seek : autosave, 0
+		if eof (autosave) = false then
+		    loop
+			get : autosave, autocoords
+			if block (autocoords) then
+			    x := (autocoords - (floor (autocoords / 10000) * 10000) - 4999) * blocksize + offsetleftright
+			    y := (floor (autocoords / 10000) - 2499) * blocksize + offsetupdown
+			    Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
+			end if
+			exit when eof (autosave)
+		    end loop
+		end if
+		seek : autosave, *
+	    else
+		Pic.Draw (screenpic, 0, 0, picCopy)
+	    end if
+	    View.Update
+	end if
+    end if
+end PressPKey
+
+%If 'd' key is pressed
+procedure PressDKey
+    if keyd then
+	if recentstartd then
+	    recentstartd := false
+	    if sprintpossibled2 = 0 then
+		sprintpossibled1 := doubletapspeed
+	    end if
+	end if
+	if sprintpossibled2 not= 0 and (onground or flying) then
+	    sprintpossibled1 := 0
+	    sprintpossibled2 := 0
+	    sprintd := true
+	end if
+	if keys and onground or mustcrawl then
+	    if flying then
+		if movegap / 2 = movegap div 2 and not onrightwall then
+		    charx += 1
+		end if
+	    else
+		if movegap = 0 and not onrightwall then
+		    charx += 1
+		end if
+	    end if
+	elsif sprintd then
+	    if flying then
+		if not onrightwall then
+		    charx += 1
+		end if
+	    else
+		if (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and not onrightwall then
+		    charx += 1
+		end if
+	    end if
+	else
+	    if flying then
+		if movegap / 2 = movegap div 2 and not onrightwall then
+		    charx += 1
+		end if
+	    else
+		if (movegap = 0 or movegap = 8) and not onrightwall then
+		    charx += 1
+		end if
+	    end if
+	end if
+	action := "walking"
+	facing := "right"
+	recentstopd := true
+    else
+	recentstartd := true
+	sprintd := false
+	if recentstopd and sprintpossibled1 not= 0 then
+	    recentstopd := false
+	    sprintpossibled2 := doubletapspeed
+	end if
+    end if
+    %Timers for double-tapping to sprint right
+    if sprintpossibled1 not= 0 then
+	sprintpossibled1 -= 1
+    end if
+    if sprintpossibled2 not= 0 then
+	sprintpossibled2 -= 1
+    end if
+end PressDKey
+
+%If 'a' key is pressed
+procedure PressAKey
+    if keya then
+	if recentstarta then
+	    recentstarta := false
+	    if sprintpossiblea2 = 0 then
+		sprintpossiblea1 := doubletapspeed
+	    end if
+	end if
+	if sprintpossiblea2 not= 0 and (onground or flying) then
+	    sprintpossiblea1 := 0
+	    sprintpossiblea2 := 0
+	    sprinta := true
+	end if
+	if keys and onground or mustcrawl then
+	    if flying then
+		if movegap / 2 = movegap div 2 and not onleftwall then
+		    charx -= 1
+		end if
+	    else
+		if movegap = 0 and not onleftwall then
+		    charx -= 1
+		end if
+	    end if
+	else
+	    if sprinta then
+		if flying then
+		    if not onleftwall then
+			charx -= 1
+		    end if
+		else
+		    if (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and not onleftwall then
+			charx -= 1
+		    end if
+		end if
+	    else
+		if flying then
+		    if movegap / 2 = movegap div 2 and not onleftwall then
+			charx -= 1
+		    end if
+		else
+		    if (movegap = 0 or movegap = 8) and not onleftwall then
+			charx -= 1
+		    end if
+		end if
+	    end if
+	end if
+	action := "walking"
+	facing := "left"
+	recentstopa := true
+    else
+	recentstarta := true
+	sprinta := false
+	if recentstopa and sprintpossiblea1 not= 0 then
+	    recentstopa := false
+	    sprintpossiblea2 := doubletapspeed
+	end if
+    end if
+    %Timers for double-tapping to sprint left
+    if sprintpossiblea1 not= 0 then
+	sprintpossiblea1 -= 1
+    end if
+    if sprintpossiblea2 not= 0 then
+	sprintpossiblea2 -= 1
+    end if
+end PressAKey
+
+%If spacebar is pressed
+procedure PressSpaceKey
+    if keyspc and (onground or flying) and mustcrawl = false and hitceiling = false then
+	if flying then
+	    chary += 1
+	else
+	    jumpcount := jumpheight
+	end if
+    end if
+end PressSpaceKey
+
+
+%If 's' key is pressed
+procedure PressSKey
+    if keys then
+	if onground then
+	    if keya or keyd then
+		action := "crawling"
+	    else
+		action := "crawlingstop"
+	    end if
+	elsif flying then
+	    chary -= 1
+	end if
+    end if
+end PressSKey
+
+%Jumping
+procedure CharJump
+    if mustcrawl = false and flying = false then
+	if jumpcount = jumpheight then
+	    facing := ""
+	end if
+	if jumpcount not= 0 then
+	    action := "jumping"
+	    if hitceiling then
+		jumpcount := 0
+	    else
+		if (movegap = 0 or movegap = 3 or movegap = 5 or movegap = 8 or movegap = 10 or movegap = 13) and jumpcount >= 18 then
+		    chary += 1
+		    jumpcount -= 1
+		elsif (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and jumpcount >= 9 and jumpcount < 18 then
+		    chary += 1
+		    jumpcount -= 1
+		elsif (movegap = 0 or movegap = 8) and jumpcount < 9 then
+		    chary += 1
+		    jumpcount -= 1
+		end if
+	    end if
+	end if
+    end if
+end CharJump
+
+%Gravity
+procedure Gravity
+    if onground = false and jumpcount = 0 and flying = false then
+	action := "falling"
+	if (movegap = 0 or movegap = 8) and gravcount < 9 then
+	    chary -= 1
+	    gravcount += 1
+	elsif (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and gravcount >= 9 and gravcount < 18 then
+	    chary -= 1
+	    gravcount += 1
+	elsif (movegap = 0 or movegap = 3 or movegap = 5 or movegap = 8 or movegap = 10 or movegap = 13) and gravcount >= 18 and gravcount < 30 then
+	    chary -= 1
+	    gravcount += 1
+	elsif (movegap = 0 or movegap = 2 or movegap = 4 or movegap = 6 or movegap = 8 or movegap = 10 or movegap = 12 or movegap = 14) and gravcount >= 30 and gravcount < 70 then
+	    chary -= 1
+	    gravcount += 1
+	elsif gravcount >= 70 then
+	    chary -= 1
+	    gravcount += 1
+	end if
+    end if
+
+    %On solid ground reset gravity
+    if onground then
+	gravcount := 0
+    end if
+end Gravity
+
+%Finish the first part of assigning a usable value to "action"
+procedure FinalizeAction1
+    %Incorporate looking direction into action when not jumping or falling
+    if action (1 .. 7) not= "jumping" and action (1 .. 7) not= "falling" then
+	if cm not= 0 then
+	    if xm >= charx then
+		facing := "right"
+	    else
+		facing := "left"
+	    end if
+	end if
+    end if
+
+    %Incorporate motion direction into action
+    if facing not= "" then
+	action += " "
+    end if
+    action += facing
+
+    %Incorporate looking direction into action when jumping or falling
+    if action (1 .. 7) = "jumping" or action (1 .. 7) = "falling" then
+	if cm not= 0 then
+	    if xm >= charx then
+		if action = "falling left" or action = "jumping left" then
+		    action += " "
+		    action += "facing right"
+		end if
+	    else
+		if action = "falling right" or action = "jumping right" then
+		    action += " "
+		    action += "facing left"
+		end if
+	    end if
+	end if
+    end if
+end FinalizeAction1
+
+%Crawling and walking animations
+procedure Animations
+    %Walking animation
+    if movegap = 0 and (movegaptens = 2 or movegaptens = 4 or movegaptens = 6 or movegaptens = 8) then
+	if wlk = 4 then
+	    ponwlk := -1
+	elsif wlk = 1 then
+	    ponwlk := 1
+	end if
+	wlk += ponwlk
+    end if
+
+    %Crawling animation
+    if movegap = 0 and (movegaptens = 4 or movegaptens = 8) then
+	if crl = 4 then
+	    poncrl := -1
+	elsif crl = 1 then
+	    poncrl := 1
+	end if
+	crl += poncrl
+    end if
+end Animations
+
+%Finish the second part of assigning a usable value to "action"
+procedure FinalizeAction2
+    %Directionless fall
+    if (action = "falling left" or action = "falling right") and keya = false and keyd = false and onground = false then
+	action := "falling"
+    end if
+
+    %Character image used if forced crawling
+    if mustcrawl then
+	if action = "standing" then
+	    action := "crawlingstop"
+	elsif action = "walking left" then
+	    action := "crawling left"
+	elsif action = "walking right" then
+	    action := "crawling right"
+	elsif action = "standing left" then
+	    action := "crawlingstop left"
+	elsif action = "standing right" then
+	    action := "crawlingstop right"
+	end if
+    end if
+end FinalizeAction2
+
+%What character image is being used
+procedure CharImage
+    if cm = 0 then  %Image if not clicking
+	if action = "walking left" then
+	    character := walkl (wlk)
+	elsif action = "walking right" then
+	    character := walkr (wlk)
+	elsif action = "crawlingstop" then
+	    character := crawlr (2)
+	elsif action = "crawlingstop left" then
+	    character := crawll (2)
+	elsif action = "crawlingstop right" then
+	    character := crawlr (2)
+	elsif action = "crawling left" then
+	    character := crawll (crl)
+	elsif action = "crawling right" then
+	    character := crawlr (crl)
+	elsif action = "falling" then
+	    character := fall
+	elsif action = "falling left" then
+	    character := falll
+	elsif action = "falling right" then
+	    character := fallr
+	elsif action = "jumping" then
+	    character := jump
+	elsif action = "jumping left" then
+	    character := jumpl
+	elsif action = "jumping right" then
+	    character := jumpr
+	elsif action = "standing left" then
+	    character := walkl (2)
+	elsif action = "standing right" then
+	    character := walkr (2)
+	elsif action = "standing" then
+	    character := stand
+	end if
+    else  %Image if clicking
+	if action = "walking left" then
+	    character := walklc (wlk)
+	elsif action = "walking right" then
+	    character := walkrc (wlk)
+	elsif action = "crawlingstop" then
+	    character := crawlrc (2)
+	elsif action = "crawlingstop left" then
+	    character := crawllc (2)
+	elsif action = "crawlingstop right" then
+	    character := crawlrc (2)
+	elsif action = "crawling left" then
+	    character := crawllc (crl)
+	elsif action = "crawling right" then
+	    character := crawlrc (crl)
+	elsif action = "falling" then
+	    if xm >= charx then
+		character := fallcr
+	    else
+		character := fallcl
+	    end if
+	elsif action = "falling left" then
+	    character := falllc
+	elsif action = "falling right" then
+	    character := fallrc
+	elsif action = "falling left facing right" then
+	    character := falllr
+	elsif action = "falling right facing left" then
+	    character := fallrl
+	elsif action = "jumping" then
+	    if xm >= charx then
+		character := jumpcr
+	    else
+		character := jumpcl
+	    end if
+	elsif action = "jumping left" then
+	    character := jumplc
+	elsif action = "jumping right" then
+	    character := jumprc
+	elsif action = "jumping left facing right" then
+	    character := jumplr
+	elsif action = "jumping right facing left" then
+	    character := jumprl
+	elsif action = "standing left" then
+	    character := walklc (2)
+	elsif action = "standing right" then
+	    character := walkrc (2)
+	end if
+    end if
+end CharImage
+
+%Draw character image and head colour
+procedure CharDraw
+    %Draw character's head colour
+    if action = "crawling left" or action = "crawlingstop left" then
+	Draw.FillOval (charx - 4, chary + 8, 3, 3, headcolour)
+    elsif action = "crawling right" or action = "crawlingstop right" or action = "crawlingstop" then
+	Draw.FillOval (charx + 4, chary + 8, 3, 3, headcolour)
+    else
+	Draw.FillOval (charx, chary + 21, 3, 3, headcolour)
+    end if
+
+    %Draw character
+    Pic.Draw (character, charx - charwidth div 2, chary, picMerge)
+end CharDraw
+
+%Save background behind aim guides and draw them
+procedure AimGuideBacksaveAndDraw
+    %Get blocks at block placing box and block breaking crosshairs
+    tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
+    tempcoords (2) := (((rcursorypb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxpb - offsetleftright) div blocksize + 4999)
+
+    if tempcoords (1) not= tempcoords (2) then
+	%Save background behind crosshairs
+	backpiccross := Pic.New (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1)
+
+	%Save background behind box
+	backpicbox := Pic.New (rcursorxpb, rcursorypb, rcursorxpb + blocksize - 1, rcursorypb + blocksize - 1)
+
+	%Draw crosshairs for breaking blocks
+	if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) and blockcolour = black or ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and bgcolour = black
+		then
+	    Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
+	else
+	    Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
+	end if
+
+	%Draw box for placing blocks
+	if #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) and blockcolour = black or ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and bgcolour = black
+		then
+	    Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
+	else
+	    Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
+	end if
+    else
+	%Save background behind crosshairs and box
+	backpiccross := Pic.New (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1)
+
+	%Draw crosshairs for breaking blocks and box for placing blocks
+	if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) and blockcolour = black or ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and bgcolour = black
+		then
+	    Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
+	    Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
+	else
+	    Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
+	    Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
+	end if
+    end if
+end AimGuideBacksaveAndDraw
+
+%Erase guide graphics
+procedure EraseAimGuide
+    if tempcoords (1) not= tempcoords (2) then
+	%Draw old unaltered block over crosshairs for breaking blocks
+	Pic.Draw (backpiccross, rcursorxbb, rcursorybb, picCopy)
+	Pic.Free (backpiccross)
+
+	%Draw old unaltered block over box for placing blocks
+	Pic.Draw (backpicbox, rcursorxpb, rcursorypb, picCopy)
+	Pic.Free (backpicbox)
+    else
+	%Draw old unaltered block over crosshairs for breaking blocks and box for placing blocks
+	Pic.Draw (backpiccross, rcursorxbb, rcursorybb, picCopy)
+	Pic.Free (backpiccross)
+    end if
+end EraseAimGuide
+
+%End of main loop processes
 
 %Set colour-change-detecting variables
 if bgcolour = 983 then
@@ -981,6 +1784,7 @@ end if
 %close text file of all saved files' names
 close : savenames
 
+%Main menu loop
 loop
     %Clear and open autosave file
     open : autosave, ("Autosave.txt"), get, put, seek
@@ -1074,107 +1878,23 @@ loaded := false
 %Show world
 View.Update
 
-%Main program
+%Game program loop
 loop
 
-    %Height that the character's hands are
-    handheight := chary + charheight div 3 * 2
+    CharPointCoords
 
-    %Character rounded position
-    rcharxl := (floor ((charx - charwidth div 2 - offsetx) / blocksize)) * blocksize + offsetx
-    rcharyd := (ceil ((chary - offsety) / blocksize)) * blocksize + offsety
-    rcharxr := (floor ((charx + charwidth div 2 - offsetx) / blocksize)) * blocksize + offsetx
-    rcharyu := (floor ((chary + charheight + 1 - offsety) / blocksize)) * blocksize + offsety
-    rcharyuceil := (ceil ((chary + charheight + 1 - offsety) / blocksize)) * blocksize + offsety
-    rcharydfloor := (floor ((chary - offsety) / blocksize)) * blocksize + offsety
-
-    %If character must crawl
-    if Pic.Height (stand) > blocksize then
-	if action = "crawlingstop" or action = "crawling left" or action = "crawling right" or action = "crawlingstop left" or action = "crawlingstop right" then
-	    tempcoords (1) := (((rcharyuceil - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
-	else
-	    tempcoords (1) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
-	end if
-	if action = "crawlingstop" or action = "crawling left" or action = "crawling right" or action = "crawlingstop left" or action = "crawlingstop right" then
-	    tempcoords (2) := (((rcharyuceil - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
-	else
-	    tempcoords (2) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
-	end if
-	if ( #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2))) and onground then
-	    mustcrawl := true
-	else
-	    mustcrawl := false
-	end if
-	if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 -
-		offsetx)
-		/ blocksize + offsetx)) then
-	    mustcrawl := false
-	end if
-	if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) /
-		blocksize + offsetx)) then
-	    mustcrawl := false
-	end if
-    end if
+    CharMustCrawl
 
     %Character standing by default
     action := "standing"
 
-    %If character is on the ground
-    tempcoords (1) := (((rcharyd - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
-    tempcoords (2) := (((rcharyd - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
-    if ( #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2))) and (chary - offsety) / blocksize + offsety = (chary
-	    - offsety) div blocksize + offsety or chary = 0 then
-	onground := true
-    else
-	onground := false
-    end if
-    if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx)
-	    / blocksize + offsetx)) and chary > 0 then
-	onground := false
-    end if
-    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) /
-	    blocksize + offsetx)) and chary > 0 then
-	onground := false
-    end if
+    CharOnGround
 
-    %If character is against a wall to the left
-    tempcoords (1) := (((rcharydfloor - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
-    tempcoords (2) := (((rcharydfloor + blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
-    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or charx - charwidth div 2 = 0 then
-	onleftwall := true
-    elsif charheight > blocksize and #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) then
-	onleftwall := true
-    else
-	onleftwall := false
-    end if
+    CharOnLeftWall
 
-    %If character is against a wall to the right
-    tempcoords (1) := (((rcharydfloor - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
-    tempcoords (2) := (((rcharydfloor + blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
-    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or charx + charwidth div 2 = maxx then
-	onrightwall := true
-    elsif charheight > blocksize and #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) then
-	onrightwall := true
-    else
-	onrightwall := false
-    end if
+    CharOnRightWall
 
-    %If character is against the ceiling
-    tempcoords (1) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxl - offsetleftright) div blocksize + 4999)
-    tempcoords (2) := (((rcharyu - offsetupdown) div blocksize + 2499) * 10000) + ((rcharxr - offsetleftright) div blocksize + 4999)
-    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) or #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) or rcharyu >= maxy then
-	hitceiling := true
-    else
-	hitceiling := false
-    end if
-    if ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and ((charx + 1 - charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + 1 - charwidth div 2 - offsetx)
-	    / blocksize + offsetx)) and rcharyu < maxy then
-	hitceiling := false
-    end if
-    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and ((charx + charwidth div 2 - offsetx) / blocksize + offsetx) = (round ((charx + charwidth div 2 - offsetx) /
-	    blocksize + offsetx)) and rcharyu < maxy then
-	hitceiling := false
-    end if
+    CharHitCeiling
 
     %Get mouse input
     Mouse.Where (xm, ym, cm)
@@ -1182,631 +1902,49 @@ loop
     %Get keyboard input
     Input.KeyDown (arrow)
 
-    %Reset input variables
-    keyspc := false
-    keya := false
-    keys := false
-    keyd := false
-    keyp := false
+    KeyAndParallelInput
 
-    %Assign input variables for keyboard
-    if arrow (' ') then
-	keyspc := true
-    end if
-    if arrow ('a') then
-	keya := true
-    end if
-    if arrow ('s') then
-	keys := true
-    end if
-    if arrow ('d') then
-	keyd := true
-    end if
-    if arrow ('p') then
-	keyp := true
-    end if
+    ScreenSlide
 
-    %If parallel port input is enabled
-    if parallelinput then
-	%Get parallel port input
-	val := parallelget
+    AimGuideMovement
 
-	%Assign input variables for parallel port
-	if val = 1 or val = 1 + 2 then %Etc., etc., ...
-	    keyspc := true
-	end if
-	if val = 2 then
-	    keya := true
-	end if
-	if val = 3 then
-	    keys := true
-	end if
-	if val = 4 then
-	    keyd := true
-	end if
-	if val = 5 then
-	    keyp := true
-	end if
-    end if
+    PlayerRightClick
 
-    %Screen sliding
-    seek : autosave, 0
-    if eof (autosave) = false and (charx - charwidth <= pxscrollclearance or charx + charwidth >= maxx - pxscrollclearance or chary <= pxscrollclearance or chary + charheight >= maxy -
-	    pxscrollclearance) then
-	if charx - charwidth div 2 <= pxscrollclearance then
-	    screenscroll (1, 0)
-	    charx += 1
-	elsif charx + charwidth div 2 >= maxx - pxscrollclearance then
-	    screenscroll (-1, 0)
-	    charx -= 1
-	end if
-	if chary <= pxscrollclearance then
-	    screenscroll (0, 1)
-	    chary += 1
-	elsif chary + charheight >= maxy - pxscrollclearance then
-	    screenscroll (0, -1)
-	    chary -= 1
-	end if
+    PlayerLeftClick
 
-	%reset x and y offsets
-	if offsetx > blocksize - 1 then
-	    offsetx := 0
-	elsif offsetx < 0 then
-	    offsetx := blocksize - 1
-	end if
-	if offsety > blocksize - 1 then
-	    offsety := 0
-	elsif offsety < 0 then
-	    offsety := blocksize - 1
-	end if
-    else
-	seek : autosave, *
-    end if
-
-    %How the aim guide moves in accordance with the mouse
-    if Math.Distance (charx, handheight, xm, ym) = 0 then
-	xinc := (xm - charx) / 0.1
-    else
-	xinc := (xm - charx) / Math.Distance (charx, handheight, xm, ym)
-    end if
-    if Math.Distance (charx, handheight, xm, ym) = 0 then
-	yinc := (ym - handheight) / 0.1
-    else
-	yinc := (ym - handheight) / Math.Distance (charx, handheight, xm, ym)
-    end if
-    tempi := round (reach)
-    for i : 1 .. round (reach)
-	if norcursorinput = false then
-	    rcursorxbb := ((floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize) + offsetx
-	    rcursorybb := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
-	    rcursorxpb := rcursorxbb
-	    rcursorypb := rcursorybb
-	    tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
-	    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) then
-		tempi := i
-		rcursorxbb := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
-		rcursorybb := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
-		rcursorxpb := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
-		rcursorypb := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
-		norcursorinput := true
-	    end if
-	else %This is just to slow it down so that there is the same delay whether you are looking at a block or not. I am not convinced that it is nessecary.
-	    null := ((floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize) + offsetx
-	    null := ((floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize) + offsety
-	    null := rcursorxbb
-	    null := rcursorybb
-	    null := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
-	    if #block (null) not= boolUnInit and block (null) then
-		null := i
-		null := (floor ((charx + xinc * i - offsetx) / blocksize)) * blocksize + offsetx
-		null := (floor ((handheight + yinc * i - offsety) / blocksize)) * blocksize + offsety
-		null := (floor ((charx + xinc * (i - 1) - offsetx) / blocksize)) * blocksize + offsetx
-		null := (floor ((handheight + yinc * (i - 1) - offsety) / blocksize)) * blocksize + offsety
-		null := 1
-	    end if
-	end if
-    end for
-    norcursorinput := false
-    if Math.Distance (charx, handheight, xm, ym) < Math.Distance (charx, handheight, charx + xinc * tempi, handheight + yinc * tempi) then
-	rcursorxbb := (floor ((xm - offsetx) / blocksize)) * blocksize + offsetx
-	rcursorybb := (floor ((ym - offsety) / blocksize)) * blocksize + offsety
-	rcursorxpb := (floor ((xm - offsetx) / blocksize)) * blocksize + offsetx
-	rcursorypb := (floor ((ym - offsety) / blocksize)) * blocksize + offsety
-    end if
-
-    %If player right-clicks
-    if cm = 100 then
-	if mclickr = 0 then
-	    mclickr := blockplacespeed
-	end if
-	if mclickr = blockplacespeed then
-	    if (rcursorxpb not= rcharxl and rcursorxpb not= rcharxr) or rcursorypb not= rcharydfloor then
-		tempcoords (1) := (((rcursorypb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxpb - offsetleftright) div blocksize + 4999)
-		x := (tempcoords (1) - (floor (tempcoords (1) / 10000) * 10000) - 4999) * blocksize + offsetleftright
-		y := (floor (tempcoords (1) / 10000) - 2499) * blocksize + offsetupdown
-		tempcoords (2) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x + blocksize - offsetleftright) div blocksize + 4999)
-		tempcoords (3) := (((y - offsetupdown) div blocksize + 2499) * 10000) + ((x - blocksize - offsetleftright) div blocksize + 4999)
-		tempcoords (4) := (((y + blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
-		tempcoords (5) := (((y - blocksize - offsetupdown) div blocksize + 2499) * 10000) + ((x - offsetleftright) div blocksize + 4999)
-		if #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) or #block (tempcoords (3)) not= boolUnInit and block (tempcoords (3)) or
-		    #block (tempcoords (4)) not= boolUnInit and block (tempcoords (4)) or #block (tempcoords (5)) not= boolUnInit and block (tempcoords (5)) then
-		    if ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) then
-			Draw.FillBox (rcursorxpb, rcursorypb, rcursorxpb + (blocksize - 1), rcursorypb + (blocksize - 1), blockcolour)
-			block (tempcoords (1)) := true
-			blkount += 1
-			seek : autosave, *
-			put : autosave, tempcoords (1)
-		    end if
-		end if
-	    end if
-	end if
-	mclickr -= 1
-	if mclickr = -1 then
-	    mclickr := blockplacespeed
-	end if
-    else
-	mclickr := 0
-    end if
-
-    %If player left-clicks
-    if cm = 1 then
-	if mclickl = 0 then
-	    mclickl := blockbreakspeed
-	end if
-	if mclickl = blockbreakspeed then
-	    tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
-	    if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) then
-		Draw.FillBox (rcursorxbb, rcursorybb, rcursorxbb + (blocksize - 1), rcursorybb + (blocksize - 1), bgcolour)
-		block (tempcoords (1)) := false
-		blkount -= 1
-	    end if
-	end if
-	mclickl -= 1
-	if mclickl = -1 then
-	    mclickl := blockbreakspeed
-	end if
-    else
-	mclickl := 0
-    end if
-
-    %If 'p' key is pressed
-    if keyp then
-	View.Set ("nooffscreenonly")
-	oldbackcolour := bgcolour
-	oldblockcolour := blockcolour
-	fork pauseguis
-	Pic.Free (screenpic)
-	screenpic := Pic.New (0, 0, maxx, maxy)
-	Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-	GUI.ResetQuit
-	GUI.ShowMenuBar
-	colourstringify (headcolour)
-	Draw.FillBox (32, maxy - 67, 62, maxy - 37, headcolour)
-	Draw.Box (32, maxy - 67, 62, maxy - 37, black)
-	Draw.Text (tempcolourstr + " head", 1, maxy - 90, font2, black)
-	colourstringify (bgcolour)
-	Draw.FillBox (145, maxy - 67, 175, maxy - 37, bgcolour)
-	Draw.Box (145, maxy - 67, 175, maxy - 37, black)
-	Draw.Text (tempcolourstr + " background", 100, maxy - 90, font2, black)
-	colourstringify (blockcolour)
-	Draw.FillBox (265, maxy - 67, 295, maxy - 37, blockcolour)
-	Draw.Box (265, maxy - 67, 295, maxy - 37, black)
-	Draw.Text (tempcolourstr + " blocks", 238, maxy - 90, font2, black)
-	loop
-	    exit when startgame
-	end loop
-
-	%If the quit button has been clicked
-	if quitthegame then
-	    GUI.Quit
-	    exit
-	end if
-
-	%Temporarily disable and hide all GUIs
+    PressPKey
+    if quitthegame then
 	GUI.Quit
-	GUI.Hide (quitButton)
-	GUI.Hide (nameTextField)
-	GUI.Hide (nameLabel)
-	GUI.Hide (btncont)
-	GUI.Hide (btnend)
-	GUI.HideMenuBar
-
-	%Reset game-continuing variable
-	startgame := false
-	View.Set ("offscreenonly")
-
-	%Loading screen
-	loading (bgcolour)
-
-	%Updates block and background colours
-	if oldblockcolour not= blockcolour or oldbackcolour not= bgcolour then
-	    Draw.FillBox (0, 0, maxx, maxy, bgcolour)
-	    seek : autosave, 0
-	    if eof (autosave) = false then
-		loop
-		    get : autosave, autocoords
-		    if block (autocoords) then
-			x := (autocoords - (floor (autocoords / 10000) * 10000) - 4999) * blocksize + offsetleftright
-			y := (floor (autocoords / 10000) - 2499) * blocksize + offsetupdown
-			Draw.FillBox (x, y, x + (blocksize - 1), y + (blocksize - 1), blockcolour)
-		    end if
-		    exit when eof (autosave)
-		end loop
-	    end if
-	    seek : autosave, *
-	else
-	    Pic.Draw (screenpic, 0, 0, picCopy)
-	end if
-	View.Update
+	exit
     end if
 
-    %If 'd' key is pressed
-    if keyd then
-	if recentstartd then
-	    recentstartd := false
-	    if sprintpossibled2 = 0 then
-		sprintpossibled1 := doubletapspeed
-	    end if
-	end if
-	if sprintpossibled2 not= 0 and (onground or flying) then
-	    sprintpossibled1 := 0
-	    sprintpossibled2 := 0
-	    sprintd := true
-	end if
-	if keys and onground or mustcrawl then
-	    if flying then
-		if movegap / 2 = movegap div 2 and not onrightwall then
-		    charx += 1
-		end if
-	    else
-		if movegap = 0 and not onrightwall then
-		    charx += 1
-		end if
-	    end if
-	elsif sprintd then
-	    if flying then
-		if not onrightwall then
-		    charx += 1
-		end if
-	    else
-		if (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and not onrightwall then
-		    charx += 1
-		end if
-	    end if
-	else
-	    if flying then
-		if movegap / 2 = movegap div 2 and not onrightwall then
-		    charx += 1
-		end if
-	    else
-		if (movegap = 0 or movegap = 8) and not onrightwall then
-		    charx += 1
-		end if
-	    end if
-	end if
-	action := "walking"
-	facing := "right"
-	recentstopd := true
-    else
-	recentstartd := true
-	sprintd := false
-	if recentstopd and sprintpossibled1 not= 0 then
-	    recentstopd := false
-	    sprintpossibled2 := doubletapspeed
-	end if
-    end if
+    PressDKey
 
-    %If 'a' key is pressed
-    if keya then
-	if recentstarta then
-	    recentstarta := false
-	    if sprintpossiblea2 = 0 then
-		sprintpossiblea1 := doubletapspeed
-	    end if
-	end if
-	if sprintpossiblea2 not= 0 and (onground or flying) then
-	    sprintpossiblea1 := 0
-	    sprintpossiblea2 := 0
-	    sprinta := true
-	end if
-	if keys and onground or mustcrawl then
-	    if flying then
-		if movegap / 2 = movegap div 2 and not onleftwall then
-		    charx -= 1
-		end if
-	    else
-		if movegap = 0 and not onleftwall then
-		    charx -= 1
-		end if
-	    end if
-	else
-	    if sprinta then
-		if flying then
-		    if not onleftwall then
-			charx -= 1
-		    end if
-		else
-		    if (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and not onleftwall then
-			charx -= 1
-		    end if
-		end if
-	    else
-		if flying then
-		    if movegap / 2 = movegap div 2 and not onleftwall then
-			charx -= 1
-		    end if
-		else
-		    if (movegap = 0 or movegap = 8) and not onleftwall then
-			charx -= 1
-		    end if
-		end if
-	    end if
-	end if
-	action := "walking"
-	facing := "left"
-	recentstopa := true
-    else
-	recentstarta := true
-	sprinta := false
-	if recentstopa and sprintpossiblea1 not= 0 then
-	    recentstopa := false
-	    sprintpossiblea2 := doubletapspeed
-	end if
-    end if
+    PressAKey
 
-    %If spacebar is pressed
-    if keyspc and (onground or flying) and mustcrawl = false and hitceiling = false then
-	if flying then
-	    chary += 1
-	else
-	    jumpcount := jumpheight
-	end if
-    end if
+    PressSpaceKey
 
-    %If 's' key is pressed
-    if keys then
-	if onground then
-	    action := "crawling"
-	elsif flying then
-	    chary -= 1
-	end if
-    end if
+    PressSKey
 
-    %Timer for double-tapping to sprint
-    if sprintpossibled1 not= 0 then
-	sprintpossibled1 -= 1
-    end if
-    if sprintpossibled2 not= 0 then
-	sprintpossibled2 -= 1
-    end if
-    if sprintpossiblea1 not= 0 then
-	sprintpossiblea1 -= 1
-    end if
-    if sprintpossiblea2 not= 0 then
-	sprintpossiblea2 -= 1
-    end if
-
-    %Stationary crouching
-    if keys and onground and keya = false and keyd = false then
-	action := "crawlingstop"
-    end if
-
-    %Jumping
-    if mustcrawl = false and flying = false then
-	if jumpcount = jumpheight then
-	    facing := ""
-	end if
-	if jumpcount not= 0 then
-	    action := "jumping"
-	    if hitceiling then
-		jumpcount := 0
-	    else
-		if (movegap = 0 or movegap = 3 or movegap = 5 or movegap = 8 or movegap = 10 or movegap = 13) and jumpcount >= 18 then
-		    chary += 1
-		    jumpcount -= 1
-		elsif (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and jumpcount >= 9 and jumpcount < 18 then
-		    chary += 1
-		    jumpcount -= 1
-		elsif (movegap = 0 or movegap = 8) and jumpcount < 9 then
-		    chary += 1
-		    jumpcount -= 1
-		end if
-	    end if
-	end if
-    end if
+    CharJump
 
     %Turn on/off flying here
 
-    %Gravity
-    if onground = false and jumpcount = 0 and flying = false then
-	action := "falling"
-	if (movegap = 0 or movegap = 8) and gravcount < 9 then
-	    chary -= 1
-	    gravcount += 1
-	elsif (movegap = 0 or movegap = 4 or movegap = 8 or movegap = 12) and gravcount >= 9 and gravcount < 18 then
-	    chary -= 1
-	    gravcount += 1
-	elsif (movegap = 0 or movegap = 3 or movegap = 5 or movegap = 8 or movegap = 10 or movegap = 13) and gravcount >= 18 and gravcount < 30 then
-	    chary -= 1
-	    gravcount += 1
-	elsif (movegap = 0 or movegap = 2 or movegap = 4 or movegap = 6 or movegap = 8 or movegap = 10 or movegap = 12 or movegap = 14) and gravcount >= 30 and gravcount < 70 then
-	    chary -= 1
-	    gravcount += 1
-	elsif gravcount >= 70 then
-	    chary -= 1
-	    gravcount += 1
-	end if
-    end if
+    Gravity
 
-    %On solid ground reset gravity
-    if onground then
-	gravcount := 0
-    end if
+    FinalizeAction1
 
-    %Incorporate looking direction into action when not jumping or falling
-    if action (1 .. 7) not= "jumping" and action (1 .. 7) not= "falling" then
-	if cm not= 0 then
-	    if xm >= charx then
-		facing := "right"
-	    else
-		facing := "left"
-	    end if
-	end if
-    end if
-
-    %Incorporate motion direction into action
-    if facing not= "" then
-	action += " "
-    end if
-    action += facing
-
-    %Incorporate looking direction into action when jumping or falling
-    if action (1 .. 7) = "jumping" or action (1 .. 7) = "falling" then
-	if cm not= 0 then
-	    if xm >= charx then
-		if action = "falling left" or action = "jumping left" then
-		    action += " "
-		    action += "facing right"
-		end if
-	    else
-		if action = "falling right" or action = "jumping right" then
-		    action += " "
-		    action += "facing left"
-		end if
-	    end if
-	end if
-    end if
-
-    %Walking animation
-    if movegap = 0 and (movegaptens = 2 or movegaptens = 4 or movegaptens = 6 or movegaptens = 8) then
-	if wlk = 4 then
-	    ponwlk := -1
-	elsif wlk = 1 then
-	    ponwlk := 1
-	end if
-	wlk += ponwlk
-    end if
-
-    %Crawling animation
-    if movegap = 0 and (movegaptens = 4 or movegaptens = 8) then
-	if crl = 4 then
-	    poncrl := -1
-	elsif crl = 1 then
-	    poncrl := 1
-	end if
-	crl += poncrl
-    end if
+    Animations
 
     %Stop sprinting if crawling
-    if action = "crawlingstop" or action = "crawlingstop left" or action = "crawlingstop right" or action = "crawling left" or action = "crawling right" then
+    if length (action) >= 8 and action (1 .. 8) = "crawling" then
 	sprintd := false
 	sprinta := false
     end if
 
-    %Directionless fall
-    if (action = "falling left" or action = "falling right") and keya = false and keyd = false and onground = false then
-	action := "falling"
-    end if
+    FinalizeAction2
 
-    %Character image used if forced crawling
-    if mustcrawl then
-	if action = "standing" then
-	    action := "crawlingstop"
-	elsif action = "walking left" then
-	    action := "crawling left"
-	elsif action = "walking right" then
-	    action := "crawling right"
-	elsif action = "standing left" then
-	    action := "crawlingstop left"
-	elsif action = "standing right" then
-	    action := "crawlingstop right"
-	end if
-    end if
-
-    %What character image is being used
-    if cm = 0 then  %Image if not clicking
-	if action = "walking left" then
-	    character := walkl (wlk)
-	elsif action = "walking right" then
-	    character := walkr (wlk)
-	elsif action = "crawlingstop" then
-	    character := crawlr (2)
-	elsif action = "crawlingstop left" then
-	    character := crawll (2)
-	elsif action = "crawlingstop right" then
-	    character := crawlr (2)
-	elsif action = "crawling left" then
-	    character := crawll (crl)
-	elsif action = "crawling right" then
-	    character := crawlr (crl)
-	elsif action = "falling" then
-	    character := fall
-	elsif action = "falling left" then
-	    character := falll
-	elsif action = "falling right" then
-	    character := fallr
-	elsif action = "jumping" then
-	    character := jump
-	elsif action = "jumping left" then
-	    character := jumpl
-	elsif action = "jumping right" then
-	    character := jumpr
-	elsif action = "standing left" then
-	    character := walkl (2)
-	elsif action = "standing right" then
-	    character := walkr (2)
-	elsif action = "standing" then
-	    character := stand
-	end if
-    else  %Image if clicking
-	if action = "walking left" then
-	    character := walklc (wlk)
-	elsif action = "walking right" then
-	    character := walkrc (wlk)
-	elsif action = "crawlingstop" then
-	    character := crawlrc (2)
-	elsif action = "crawlingstop left" then
-	    character := crawllc (2)
-	elsif action = "crawlingstop right" then
-	    character := crawlrc (2)
-	elsif action = "crawling left" then
-	    character := crawllc (crl)
-	elsif action = "crawling right" then
-	    character := crawlrc (crl)
-	elsif action = "falling" then
-	    if xm >= charx then
-		character := fallcr
-	    else
-		character := fallcl
-	    end if
-	elsif action = "falling left" then
-	    character := falllc
-	elsif action = "falling right" then
-	    character := fallrc
-	elsif action = "falling left facing right" then
-	    character := falllr
-	elsif action = "falling right facing left" then
-	    character := fallrl
-	elsif action = "jumping" then
-	    if xm >= charx then
-		character := jumpcr
-	    else
-		character := jumpcl
-	    end if
-	elsif action = "jumping left" then
-	    character := jumplc
-	elsif action = "jumping right" then
-	    character := jumprc
-	elsif action = "jumping left facing right" then
-	    character := jumplr
-	elsif action = "jumping right facing left" then
-	    character := jumprl
-	elsif action = "standing left" then
-	    character := walklc (2)
-	elsif action = "standing right" then
-	    character := walkrc (2)
-	end if
-    end if
+    CharImage
 
     %Get character dimensions
     charwidth := Pic.Width (character)
@@ -1816,79 +1954,14 @@ loop
     Pic.Free (backpic)
     backpic := Pic.New (charx - charwidth div 2 - charudpxrange, chary - charudpxrange, charx + charwidth div 2 + charudpxrange, chary + charheight + charudpxrange)
 
-    %Draw character's head colour
-    if action = "crawling left" or action = "crawlingstop left" then
-	Draw.FillOval (charx - 4, chary + 8, 3, 3, headcolour)
-    elsif action = "crawling right" or action = "crawlingstop right" or action = "crawlingstop" then
-	Draw.FillOval (charx + 4, chary + 8, 3, 3, headcolour)
-    else
-	Draw.FillOval (charx, chary + 21, 3, 3, headcolour)
-    end if
+    CharDraw
 
-    %Draw character
-    Pic.Draw (character, charx - charwidth div 2, chary, picMerge)
-
-    %Get blocks at block placing box and block breaking crosshairs
-    tempcoords (1) := (((rcursorybb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxbb - offsetleftright) div blocksize + 4999)
-    tempcoords (2) := (((rcursorypb - offsetupdown) div blocksize + 2499) * 10000) + ((rcursorxpb - offsetleftright) div blocksize + 4999)
-
-    if tempcoords (1) not= tempcoords (2) then
-	%Save background behind crosshairs
-	backpiccross := Pic.New (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1)
-
-	%Save background behind box
-	backpicbox := Pic.New (rcursorxpb, rcursorypb, rcursorxpb + blocksize - 1, rcursorypb + blocksize - 1)
-
-	%Draw crosshairs for breaking blocks
-	if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) and blockcolour = black or ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and bgcolour = black
-		then
-	    Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
-	else
-	    Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
-	end if
-
-	%Draw box for placing blocks
-	if #block (tempcoords (2)) not= boolUnInit and block (tempcoords (2)) and blockcolour = black or ( #block (tempcoords (2)) = boolUnInit or block (tempcoords (2)) = false) and bgcolour = black
-		then
-	    Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
-	else
-	    Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
-	end if
-    else
-	%Save background behind crosshairs and box
-	backpiccross := Pic.New (rcursorxbb, rcursorybb, rcursorxbb + blocksize - 1, rcursorybb + blocksize - 1)
-
-	%Draw crosshairs for breaking blocks and box for placing blocks
-	if #block (tempcoords (1)) not= boolUnInit and block (tempcoords (1)) and blockcolour = black or ( #block (tempcoords (1)) = boolUnInit or block (tempcoords (1)) = false) and bgcolour = black
-		then
-	    Pic.Draw (crosshairsbb2, rcursorxbb, rcursorybb, picMerge)
-	    Pic.Draw (crosshairspb2, rcursorxpb, rcursorypb, picMerge)
-	else
-	    Pic.Draw (crosshairsbb, rcursorxbb, rcursorybb, picMerge)
-	    Pic.Draw (crosshairspb, rcursorxpb, rcursorypb, picMerge)
-	end if
-    end if
-
-    %Draw.FillOval (rcharxl, rcharyu, 2, 2, Rand.Int (33, 55))
+    AimGuideBacksaveAndDraw
 
     %Show new screen
     View.Update
 
-    %Erase guide graphics
-    if tempcoords (1) not= tempcoords (2) then
-	%Draw old unaltered block over crosshairs for breaking blocks
-	Pic.Draw (backpiccross, rcursorxbb, rcursorybb, picCopy)
-	Pic.Free (backpiccross)
-
-	%Draw old unaltered block over box for placing blocks
-	Pic.Draw (backpicbox, rcursorxpb, rcursorypb, picCopy)
-	Pic.Free (backpicbox)
-    else
-	%Draw old unaltered block over crosshairs for breaking blocks and box for placing blocks
-	Pic.Draw (backpiccross, rcursorxbb, rcursorybb, picCopy)
-	Pic.Free (backpiccross)
-    end if
-    %end if
+    EraseAimGuide
 
     %Draw old unaltered background over character
     Pic.Draw (backpic, charx - charwidth div 2 - charudpxrange, chary - charudpxrange, picCopy)
@@ -1906,6 +1979,11 @@ loop
     delay (0)  %This delay to be adjusted with screen size and computer performance speed.
 end loop
 
+
+View.Set ("nooffscreenonly")
+colorback (white)
+cls
+
 %Erase contents of autosave files
 close : autosave
 open : autosave, ("Autosave.txt"), get, put, seek
@@ -1920,7 +1998,6 @@ GUI.Disable (btnend)
 GUI.Hide (btncont)
 GUI.Hide (btnend)
 GUI.HideMenuBar
-View.Set ("nooffscreenonly")
-colorback (white)
 cls
+
 put "TGIO (Thank Goodness It's Over!)"
