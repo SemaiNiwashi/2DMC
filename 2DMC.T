@@ -11,12 +11,17 @@ import GUI
 View.Set ("position:top;right,graphics:640;400") %Smallest advisable:450,330
 buttonchoose ("multibutton")
 setscreen ("noecho")
+%Framerate goal: deltatime of 6-7 on still, 17-20 on screen scrolling
+
+
+%Fix loading file overwrite your choice for creative or not (when you click load on the world, make it check or uncheck the box for you, but you can still change it before clicking play)
 /*
  -Background makes block not infinite
  -No background blocks underground
- -Only naturally occuring terrain blocks can be infinite (dirt, stone, sand, water (not ores))
+ -Only naturally occuring terrain blocks can be infinite (dirt, stone, sand, water (not ores?))
+ -ORRRR! Background blocks only have a go-around effect (or can only be placed(X)) if [there is no solid block on them] || [there is an air block on the foreground within 2 squares of them]!
  -Trees on whole regular blocks, no "nat wood" - this way, can climb them and jump from treetop to treetop
- -Wood: Can be climbed like a ladder if just a pole
+ -Wood: Can be climbed like a ladder if just a pole (new animation for this?)
  -Hotbar 1,2,3 are three tools: foreground, background, and terrain(terrain tool is just foreground tool, but removes any background blocks behind it)
  -Tools other than foreground have to be unlocked/acquired/crafted
  -Rest of hotbar is blocks
@@ -38,7 +43,7 @@ setscreen ("noecho")
 %   be assumed duplicated to the front, too. Only visible when the player steps forward, then they can't step back in
 %   there. Go "around" the house! :D
 
-%I think this was for attempts at fixing the screen jitter (?)
+%I think this was for attempts at fixing the player screenscroll jitter (?)
 var tempMin, tempMax : real := 68
 var timer : int := 0
 
@@ -47,6 +52,7 @@ var timer : int := 0
 const midx : int := maxx div 2
 const midy : int := maxy div 2
 const boolUnInit := 16#FF
+const thisGenVersion : int := 3
 const jumpheight : real := 2.3
 const reach : real := 5
 const doubletapspeed : int := 300
@@ -55,7 +61,7 @@ var blockbreakspeed : int := 130
 const playerSpeed : real := 5 / 1000
 const charudpxrange := 30
 var infinatePlacing : boolean := false
-var bareBonesPreview : boolean := false
+var bareBonesPreview : boolean := true
 const parallelinput : boolean := false
 const keepmapblocksize : boolean := true
 const pxscrollclearance : int := 70
@@ -66,8 +72,8 @@ var trainx : real := 10
 var trainy : real := 3
 var trainLeft : boolean := true
 var trainbackpic : int := Pic.New (0, 0, 2, 2)
+
 %Block class
-const numBlockTypes : int := 16
 type blockStruct :
     record
 	id : int
@@ -76,7 +82,6 @@ type blockStruct :
 	physics : boolean
 	clr : int
     end record
-var blockType : array 0 .. numBlockTypes - 1 of blockStruct
 
 type blockVec :
     record
@@ -84,40 +89,77 @@ type blockVec :
 	bg : int1
     end record
 
-procedure setBlockInfo (var blockIn : int, nameIn : string, solidIn : boolean, physicsIn : boolean, clrIn /*r,g,b*/ : int)
+type blockGroup :
+    record
+	any : int1
+	solid : int1
+    end record
+var blkGroup : blockGroup
+blkGroup.any := -1
+blkGroup.solid := -2
+
+type layerId : enum (background, foreground, both)
+
+%Block entry spot 1
+type blk : enum (void, boarder, air, error, dirt, stone, sand, mud, grass,
+    leaves, wood, platform, water, lava, fire, oil, rail, ladder, wire,
+    pressure_plate, tnt)
+
+var numBlockTypes : int := ord (upper (blk)) + 1
+var blockType : array 0 .. numBlockTypes - 1 of blockStruct
+
+procedure setBlockInfo (var blockIn : int, nameIn : string, solidIn : boolean, physicsIn : boolean, r, g, b : int)
+    if blockIn > numBlockTypes then
+	put "ERROR! \"blk\" enum list does not match \"setBlockInfo\" list!"
+	delay (3000)
+	quit
+    end if
     blockType (blockIn).id := blockIn
     blockType (blockIn).name := nameIn
     blockType (blockIn).solid := solidIn
     blockType (blockIn).physics := physicsIn
-    %rgb.setcolor(20+iter, r, g, b)
-    blockType (blockIn).clr := clrIn % 20 + iter
+    if 32 + blockIn > maxcolor then
+	var res : int := RGB.AddColor (r / 255, g / 255, b / 255)
+	if res = 1 then
+	    put "Color add failed on color number ", maxcolor + 1
+	    quit
+	end if
+    end if
+    RGB.SetColor (104 + blockIn, r / 255, g / 255, b / 255)
+    blockType (blockIn).clr := 104 + blockIn
     blockIn += 1
 end setBlockInfo
 
 var iter : int := 0
-%Legend: name, isSolid, color
-setBlockInfo (iter, "void", false, false, white)
-setBlockInfo (iter, "boarder", true, false, 20)
-setBlockInfo (iter, "air", false, false, brightcyan)
-setBlockInfo (iter, "dirt", true, false, 114)
-setBlockInfo (iter, "stone", true, false, grey)
-%setBlockInfo (iter, "sand", true, true, 91) %New!
-%setBlockInfo (iter, "mud", true, true, 91) %New!
-setBlockInfo (iter, "grass", true, false, green)
-setBlockInfo (iter, "leaves_nat", false, false, brightgreen)
-setBlockInfo (iter, "leaves", true, false, brightgreen)
-setBlockInfo (iter, "wood_nat", false, false, 186)
-setBlockInfo (iter, "wood", true, false, 186)
-setBlockInfo (iter, "platform", false, false, 114)
-setBlockInfo (iter, "water", false, true, 54)
-%setBlockInfo (iter, "lava", false, true, 54)
-%setBlockInfo (iter, "fire", false, false, 54)
-%setBlockInfo (iter, "oil", false, false, 54)
-setBlockInfo (iter, "rail", false, false, 29)
-setBlockInfo (iter, "ladder", false, false, 139)
-setBlockInfo (iter, "wire", false, false, brightred)
-setBlockInfo (iter, "pressure_plate", false, false, 175)
+%Block entry spot 2
+%Legend: name, isSolid, hasPhysics, color(r,g,b)
+setBlockInfo (iter, "void", false, false, 255, 255, 255)
+setBlockInfo (iter, "boarder", true, false, 56, 56, 56)
+setBlockInfo (iter, "air", false, false, 0, 255, 255)
+setBlockInfo (iter, "error", true, false, 255, 0, 255)
+setBlockInfo (iter, "dirt", true, false, 113, 56, 0)
+setBlockInfo (iter, "stone", true, false, 192, 192, 192)
+setBlockInfo (iter, "sand", true, true, 255, 235, 182)
+setBlockInfo (iter, "mud", true, true, 255, 235, 182)
+setBlockInfo (iter, "grass", true, false, 0, 128, 0)
+setBlockInfo (iter, "leaves", true, false, 0, 255, 0)
+setBlockInfo (iter, "wood", true, false, 65, 32, 0)
+setBlockInfo (iter, "platform", false, false, 113, 56, 0)
+setBlockInfo (iter, "water", false, true, 0, 125, 255)
+setBlockInfo (iter, "lava", false, true, 0, 125, 255)
+setBlockInfo (iter, "fire", false, false, 0, 125, 255)
+setBlockInfo (iter, "oil", false, false, 0, 125, 255)
+setBlockInfo (iter, "rail", false, false, 203, 203, 203)
+setBlockInfo (iter, "ladder", false, false, 113, 97, 56)
+setBlockInfo (iter, "wire", false, false, 255, 0, 0)
+setBlockInfo (iter, "pressure_plate", false, false, 81, 89, 113)
+setBlockInfo (iter, "tnt", false, false, 255, 0, 0)
 
+if iter not= numBlockTypes then
+    put "ERROR! \"blk\" enum list does not match \"setBlockInfo\" list!"
+    delay (3000)
+    quit
+end if
 
 %Variable declarations
 type vec2 :
@@ -230,9 +272,9 @@ var ponwlk, poncrl, isaves, wlk, crl : int := 1
 var headcolour : int := 983
 var oldbackcolour, bgcolour : int := white
 var health : int := 1000
-var textfound : string
 var placingBlock : blockStruct
-var facing, oldfacing, loadfile : string := ""
+var textfound : string
+var facing, oldfacing, loadfile, importedBlockList : string := ""
 var action, actionCurrent : string := "standing"
 var item1 : array 1 .. 16 of int
 var item2 : array 1 .. 12 of int
@@ -717,62 +759,82 @@ loading (white)
 %Or rather, it USED to! Wow, it's snappy fast as an int1 (-128 to 127)!
 const XLIMIT : int := 5000 % = total of 5000 + 5000 + 1 = 10001 blocks
 const YLIMIT : int := 2500 % = total of 2500 + 2500 + 1 = 5001 blocks
-var block : array - XLIMIT .. XLIMIT of array - YLIMIT .. YLIMIT of int1
+var block : array - XLIMIT .. XLIMIT of array - YLIMIT .. YLIMIT of blockVec
 
 %Terrain generation rules
-function terrainQueryText (x, y : real) : string
-    var cdx : int := toBlock (x)
-    var cdy : int := toBlock (y)
-    if genVersion < 3 then %Flat world terrain gen
-	if cdy < 0 then
-	    result "dirt"
+function terrainQueryText (x, y : int, layer : int1) : string
+    if genVersion < 4 then %Flat world terrain gen
+	if layer not= ord(layerId.background) then %foreground, or both - only okay because background gen is always void!
+	    if y < 0 then
+		result "dirt"
+	    else
+		result "air"
+	    end if
+	else
+	    result "void"
 	end if
     end if
     result "air"
 end terrainQueryText
 
-function terrainQuery (x, y : real) : int
-    result blockID (terrainQueryText (x, y))
+function terrainQuery (x, y : int, layer : int1) : int
+    result blockID (terrainQueryText (x, y, layer))
 end terrainQuery
 
 %Check block function
-function isBlock (xin, yin : real, blockIn : string, useTerrain : boolean) : boolean
-    var cdx : int := toBlock (xin)
-    var cdy : int := toBlock (yin)
-
+function isBlock (cdx, cdy : int, blockIn : int1, layer : int1, useTerrain : boolean) : boolean
     if cdx < -XLIMIT or cdx > XLIMIT or cdy < -YLIMIT or cdy > YLIMIT then
-	if blockIn = "boarder" then
-	    result true
+	if layer not= ord (layerId.background) then
+	    result blockIn = ord (blk.boarder)
 	else
-	    result false
+	    result blockIn = ord (blk.void)
 	end if
     end if
 
-    var foundType : int := block (cdx) (cdy)
-
-    if useTerrain and blockType (foundType).name = "void" then
-	foundType := terrainQuery (cdx, cdy)
+    var foundType : int
+    if layer not= ord (layerId.background) then
+	foundType := block (cdx) (cdy).block
+    end if
+    if layer = ord (layerId.background) or layer = ord (layerId.both) and foundType <= ord (blk.air) then %If found invisible block (void, boarder, air)
+	foundType := block (cdx) (cdy).bg
     end if
 
-    if blockIn = "any" then
-	result blockType (foundType).name not= "air" and blockType (foundType).name not= "void"
-    elsif blockIn = "solid" then
+    if useTerrain and foundType = ord (blk.void) then
+	foundType := terrainQuery (cdx, cdy, layer)
+    end if
+
+    if blockIn = blkGroup.any then
+	result foundType not= ord (blk.air) and foundType not= ord (blk.void)
+    elsif blockIn = blkGroup.solid then
 	result blockType (foundType).solid
     else
-	result blockType (foundType).name = blockIn
+	result foundType = blockIn
     end if
 end isBlock
 
-function getBlock (x, y : real, useTerrain : boolean) : blockStruct
+function isBlockR (xin, yin : real, blockIn : int1, layer : int1, useTerrain : boolean) : boolean
+    result isBlock (toBlock (xin), toBlock (yin), blockIn, layer, useTerrain)
+end isBlockR
+
+function getBlock (x, y : real, background, useTerrain : boolean) : blockStruct
     var cdx : int := toBlock (x)
     var cdy : int := toBlock (y)
 
     if cdx < -XLIMIT or cdx > XLIMIT or cdy < -YLIMIT or cdy > YLIMIT then
 	result blockType (blockID ("boarder"))
     end if
-    var returnBlock : blockStruct := blockType (block (cdx) (cdy))
+    var returnBlock : blockStruct
+    if background then
+	returnBlock := blockType (block (cdx) (cdy).bg)
+    else
+	returnBlock := blockType (block (cdx) (cdy).block)
+    end if
     if useTerrain and returnBlock.name = "void" then
-	returnBlock := blockType (terrainQuery (cdx, cdy))
+	var layer : int1 := 0
+	if not background then
+	    layer := 1
+	end if
+	returnBlock := blockType (terrainQuery (cdx, cdy, layer))
     end if
     result returnBlock
 end getBlock
@@ -797,7 +859,7 @@ function raycastLine (x1, y1, x2, y2, rangeIn : real, var rayHit, rayBefore : ve
 	rayHit.x := x1 + xinc * i
 	rayHit.y := y1 + yinc * i
 	%Draw.Dot (toScrnCdX (rayHit.x), toScrnCdY (rayHit.y), brightgreen)
-	if isBlock (rayHit.x, rayHit.y, "solid", true) then
+	if isBlock (toBlock (rayHit.x), toBlock (rayHit.y), blkGroup.solid, 1, true) then
 	    rayBefore.x := x1 + xinc * (i - toGameCdMeasure (1))
 	    rayBefore.y := y1 + yinc * (i - toGameCdMeasure (1))
 	    result true
@@ -816,22 +878,34 @@ function raycastLine (x1, y1, x2, y2, rangeIn : real, var rayHit, rayBefore : ve
     end loop
 end raycastLine
 
-procedure setBlock (x, y : real, blockIn : string)
+procedure setBlock (x, y : real, blockIn : int1, background : boolean)
     var cdx : int := toBlock (x)
     var cdy : int := toBlock (y)
     if cdx < -XLIMIT or cdx > XLIMIT or cdy < -YLIMIT or cdy > YLIMIT then
 	return
     end if
-    block (cdx) (cdy) := blockID (blockIn)
+
+    if background then
+	block (cdx) (cdy).bg := blockIn
+    else
+	block (cdx) (cdy).block := blockIn
+    end if
 end setBlock
 
 procedure DrawBlockScrn (x, y, clr : int)
     Draw.FillBox (x, y, x + blocksize - 1, y + blocksize - 1, clr)
 end DrawBlockScrn
 
-procedure DrawBlock (x, y : real, useTerrain : boolean)
-    var foundType : blockStruct := getBlock (x, y, useTerrain)
-    DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), foundType.clr)
+procedure DrawBlock (x, y : int, useTerrain : boolean)
+    var foundTypeBlock : blockStruct := getBlock (x, y, false, useTerrain)
+    if not isBlock (x, y, blkGroup.any, 1, useTerrain) then %slower than necessary?
+	var foundTypeBg : blockStruct := getBlock (x, y, true, useTerrain)
+	if foundTypeBg.id not= ord (blk.void) then
+	    DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), foundTypeBg.clr)
+	    return
+	end if
+    end if
+    DrawBlockScrn (toScrnCdX (x), toScrnCdY (y), foundTypeBlock.clr)
 end DrawBlock
 
 procedure DrawBlockClr (x, y : real, clr : int)
@@ -849,10 +923,20 @@ procedure saveWorld
     backpic := Pic.New (0, 0, maxx, maxy) %Pic.New (0, maxy - 210, 340, maxy - 35)
     loading (bgcolour)
     textfound := GUI.GetText (nameTextField)
-    if textfound not= "" then
+    var pauseMessage : string := ""
+    if textfound = "" then
+	pauseMessage := "ERROR: No file name entered                      "
+    elsif length (textfound) > 40 then
+	pauseMessage := "ERROR: File name too long! (max 40 characters)   "
+    else
+	var exportBlockString : string := ""
+	for i : 0 .. numBlockTypes - 1
+	    exportBlockString += "," + blockType (i).name
+	end for
+
 	open : loadedsavepref, ("Saves\\Preferences\\" + textfound + ".txt"), get, put, seek
 
-	put : loadedsavepref, "Gen_Ver_", 2
+	put : loadedsavepref, "Gen_Ver_", thisGenVersion
 	put : loadedsavepref, pos.x
 	put : loadedsavepref, pos.y
 	put : loadedsavepref, headcolour
@@ -863,22 +947,31 @@ procedure saveWorld
 	put : loadedsavepref, offsetleftright
 	put : loadedsavepref, health
 	put : loadedsavepref, survival
+	put : loadedsavepref, exportBlockString
 	close : loadedsavepref
 
 	open : saveFile, ("Saves\\" + textfound + ".txt"), get, put, seek
 	for x : mstScrnHsGnLft .. mstScrnHsGnRght
 	    for y : mstScrnHsGnDwn .. mstScrnHsGnUp
-		if not isBlock (x, y, "void", false) and block (x) (y) not= terrainQuery (x, y) then
-		    put : saveFile, x, " ", y, " ", block (x) (y)
+		var blockBlock, bgBlock : int1 := 0
+		if not isBlock (x, y, ord (blk.void), 1, false) and block (x) (y).block not= terrainQuery (x, y, 1) then
+		    blockBlock := block (x) (y).block
+		end if
+		if not isBlock (x, y, ord (blk.void), 0, false) and block (x) (y).bg not= terrainQuery (x, y, 0) then
+		    bgBlock := block (x) (y).bg
+		end if
+		if blockBlock not= 0 or bgBlock not= 0 then
+		    put : saveFile, x, " ", y, " ", blockBlock, " ", bgBlock
 		end if
 	    end for
 	end for
 	close : saveFile
-	Pic.Draw (backpic, 0, 0, picCopy)
-	locate (10, 1)
-	put textfound, " saved!                "
-	GUI.Refresh
+	pauseMessage := textfound + " saved!                                            "
     end if
+    Pic.Draw (backpic, 0, 0, picCopy)
+    locate (10, 1)
+    put pauseMessage
+    GUI.Refresh
 end saveWorld
 
 procedure createguis
@@ -973,7 +1066,7 @@ procedure showWorld ()
     var x : int := toGameCdXR (0) - 1
     var y : int := toGameCdYR (0) - 1
     loop
-	if isBlock (x, y, "any", true) then
+	if isBlock (x, y, blkGroup.any, 2, true) then % or isBlock (x, y, blkGroup.any, true, true) then %Edit: uhhh...?
 	    DrawBlock (x, y, true)
 	end if
 	x += 1
@@ -1112,6 +1205,7 @@ procedure GetPreferences
 	end if
 
 	var nullreal : real
+	var tempInt : int
 	if genVersion = 0 then
 	    pos.x := strreal (instring)
 	else
@@ -1124,12 +1218,16 @@ procedure GetPreferences
 	    get : loadedsavepref, nullreal
 	end if
 	get : loadedsavepref, timeOfDay
-	get : loadedsavepref, instring
-	if strint (instring) < 0 or strint (instring) >= numBlockTypes then
-	    instring := "3"
+	if genVersion < 3 then
+	    timeOfDay := 6 %whatevernoonis
 	end if
-	placingBlock := blockType (strint (instring))
-	if placingBlock.id < 3 then
+	get : loadedsavepref, instring
+	tempInt := strint (instring)
+	if tempInt < 0 or tempInt >= numBlockTypes then
+	    tempInt := ord (blk.dirt)
+	end if
+	placingBlock := blockType (tempInt)
+	if genVersion < 3 then
 	    placingBlock := blockType (blockID ("stone"))
 	end if
 	if keepmapblocksize then
@@ -1161,6 +1259,17 @@ procedure GetPreferences
 	    get : loadedsavepref, offsetleftright
 	    get : loadedsavepref, health
 	    get : loadedsavepref, survival
+	end if
+	loop
+	    exit when eof (loadedsavepref)
+	    get : loadedsavepref, importedBlockList : *
+	    if importedBlockList not= "" and importedBlockList (1) not= "," then
+		importedBlockList := ""
+	    end if
+	    exit
+	end loop
+	if importedBlockList = "" then
+	    importedBlockList := ",void,boarder,air,dirt,stone,grass,leaves_nat,leaves,wood_nat,wood,platform,water,rail,ladder,wire,pressure_plate"
 	end if
 	%Convert incorrect ground levels to 0
 	if groundLevel not= 0 then
@@ -1212,7 +1321,7 @@ procedure GetPreferences
 	    close : loadedsavepref
 	end if
     else
-	genVersion := 2
+	genVersion := thisGenVersion
 	if headcolour = 983 then
 	    headcolour := white
 	end if
@@ -1235,6 +1344,33 @@ procedure AssignStartingVariables
     standheight := toGameCdMeasure (Pic.Height (stand))
 end AssignStartingVariables
 
+function strContains (str1, str2 : string) : boolean
+    for i : 1 .. length (str1) - length (str2)
+	if str1 (i .. i + length (str2) - 1) = str2 then
+	    result true
+	end if
+    end for
+    result false
+end strContains
+
+function getBestBlockIdMatch (blkName : string) : int
+    var bestMatchSoFar : int := ord (blk.error)
+    var bestMatchScore := 999
+    for i : 0 .. numBlockTypes - 1
+	if blockType (i).name = blkName then
+	    result i
+	end if
+	if strContains (blockType (i).name, blkName) or strContains (blkName, blockType (i).name) then
+	    var thisMatchScore : int := abs (length (blockType (i).name) - length (blkName))
+	    if thisMatchScore < bestMatchScore then %Closer to 0 difference is better
+		bestMatchSoFar := i
+		bestMatchScore := thisMatchScore
+	    end if
+	end if
+    end for
+    result bestMatchSoFar
+end getBestBlockIdMatch
+
 %Generate world
 procedure GenerateWorld
     /*if genVersion >= 2 then
@@ -1253,6 +1389,33 @@ procedure GenerateWorld
      end if*/
 
     if loaded then %Load world
+	var numItems : int := 0
+	for i : 1 .. length (importedBlockList)
+	    if importedBlockList (i) = "," then
+		numItems += 1
+	    end if
+	end for
+	var importedBlockArray : array 0 .. numItems - 1 of string
+	var pos1 : int := 1
+	var pos2 : int := 1
+	numItems := 0
+	for i : 2 .. length (importedBlockList)
+	    if importedBlockList (i) = "," or i = length (importedBlockList) then
+		pos1 := pos2
+		pos2 := i
+		if i = length (importedBlockList) then
+		    pos2 += 1
+		end if
+		var blockInList : string := importedBlockList (pos1 + 1 .. pos2 - 1)
+		importedBlockArray (numItems) := blockInList
+		numItems += 1
+	    end if
+	end for
+	var bestMatch : array 0 .. numItems - 1 of int
+	for i : 0 .. numItems - 1
+	    bestMatch (i) := getBestBlockIdMatch (importedBlockArray (i))
+	end for
+
 	open : loadedsave, ("Saves\\" + loadfile + ".txt"), get, put, seek, mod
 	var firstblock : boolean := true
 	seek : loadedsave, 0
@@ -1260,17 +1423,45 @@ procedure GenerateWorld
 	    loop
 		var xInd : int
 		var yInd : int
-		if genVersion < 2 then
+		if genVersion < 2 then %Ver 0 & 1
 		    get : loadedsave, textfound
 		    xInd := decodeX (strint (textfound))
 		    yInd := decodeY (strint (textfound))
-		    setBlock (xInd, yInd, "dirt")
-		else
+		    setBlock (xInd, yInd, ord (blk.dirt), false)
+		else %Ver 2 and up
 		    get : loadedsave, xInd
 		    get : loadedsave, yInd
 		    var thisBlockID : int
 		    get : loadedsave, thisBlockID
-		    setBlock (xInd, yInd, blockType (thisBlockID).name)
+		    setBlock (xInd, yInd, bestMatch (thisBlockID), false)
+		    /*if thisBlockID not= 0 then
+		     if thisBlockID > 2 then
+		     thisBlockID += 1
+		     elsif thisBlockID > 4 then
+		     thisBlockID += 3
+		     elsif thisBlockID > 6 then
+		     thisBlockID += 2
+		     elsif thisBlockID > 8 then
+		     thisBlockID += 1
+		     elsif thisBlockID > 11 then
+		     thisBlockID += 4
+		     elsif thisBlockID > 15 then
+		     thisBlockID := 3
+		     end if
+		     if thisBlockID >= numBlockTypes then
+		     thisBlockID := 3
+		     end if
+		     setBlock (xInd, yInd, thisBlockID, false)
+		     end if*/
+		    if genVersion > 2 then %Ver 3 and up (this gets the background block)
+			get : loadedsave, thisBlockID
+			/*if thisBlockID not= 0 then
+			 if thisBlockID >= numBlockTypes then
+			 thisBlockID := ord(blk.error)
+			 end if*/
+			setBlock (xInd, yInd, bestMatch (thisBlockID), true)
+			%end if
+		    end if
 		end if
 		if firstblock then
 		    firstblock := false
@@ -1298,33 +1489,18 @@ procedure GenerateWorld
 	end if
 	close : loadedsave
 
-	if genVersion < 2 then
+	if genVersion < 2 then %Ver 0 & 1
 	    %Turn the "void"s in the loaded world into proper "0"s.
 	    for i : mstScrnHsGnLft .. mstScrnHsGnRght
 		var startFilling : boolean := false
 		for i2 : mstScrnHsGnDwn .. mstScrnHsGnUp
-		    if not isBlock (i, i2, "void", false) then
+		    if not isBlock (i, i2, ord (blk.void), 1, false) then
 			startFilling := true
 		    elsif startFilling then
-			setBlock (i, i2, "air")
+			setBlock (i, i2, ord (blk.air), false)
 		    end if
 		end for
 	    end for
-	    %Generate ground on screen   %I know... I had to do this again here (with an added if statement in it)
-	    %                             because they are opposite systems, and I want to be backwards-compatible.
-	    /*var x : int := round (smallestOf (-toGameCdXR (maxx div 2) - 1, toGameCdXR (0) - 1))
-	     var y : int := round (smallestOf (-3, toGameCdYR (0)))
-	     loop
-	     if isBlock (x, y, "void", false) then
-	     setBlock (x, y, terrainQueryText (x, y))
-	     end if
-	     x += 1
-	     if x > toGameCdXR (maxx) then
-	     x := round (smallestOf (-toGameCdXR (maxx div 2) - 1, toGameCdXR (0) - 1))
-	     y += 1
-	     end if
-	     exit when y > toGameCdYR (maxy)
-	     end loop*/
 	end if
     else
 	textfound := ""
@@ -1356,16 +1532,27 @@ procedure WorldPreview
 	    for cdy : mstScrnHsGnDwn .. mstScrnHsGnUp
 		var drawCondition : boolean
 		if bareBonesPreview then
-		    drawCondition := not isBlock (cdx, cdy, "void", false)
+		    drawCondition := not isBlock (cdx, cdy, ord (blk.void), 2, false)
 		else
-		    drawCondition := isBlock (cdx, cdy, "any", true)
+		    drawCondition := isBlock (cdx, cdy, blkGroup.any, 2, true)
 		end if
 		if drawCondition then
 		    var x : int := cdx - mstScrnHsGnLft
 		    var y : int := cdy - mstScrnHsGnDwn
-		    var foundType : int := block (cdx) (cdy)
-		    if not bareBonesPreview and blockType (foundType).name = "void" then
-			foundType := terrainQuery (cdx, cdy)
+		    var foundType : int := block (cdx) (cdy).block
+		    if not bareBonesPreview then
+			if blockType (foundType).name = "void" then
+			    foundType := terrainQuery (cdx, cdy, 1)
+			    if blockType (foundType).name = "air" then
+				foundType := block (cdx) (cdy).bg
+				if blockType (foundType).name = "void" then
+				    foundType := terrainQuery (cdx, cdy, 0)
+				    if blockType (foundType).name = "void" then
+					foundType := blockID ("air")
+				    end if
+				end if
+			    end if
+			end if
 		    end if
 		    Draw.Dot (x, y, blockType (foundType).clr)
 		end if
@@ -1454,13 +1641,13 @@ procedure KeyAndParallelInput
     if arrow ('l') then
 	for i : 0 .. 5
 	    for i2 : 0 .. 5
-		setBlock (pos.x - 3 + i, pos.y - 3 + i2, "dirt")
+		setBlock (pos.x - 3 + i, pos.y - 3 + i2, ord (blk.dirt), false)
 	    end for
 	end for
 	showWorld ()
     end if
     if arrow ('k') then
-	setBlock (pos.x, pos.y, "air")
+	setBlock (pos.x, pos.y, ord (blk.air), false)
     end if
     if arrow ('o') then
 	trainx := pos.x
@@ -1568,7 +1755,7 @@ procedure AimGuideMovement
 
 	%Fix block placing indicator if diagonal
 	if abs (toGameCdX (rcursorbb.x) - toGameCdX (rcursorpb.x)) + abs (toGameCdY (rcursorbb.y) - toGameCdY (rcursorpb.y)) > 1 then
-	    if not isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "solid", true) then
+	    if not isBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), blkGroup.solid, 1, true) then
 		rcursorpb.x := rcursorbb.x
 		rcursorpb.y := rcursorbb.y
 	    else
@@ -1609,10 +1796,10 @@ procedure AimGuideMovement
 		    end if
 		    optionB.y := toBlock (toGameCdY (rcursorbb.y))
 		end if
-		if not isBlock (optionA.x, optionA.y, "solid", true) then
+		if not isBlock (optionA.x, optionA.y, blkGroup.solid, 1, true) then
 		    rcursorpb.x := toScrnCdX (optionA.x)
 		    rcursorpb.y := toScrnCdY (optionA.y)
-		elsif not noOptionB and not isBlock (optionB.x, optionB.y, "solid", true) then
+		elsif not noOptionB and not isBlock (optionB.x, optionB.y, blkGroup.solid, 1, true) then
 		    rcursorpb.x := toScrnCdX (optionB.x)
 		    rcursorpb.y := toScrnCdY (optionB.y)
 		end if
@@ -1628,22 +1815,21 @@ procedure PlayerRightClick
 	    mclickr := blockplacespeed
 	end if
 	if mclickr = blockplacespeed then
-	    var mouseGX : real := toGameCdX (rcursorpb.x)
-	    var mouseGY : real := toGameCdY (rcursorpb.y)
+	    var mouseGX : int := toGameCdXR (rcursorpb.x)
+	    var mouseGY : int := toGameCdYR (rcursorpb.y)
 	    var mouseOnPlayer : boolean := false
 	    if placingBlock.solid then
-		mouseOnPlayer := toBlock (mouseGX + 1) > leftSide () and toBlock (mouseGX) <= rightSide ()
-		    and toBlock (mouseGY + 1) > pos.y and toBlock (mouseGY) <= topSideCrouch ()
+		mouseOnPlayer := mouseGX + 1 > leftSide () and mouseGX <= rightSide ()
+		    and mouseGY + 1 > pos.y and mouseGY <= topSideCrouch ()
 	    end if
-
-	    if not mouseOnPlayer or not isBlock (mouseGX, mouseGY, "solid", true) then
+	    if not mouseOnPlayer and not isBlock (mouseGX, mouseGY, blkGroup.solid, 1, true) then
 		var againstValidBlock : boolean :=
-		    isBlock (mouseGX + 1, mouseGY, "any", true) or
-		    isBlock (mouseGX - 1, mouseGY, "any", true) or
-		    isBlock (mouseGX, mouseGY + 1, "any", true) or
-		    isBlock (mouseGX, mouseGY - 1, "any", true)
+		    isBlock (mouseGX + 1, mouseGY, blkGroup.any, 1, true) or
+		    isBlock (mouseGX - 1, mouseGY, blkGroup.any, 1, true) or
+		    isBlock (mouseGX, mouseGY + 1, blkGroup.any, 1, true) or
+		    isBlock (mouseGX, mouseGY - 1, blkGroup.any, 1, true)
 		if infinatePlacing or placingBlock.physics or againstValidBlock then
-		    setBlock (mouseGX, mouseGY, placingBlock.name)
+		    setBlock (mouseGX, mouseGY, placingBlock.id, false)
 		    DrawBlock (mouseGX, mouseGY, true)     %draws block you clicked, until a screen scroll/update
 		end if
 	    end if
@@ -1661,19 +1847,15 @@ end PlayerRightClick
 procedure PlayerLeftClick
     if cm = 1 and health > 0 and xm >= 0 and xm <= maxx and ym >= 0 and ym <= maxy then
 	if keyalt then
-	    placingBlock := getBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), true)
-	    /*placingBlock := blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y)))
-	     if placingBlock.name = "void" then
-	     placingBlock := blockType (terrainQuery (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y)))
-	     end if*/
+	    placingBlock := getBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), false, true)
 	else
 	    if mclickl = 0 then
 		mclickl := blockbreakspeed
 	    end if
 	    if mclickl = blockbreakspeed then
-		if isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) then
-		    setBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "air")
-		    DrawBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), true)
+		if isBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), blkGroup.any, 1, true) then
+		    setBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), ord (blk.air), false)
+		    DrawBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), true)
 		end if
 	    end if
 	    mclickl -= 1
@@ -1947,17 +2129,17 @@ procedure CharOnSurface
     end if
     for i : 0 .. checkCount - 1
 	%Floor
-	if isBlock (leftSide () + i, pos.y, "solid", true) and not isBlock (leftSide () + i, oldPos.y, "solid", true) then
+	if isBlockR (leftSide () + i, pos.y, blkGroup.solid, 1, true) and not isBlockR (leftSide () + i, oldPos.y, blkGroup.solid, 1, true) then
 	    fellIntoBlock := true
 	    exit when flewIntoBlock
-	elsif isBlock (leftSide () + i, pos.y - 1, "solid", true) then
+	elsif isBlockR (leftSide () + i, pos.y - 1, blkGroup.solid, 1, true) then
 	    blockBelow := true
 	end if
 	%Ceiling
-	if isBlock (leftSide () + i, topSide (), "solid", true) and not isBlock (leftSide () + i, topSideOld (), "solid", true) then
+	if isBlockR (leftSide () + i, topSide (), blkGroup.solid, 1, true) and not isBlockR (leftSide () + i, topSideOld (), blkGroup.solid, 1, true) then
 	    flewIntoBlock := true
 	    exit when fellIntoBlock
-	elsif isBlock (leftSide () + i, topSide () + 1, "solid", true) then
+	elsif isBlockR (leftSide () + i, topSide () + 1, blkGroup.solid, 1, true) then
 	    blockAbove := true
 	end if
     end for
@@ -2002,17 +2184,17 @@ procedure CharOnWall
     end if
     for i : 0 .. checkCount - 1
 	%Left
-	if isBlock (leftSide (), pos.y + i, "solid", true) and not isBlock (leftSideOld (), pos.y + i, "solid", true) then
+	if isBlockR (leftSide (), pos.y + i, blkGroup.solid, 1, true) and not isBlockR (leftSideOld (), pos.y + i, blkGroup.solid, 1, true) then
 	    onleftwall := true
 	    exit when onrightwall
-	elsif isBlock (leftSide () - 1, pos.y + i, "solid", true) then
+	elsif isBlockR (leftSide () - 1, pos.y + i, blkGroup.solid, 1, true) then
 	    blockBesideLeft := true
 	end if
 	%Right
-	if isBlock (rightSide (), pos.y + i, "solid", true) and not isBlock (rightSideOld (), pos.y + i, "solid", true) then
+	if isBlockR (rightSide (), pos.y + i, blkGroup.solid, 1, true) and not isBlockR (rightSideOld (), pos.y + i, blkGroup.solid, 1, true) then
 	    onrightwall := true
 	    exit when onleftwall
-	elsif isBlock (rightSide () + 1, pos.y + i, "solid", true) then
+	elsif isBlockR (rightSide () + 1, pos.y + i, blkGroup.solid, 1, true) then
 	    blockBesideRight := true
 	end if
     end for
@@ -2054,7 +2236,7 @@ procedure CharMustCrawl
 	%Draw.Box (toScrnCdX (toBlock (leftSide ())), toScrnCdY (toBlock (headHeightLevel)),
 	%    toScrnCdX (toBlock (leftSide () + (checkCount - 1)) + 1) - 1, toScrnCdY (toBlock (headHeightLevel + 1)) - 1, brightred)
 	for i : 0 .. checkCount - 1
-	    if isBlock (leftSide () + i, headHeightLevel, "solid", true) then
+	    if isBlockR (leftSide () + i, headHeightLevel, blkGroup.solid, 1, true) then
 		mustcrawl := true
 		actionCurrent := "crawling"
 		charheight := crouchheight
@@ -2076,18 +2258,18 @@ procedure CharInBlock
     inground := false
     for i : 0 .. checkCountx - 1
 	for i2 : 0 .. checkCounty - 1
-	    if isBlock (leftSide () + i, pos.y + i2, "solid", true) then
+	    if isBlockR (leftSide () + i, pos.y + i2, blkGroup.solid, 1, true) then
 		onground := true
 		onleftwall := false
 		for i3 : 0 .. checkCounty - 1
-		    if isBlock (leftSide (), toBlock (pos.y) + i3, "solid", true) then
+		    if isBlockR (leftSide (), toBlock (pos.y) + i3, blkGroup.solid, 1, true) then
 			onleftwall := true
 			exit
 		    end if
 		end for
 		onrightwall := false
 		for i3 : 0 .. checkCounty - 1
-		    if isBlock (rightSide (), toBlock (pos.y) + i3, "solid", true) then
+		    if isBlockR (rightSide (), toBlock (pos.y) + i3, blkGroup.solid, 1, true) then
 			onrightwall := true
 			exit
 		    end if
@@ -2125,7 +2307,7 @@ procedure CharSnapDownFall
 	%    toScrnCdX (toBlock (leftSide () + (checkCountx - 1)) + 1) - 1, toScrnCdY (toBlock (topSideCrouch () + (checkCounty - 1)) + 1) - 1, brightred)
 	for i : 0 .. checkCountx - 1
 	    for i2 : 0 .. checkCounty - 1
-		if isBlock (leftSide () + i, topSideCrouch () + i2, "solid", true) then
+		if isBlockR (leftSide () + i, topSideCrouch () + i2, blkGroup.solid, 1, true) then
 		    offendingY := toBlock (topSideCrouch () + i2)
 		    canStand := false
 		    exit
@@ -2138,7 +2320,7 @@ procedure CharSnapDownFall
 	    checkCounty := ceil (pos.y - desiredBottom)     %Only checking from where player currently is down to desired position
 	    for i : 0 .. checkCountx - 1
 		for i2 : 0 .. checkCounty - 1
-		    if isBlock (leftSide () + i, toBlock (desiredBottom) + i2, "solid", true) then
+		    if isBlockR (leftSide () + i, toBlock (desiredBottom) + i2, blkGroup.solid, 1, true) then
 			canStand := false
 			exit
 		    end if
@@ -2435,20 +2617,23 @@ procedure CharDraw
      put charxcdreal
      put tempMin, " ", tempMax
      put charxcd*/
+     
+     locate (1,1)
+     put action
     Pic.Draw (character, toScrnCdX (leftSide ()), toScrnCdY (pos.y), picMerge)
 end CharDraw
 
 procedure TrainCompute
-    if not isBlock (trainx, trainy - 0.01, "solid", true) then
+    if not isBlockR (trainx, trainy - 0.01, blkGroup.solid, 1, true) then
 	trainy -= 0.01
     end if
-    if not isBlock (trainx - 0.01, trainy, "solid", true) and trainLeft then
+    if not isBlockR (trainx - 0.01, trainy, blkGroup.solid, 1, true) and trainLeft then
 	trainx -= 0.01
     end if
-    if not isBlock (trainx + 1.01, trainy, "solid", true) and not trainLeft then
+    if not isBlockR (trainx + 1.01, trainy, blkGroup.solid, 1, true) and not trainLeft then
 	trainx += 0.01
     end if
-    if isBlock (trainx - 0.01, trainy, "solid", true) or isBlock (trainx + 1.01, trainy, "solid", true) then
+    if isBlockR (trainx - 0.01, trainy, blkGroup.solid, 1, true) or isBlockR (trainx + 1.01, trainy, blkGroup.solid, 1, true) then
 	trainy += 0.08
     end if
     if trainx <= -208 then
@@ -2470,16 +2655,18 @@ procedure AimGuideBacksaveAndDraw
 	    backpicbox := Pic.New (rcursorpb.x, rcursorpb.y, rcursorpb.x + blocksize - 1, rcursorpb.y + blocksize - 1)
 
 	    %Draw crosshairs for breaking blocks
-	    if isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) and blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y))).clr = black
-		    or not isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) and bgcolour = black then
+	    if isBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), blkGroup.any, 1, true) and blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y)).block).clr = black
+		    or isBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), blkGroup.any, 0, true) and blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y)).bg).clr = black
+		    or bgcolour = black then
 		Pic.Draw (crosshairsbb2, rcursorbb.x, rcursorbb.y, picMerge)
 	    else
 		Pic.Draw (crosshairsbb, rcursorbb.x, rcursorbb.y, picMerge)
 	    end if
 
 	    %Draw box for placing blocks
-	    if isBlock (toGameCdX (rcursorpb.x), toGameCdY (rcursorpb.y), "any", true) and blockType (block (toGameCdXR (rcursorpb.x)) (toGameCdYR (rcursorpb.y))).clr = black
-		    or not isBlock (toGameCdX (rcursorpb.x), toGameCdY (rcursorpb.y), "any", true) and bgcolour = black then
+	    if isBlock (toGameCdXR (rcursorpb.x), toGameCdYR (rcursorpb.y), blkGroup.any, 1, true) and blockType (block (toGameCdXR (rcursorpb.x)) (toGameCdYR (rcursorpb.y)).block).clr = black
+		    or isBlock (toGameCdXR (rcursorpb.x), toGameCdYR (rcursorpb.y), blkGroup.any, 0, true) and blockType (block (toGameCdXR (rcursorpb.x)) (toGameCdYR (rcursorpb.y)).bg).clr = black
+		    or bgcolour = black then
 		Pic.Draw (crosshairspb2, rcursorpb.x, rcursorpb.y, picMerge)
 	    else
 		Pic.Draw (crosshairspb, rcursorpb.x, rcursorpb.y, picMerge)
@@ -2489,8 +2676,9 @@ procedure AimGuideBacksaveAndDraw
 	    backpiccross := Pic.New (rcursorbb.x, rcursorbb.y, rcursorbb.x + blocksize - 1, rcursorbb.y + blocksize - 1)
 
 	    %Draw crosshairs for breaking blocks and box for placing blocks
-	    if isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) and blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y))).clr = black
-		    or not isBlock (toGameCdX (rcursorbb.x), toGameCdY (rcursorbb.y), "any", true) and bgcolour = black then
+	    if isBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), blkGroup.any, 1, true) and blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y)).block).clr = black
+		    or isBlock (toGameCdXR (rcursorbb.x), toGameCdYR (rcursorbb.y), blkGroup.any, 0, true) and blockType (block (toGameCdXR (rcursorbb.x)) (toGameCdYR (rcursorbb.y)).bg).clr = black
+		    or bgcolour = black then
 		Pic.Draw (crosshairsbb2, rcursorbb.x, rcursorbb.y, picMerge)
 		Pic.Draw (crosshairspb2, rcursorpb.x, rcursorpb.y, picMerge)
 	    else
@@ -2625,7 +2813,8 @@ procedure resetVariables
     View.Update
     for i : mstScrnHsGnLft .. mstScrnHsGnRght
 	for i2 : mstScrnHsGnDwn .. mstScrnHsGnUp
-	    setBlock (i, i2, "void")
+	    setBlock (i, i2, ord (blk.void), false)
+	    setBlock (i, i2, ord (blk.void), true)
 	end for
     end for
     mstScrnHsGnLft := 0
@@ -2670,18 +2859,29 @@ loop
 		exit when fileName = ""
 		if fileName not= "." and fileName not= ".." then
 		    fileName := fileName (1 .. (length (fileName) - 4))
-		    isaves += 1
-		    menuitemsaves (isaves) := fileName
-		    menuitemdelete (isaves - 1) := fileName
+		    var continue : boolean := false
+		    if length (fileName) > 40 then
+			cls
+			put "ERROR: File name too long! (max 40 characters)\nFile name: ", fileName
+			put "File being ignored."
+			continue := true
+			delay (3000)
+		    end if
+		    if not continue then
+			isaves += 1
+			menuitemsaves (isaves) := fileName
+			menuitemdelete (isaves - 1) := fileName
+		    end if
 		end if
 	    end loop
 	    Dir.Close (savenames)
 	end if
 
-	%Clear all blocks
+	%Clear all blocks %This happens in resetvariables, right, so do we actually need it here?
 	for x : mstScrnHsGnLft .. mstScrnHsGnRght
 	    for y : mstScrnHsGnDwn .. mstScrnHsGnUp
-		block (x) (y) := blockID ("void")
+		block (x) (y).block := blockID ("void")
+		block (x) (y).bg := blockID ("void")
 	    end for
 	end for
 	cls
@@ -2857,6 +3057,8 @@ loop
 	IfDeadGameOver
 
 	%DebugDraw
+	%locate (1, 1)
+	%put deltaTime
 
 	%Show new screen
 	View.Update
