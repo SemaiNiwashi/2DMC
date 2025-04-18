@@ -1,0 +1,12 @@
+Gen_Ver_3
+4.834375
+-1
+0
+6
+5
+16
+-5.328708
+-3.058594
+932
+true
+,void,boarder,air,error,dirt,stone,sand,mud,grass,leaves,wood,platform,water,lava,fire,oil,rail,ladder,wire,pressure_plate,tnt
